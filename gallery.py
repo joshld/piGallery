@@ -5,6 +5,7 @@ import random
 import argparse
 import datetime
 import requests
+import subprocess
 from geopy.geocoders import Nominatim
 
 # ---------------- Constants ----------------
@@ -46,6 +47,9 @@ HISTORY_SIZE = 5
 WEATHER_UPDATE_INTERVAL = 15 * 60  # seconds
 LOCATION_CITY_SUBURB = "City, Country"
 IMAGES_DIRECTORY = "/your/images/directory/"
+
+DISPLAY_OFF_TIME = "21:00"
+DISPLAY_ON_TIME = "05:00"
 
 
 # ---------------- Utility Functions ----------------
@@ -180,12 +184,45 @@ class Slideshow:
             self.forward_stack.append(self.history[self.current_index])
             self.current_img = self.history[self.current_index]
 
+    def is_display_on(self):
+        now = datetime.datetime.now().time()
+        off_time = datetime.datetime.strptime(DISPLAY_OFF_TIME, "%H:%M").time()
+        on_time = datetime.datetime.strptime(DISPLAY_ON_TIME, "%H:%M").time()
+
+        if on_time < off_time:  # normal case (e.g., 07:00–23:00)
+            return on_time <= now < off_time
+        else:  # crosses midnight (e.g., 22:00–06:00)
+            return not (off_time <= now < on_time)
+
+    def set_display_power(self, on: bool):
+        try:
+            # Check current state
+            result = subprocess.run(
+                ["vcgencmd", "display_power"],
+                capture_output=True,
+                text=True
+            )
+            current_state = int(result.stdout.strip().split('=')[1])
+
+            if on and current_state == 0:
+                os.system("vcgencmd display_power 1")
+            elif not on and current_state == 1:
+                os.system("vcgencmd display_power 0")
+            # else: already in desired state
+        except Exception as e:
+            print(f"Failed to set display power: {e}")
+
     def run(self):
         clock = pygame.time.Clock()
         while True:
-            self.next_image()
-            self.draw_image()
-            pygame.display.flip()
+            if self.is_display_on():
+                self.set_display_power(True)
+                self.next_image()
+                self.draw_image()
+                pygame.display.flip()
+            else:
+                self.set_display_power(False)
+
             start_time = time.time()
             while time.time() - start_time < self.display_time:
                 for event in pygame.event.get():
