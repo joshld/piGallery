@@ -33,7 +33,7 @@ def get_weather(lat=51.5072, lon=-0.1276):  # London coords
         weather = data["current_weather"]
         temp = weather["temperature"]
         wind = weather["windspeed"]
-        return f"{temp}°C, Wind {wind} km/h"
+        return float(temp), float(wind)
     except Exception as e:
         return f"Weather error: {e}"
 
@@ -44,8 +44,8 @@ city_suburb = "City, Country"
 lat, long = get_coords_from_place(city_suburb)
 print(f"Coords for {city_suburb}: lat: {lat}, long: {long}")
 
-weather = get_weather(lat, long)
-print(f"Current weather for {city_suburb}: {weather}") 
+temp, wind = get_weather(lat, long)
+print(f"Current weather for {city_suburb}: {temp}°C, {wind} km/h") 
 
 parser = argparse.ArgumentParser(description="Fullscreen slideshow")
 parser.add_argument("--delay", type=float, default=10,
@@ -67,6 +67,7 @@ SCREEN_W, SCREEN_H = screen.get_size()
 pygame.font.init()
 font_filename = pygame.font.SysFont('Arial', 14)
 font_time = pygame.font.SysFont(None, 96)
+font_weather = pygame.font.SysFont(None, 96)
 text_color = (255, 255, 255)  # white
 
 # Typical aspect ratios
@@ -111,10 +112,19 @@ while True:
         text_rect = text_surface.get_rect(bottomright=(SCREEN_W - 10, SCREEN_H - 10))
         screen.blit(text_surface, text_rect)
 
-        # Display current time at top-left
+        # Display current time in top-left
         current_time = datetime.datetime.now().strftime("%H:%M")
-        time_surface = font_time.render(current_time, True, text_color)
+        time_surface = font_time.render(current_time, True, text_color).convert_alpha()
+        time_surface.set_alpha(128)
         screen.blit(time_surface, (10, 10))
+
+        # Display weather in top-right
+        temp, wind = get_weather(lat, long) 
+        current_weather = f"{temp}°C" 
+        weather_surface = font_weather.render(current_weather, True, text_color).convert_alpha()
+        weather_surface.set_alpha(128)
+        weather_rect = weather_surface.get_rect(topright=(SCREEN_W - 10, 10))
+        screen.blit(weather_surface, weather_rect)
 
         pygame.display.flip()
         time.sleep(DISPLAY_TIME)
