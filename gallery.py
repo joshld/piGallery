@@ -48,7 +48,7 @@ WEATHER_UPDATE_INTERVAL = 15 * 60  # seconds
 LOCATION_CITY_SUBURB = "City, Country"
 IMAGES_DIRECTORY = "/your/images/directory/"
 
-DISPLAY_OFF_TIME = "21:00"
+DISPLAY_OFF_TIME = "23:00"
 DISPLAY_ON_TIME = "05:00"
 
 
