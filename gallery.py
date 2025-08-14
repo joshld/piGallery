@@ -97,8 +97,7 @@ class Slideshow:
         self.screen_w, self.screen_h = screen.get_size()
         self.display_time = display_time
 
-        self.images = [f for f in os.listdir(folder) if f.lower().endswith((".jpg", ".jpeg", ".png"))]
-        random.shuffle(self.images)
+        self.images = []
         self.folder = folder
 
         self.history = []
