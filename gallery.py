@@ -133,6 +133,16 @@ class Slideshow:
             self.last_weather_update = now
 
     def draw_image(self):
+        # Skip if file is missing
+        while self.current_img:
+            img_path = os.path.join(self.folder, self.current_img)
+            if os.path.exists(img_path):
+                break
+            print(f"Missing file: {self.current_img}, skipping...")
+            self.next_image()
+        else:
+            return
+
         img_path = os.path.join(self.folder, self.current_img)
         img = pygame.image.load(img_path)
         img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h)
@@ -163,6 +173,20 @@ class Slideshow:
         weather_surf.set_alpha(TEXT_ALPHA)
         self.screen.blit(weather_surf, (self.screen_w - weather_surf.get_width() - 10, 72))
 
+    def refresh_images(self):
+        # Recursively scan for images (supports subfolders)
+        new_images = []
+        for root, _, files in os.walk(self.folder):
+            for f in files:
+                if f.lower().endswith((".jpg", ".jpeg", ".png")):
+                    # Store relative path from base folder
+                    rel_path = os.path.relpath(os.path.join(root, f), self.folder)
+                    if rel_path not in self.history and rel_path != self.current_img:
+                        new_images.append(rel_path)
+        if new_images:
+            random.shuffle(new_images)
+            self.images.extend(new_images)
+
     def next_image(self):
         if self.forward_stack:
             self.current_img = self.forward_stack.pop()
@@ -171,11 +195,13 @@ class Slideshow:
             self.current_img = self.history[self.current_index]
         else:
             if not self.images:
-                random.shuffle(self.images)
+                self.refresh_images()
+                if not self.images:  # still empty, nothing to do
+                    return
             self.current_img = self.images.pop()
             self.history.append(self.current_img)
-            if len(self.history) > HISTORY_SIZE:
-                self.history.pop(0)
+            # if len(self.history) > HISTORY_SIZE:
+                # self.history.pop(0)
             self.current_index = len(self.history) - 1
 
     def prev_image(self):
