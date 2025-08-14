@@ -108,8 +108,9 @@ SCREEN_W, SCREEN_H = screen.get_size()
 pygame.font.init()
 font_filename = pygame.font.SysFont('Arial', 14)
 font_time = pygame.font.SysFont(None, 96)
+font_date = pygame.font.SysFont(None, 42)
 font_temp = pygame.font.SysFont(None, 96)
-font_weather = pygame.font.SysFont(None, 36)
+font_weather = pygame.font.SysFont(None, 42)
 text_color = (255, 255, 255)  # white
 
 # Typical aspect ratios
@@ -157,10 +158,15 @@ while True:
         screen.blit(text_surface, text_rect)
 
         # Display current time in top-left
-        current_time = datetime.datetime.now().strftime("%I:%M")
+        date_time = datetime.datetime.now()
+        current_time = date_time.strftime("%I:%M")
         time_surface = font_time.render(current_time, True, text_color).convert_alpha()
         time_surface.set_alpha(128)
         screen.blit(time_surface, (10, 10))
+        current_date = date_time.strftime("%d %b %y")
+        date_surface = font_date.render(current_date, True, text_color).convert_alpha()
+        date_surface.set_alpha(128)
+        screen.blit(date_surface, (10, 72))
 
         # Display weather in top-right
         now = time.time()
