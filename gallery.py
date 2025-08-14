@@ -42,7 +42,7 @@ WEATHER_CODES = {
 
 def get_coords_from_place(place_name):
     geolocator = Nominatim(user_agent="my_geocoder")
-    location = geolocator.geocode(place_name)
+    location = geolocator.geocode(place_name, timeout=3)
     if location:
         return float(location.latitude), float(location.longitude)
     else:
@@ -120,69 +120,110 @@ AR_portrait = 0.667
 # AR_portrait = 0.1
 AR_screen = SCREEN_W / SCREEN_H
 
+clock = pygame.time.Clock()
+
+random.shuffle(images)
+history = []      # stores last 5 shown
+forward_stack = []  # stores images after going back
+current_img = None
+current_index = -1  # position in history when navigating
+
 # Loop through images indefinitely
 while True:
-    random.shuffle(images)
-    for img_file in images:
-        img_path = os.path.join(image_folder, img_file)
-        img = pygame.image.load(img_path)
-        img_w, img_h = img.get_size()
+    # Determine which image to show
+    if forward_stack:  # going forward from back history
+        current_img = forward_stack.pop()
+    elif current_index < len(history) - 1:  # going forward inside history
+        current_index += 1
+        current_img = history[current_index]
+    else:
+        if not images:  # reshuffle when we run out
+            random.shuffle(images)
+        current_img = images.pop()
+        history.append(current_img)
+        if len(history) > 5:
+            history.pop(0)
+        current_index = len(history) - 1
 
-        if img_w >= img_h:
-            # Landscape → scale height, width adjusted
-            scale_factor = SCREEN_H / img_h
-            scaled_width = img_w * scale_factor
-            target_width = scaled_width * (AR_screen / AR_portrait)
-            new_w = int(min(target_width, SCREEN_W))
-            img_scaled = pygame.transform.scale(img, (new_w, SCREEN_H))
-            x_offset = (SCREEN_W - new_w) // 2
-            y_offset = 0
-        else:
-            # Portrait → scale height, width adjusted
-            scale_factor = SCREEN_H / img_h
-            scaled_width = img_w * scale_factor
-            target_width = scaled_width * (AR_screen / AR_landscape)
-            new_w = int(min(target_width, SCREEN_W))
-            img_scaled = pygame.transform.scale(img, (new_w, SCREEN_H))
-            x_offset = (SCREEN_W - new_w) // 2
-            y_offset = 0
+    # Load and scale image
+    img_path = os.path.join(image_folder, current_img)
+    img = pygame.image.load(img_path)
+    img_w, img_h = img.get_size()
 
-        # Draw image
-        screen.fill((0, 0, 0))
-        screen.blit(img_scaled, (x_offset, y_offset))
+    if img_w >= img_h:
+        scale_factor = SCREEN_H / img_h
+        scaled_width = img_w * scale_factor
+        target_width = scaled_width * (AR_screen / AR_portrait)
+        new_w = int(min(target_width, SCREEN_W))
+        img_scaled = pygame.transform.scale(img, (new_w, SCREEN_H))
+        x_offset = (SCREEN_W - new_w) // 2
+        y_offset = 0
+    else:
+        scale_factor = SCREEN_H / img_h
+        scaled_width = img_w * scale_factor
+        target_width = scaled_width * (AR_screen / AR_landscape)
+        new_w = int(min(target_width, SCREEN_W))
+        img_scaled = pygame.transform.scale(img, (new_w, SCREEN_H))
+        x_offset = (SCREEN_W - new_w) // 2
+        y_offset = 0
 
-        # Display filename and resolution at bottom center
-        text = f"{img_file} ({new_w}x{SCREEN_H})"
-        text_surface = font_filename.render(text, True, text_color)
-        text_rect = text_surface.get_rect(bottomright=(SCREEN_W - 10, SCREEN_H - 10))
-        screen.blit(text_surface, text_rect)
+    # Draw image
+    screen.fill((0, 0, 0))
+    screen.blit(img_scaled, (x_offset, y_offset))
 
-        # Display current time in top-left
-        date_time = datetime.datetime.now()
-        current_time = date_time.strftime("%I:%M")
-        time_surface = font_time.render(current_time, True, text_color).convert_alpha()
-        time_surface.set_alpha(128)
-        screen.blit(time_surface, (10, 10))
-        current_date = date_time.strftime("%d %b %y")
-        date_surface = font_date.render(current_date, True, text_color).convert_alpha()
-        date_surface.set_alpha(128)
-        screen.blit(date_surface, (10, 72))
+    # Display filename and resolution at bottom center
+    text = f"{current_img} ({new_w}x{SCREEN_H})"
+    text_surface = font_filename.render(text, True, text_color)
+    text_rect = text_surface.get_rect(bottomright=(SCREEN_W - 10, SCREEN_H - 10))
+    screen.blit(text_surface, text_rect)
 
-        # Display weather in top-right
-        now = time.time()
-        if now - last_weather_update > weather_update_interval:
-            temp, wind, code = get_weather(lat, long)
-            current_temp = f"{temp}°C"
-            current_weather = f"{WEATHER_CODES[code]}"
+    # Display current time in top-left
+    date_time = datetime.datetime.now()
+    current_time = date_time.strftime("%I:%M")
+    time_surface = font_time.render(current_time, True, text_color).convert_alpha()
+    time_surface.set_alpha(128)
+    screen.blit(time_surface, (10, 10))
+    current_date = date_time.strftime("%d %b %y")
+    date_surface = font_date.render(current_date, True, text_color).convert_alpha()
+    date_surface.set_alpha(128)
+    screen.blit(date_surface, (10, 72))
 
-        temp_surface = font_temp.render(current_temp, True, text_color).convert_alpha()
-        temp_surface.set_alpha(128)
-        temp_rect = temp_surface.get_rect(topright=(SCREEN_W - 10, 10))
-        screen.blit(temp_surface, temp_rect)
-        weather_surface = font_weather.render(current_weather, True, text_color).convert_alpha()
-        weather_surface.set_alpha(128)
-        weather_rect = weather_surface.get_rect(topright=(SCREEN_W - 10, 72))
-        screen.blit(weather_surface, weather_rect)
+    # Display weather in top-right
+    now = time.time()
+    if now - last_weather_update > weather_update_interval:
+        temp, wind, code = get_weather(lat, long)
+        current_temp = f"{temp}°C"
+        current_weather = f"{WEATHER_CODES[code]}"
 
-        pygame.display.flip()
-        time.sleep(DISPLAY_TIME)
+    temp_surface = font_temp.render(current_temp, True, text_color).convert_alpha()
+    temp_surface.set_alpha(128)
+    temp_rect = temp_surface.get_rect(topright=(SCREEN_W - 10, 10))
+    screen.blit(temp_surface, temp_rect)
+    weather_surface = font_weather.render(current_weather, True, text_color).convert_alpha()
+    weather_surface.set_alpha(128)
+    weather_rect = weather_surface.get_rect(topright=(SCREEN_W - 10, 72))
+    screen.blit(weather_surface, weather_rect)
+
+    pygame.display.flip()
+
+    start_time = time.time()
+    while time.time() - start_time < DISPLAY_TIME:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                raise SystemExit
+            if event.type == pygame.KEYDOWN:  # Only check keys here
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    raise SystemExit
+                elif event.key == pygame.K_RIGHT:  # Next image
+                    start_time = 0  # exit inner loop early
+                    break
+                elif event.key == pygame.K_LEFT:   # back
+                    if current_index > 0:
+                        current_index -= 1
+                        current_img = history[current_index]
+                        forward_stack.append(current_img)
+                        start_time = 0
+                        break
+            clock.tick(60)
