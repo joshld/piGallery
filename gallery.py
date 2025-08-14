@@ -8,9 +8,38 @@ import requests
 import subprocess
 from geopy.geocoders import Nominatim
 import sys
+
 if sys.version_info < (3, 7):
     print("Python 3.7 or newer is required.")
     sys.exit(1)
+
+# ---------------- Config ----------------
+import configparser
+
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.ini")
+DEFAULT_CONFIG = {
+    "gallery": {
+        "location_city_suburb": "Sydney, Australia",
+        "images_directory": "/path/to/your/images/",
+        "display_off_time": "23:00",
+        "display_on_time": "05:00"
+    }
+}
+
+config = configparser.ConfigParser()
+if not os.path.exists(CONFIG_PATH):
+    config.read_dict(DEFAULT_CONFIG)
+    with open(CONFIG_PATH, "w") as f:
+        config.write(f)
+else:
+    config.read(CONFIG_PATH)
+
+GALLERY_CONFIG = config["gallery"] if "gallery" in config else DEFAULT_CONFIG["gallery"]
+
+LOCATION_CITY_SUBURB = GALLERY_CONFIG["location_city_suburb"]
+IMAGES_DIRECTORY = GALLERY_CONFIG["images_directory"]
+DISPLAY_OFF_TIME = GALLERY_CONFIG["display_off_time"]
+DISPLAY_ON_TIME = GALLERY_CONFIG["display_on_time"]
 
 # ---------------- Constants ----------------
 WEATHER_CODES = {
@@ -51,9 +80,9 @@ HISTORY_SIZE = 5
 WEATHER_UPDATE_INTERVAL = 15 * 60  # seconds
 LOCATION_CITY_SUBURB = "City, Country"
 IMAGES_DIRECTORY = "/your/images/directory/"
-
 DISPLAY_OFF_TIME = "23:00"
 DISPLAY_ON_TIME = "05:00"
+# LOCATION_CITY_SUBURB, IMAGES_DIRECTORY, DISPLAY_OFF_TIME, DISPLAY_ON_TIME are now loaded from config.ini
 
 
 # ---------------- Utility Functions ----------------
