@@ -7,6 +7,39 @@ import datetime
 import requests
 from geopy.geocoders import Nominatim
 
+
+WEATHER_CODES = {
+    0: "Clear sky",
+    1: "Mainly clear",
+    2: "Partly cloudy",
+    3: "Overcast",
+    45: "Fog",
+    48: "Rime fog",
+    51: "Light drizzle",
+    53: "Moderate drizzle",
+    55: "Dense drizzle",
+    56: "Light freezing drizzle",
+    57: "Dense freezing drizzle",
+    61: "Slight rain",
+    63: "Moderate rain",
+    65: "Heavy rain",
+    66: "Light freezing rain",
+    67: "Heavy freezing rain",
+    71: "Slight snow fall",
+    73: "Moderate snow fall",
+    75: "Heavy snow fall",
+    77: "Snow grains",
+    80: "Slight rain showers",
+    81: "Moderate rain showers",
+    82: "Violent rain showers",
+    85: "Slight snow showers",
+    86: "Heavy snow showers",
+    95: "Thunderstorm",
+    96: "Thunderstorm with slight hail",
+    99: "Thunderstorm with heavy hail",
+}
+
+
 def get_coords_from_place(place_name):
     geolocator = Nominatim(user_agent="my_geocoder")
     location = geolocator.geocode(place_name)
@@ -15,11 +48,13 @@ def get_coords_from_place(place_name):
     else:
         return None
 
+
 def get_location():
     response = requests.get("https://ipinfo.io/json")
     data = response.json()
     lat, lon = data["loc"].split(",")
     return float(lat), float(lon)
+
 
 def get_weather(lat=51.5072, lon=-0.1276):  # London coords
     url = (
@@ -33,9 +68,11 @@ def get_weather(lat=51.5072, lon=-0.1276):  # London coords
         weather = data["current_weather"]
         temp = weather["temperature"]
         wind = weather["windspeed"]
-        return float(temp), float(wind)
+        code = weather["weathercode"]
+        return float(temp), float(wind), code
     except Exception as e:
         return f"Weather error: {e}"
+
 
 #latitude, longitude = get_location()
 #print(f"Acquired location: lat: {latitude}, long: {longitude}")
@@ -44,8 +81,12 @@ city_suburb = "City, Country"
 lat, long = get_coords_from_place(city_suburb)
 print(f"Coords for {city_suburb}: lat: {lat}, long: {long}")
 
-temp, wind = get_weather(lat, long)
-print(f"Current weather for {city_suburb}: {temp}°C, {wind} km/h") 
+temp, wind, code = get_weather(lat, long)
+print(f"Current weather for {city_suburb}: {temp}°C, {wind} km/h, {WEATHER_CODES[code]}")
+current_temp = f"{temp}°C"
+current_weather = f"{WEATHER_CODES[code]}"
+last_weather_update = time.time()
+weather_update_interval = 15 * 60
 
 parser = argparse.ArgumentParser(description="Fullscreen slideshow")
 parser.add_argument("--delay", type=float, default=10,
@@ -67,12 +108,15 @@ SCREEN_W, SCREEN_H = screen.get_size()
 pygame.font.init()
 font_filename = pygame.font.SysFont('Arial', 14)
 font_time = pygame.font.SysFont(None, 96)
-font_weather = pygame.font.SysFont(None, 96)
+font_temp = pygame.font.SysFont(None, 96)
+font_weather = pygame.font.SysFont(None, 36)
 text_color = (255, 255, 255)  # white
 
 # Typical aspect ratios
 AR_landscape = 1.5
+# AR_landscape = 1.8
 AR_portrait = 0.667
+# AR_portrait = 0.1
 AR_screen = SCREEN_W / SCREEN_H
 
 # Loop through images indefinitely
@@ -113,19 +157,26 @@ while True:
         screen.blit(text_surface, text_rect)
 
         # Display current time in top-left
-        current_time = datetime.datetime.now().strftime("%H:%M")
+        current_time = datetime.datetime.now().strftime("%I:%M")
         time_surface = font_time.render(current_time, True, text_color).convert_alpha()
         time_surface.set_alpha(128)
         screen.blit(time_surface, (10, 10))
 
         # Display weather in top-right
-        temp, wind = get_weather(lat, long) 
-        current_weather = f"{temp}°C" 
+        now = time.time()
+        if now - last_weather_update > weather_update_interval:
+            temp, wind, code = get_weather(lat, long)
+            current_temp = f"{temp}°C"
+            current_weather = f"{WEATHER_CODES[code]}"
+
+        temp_surface = font_temp.render(current_temp, True, text_color).convert_alpha()
+        temp_surface.set_alpha(128)
+        temp_rect = temp_surface.get_rect(topright=(SCREEN_W - 10, 10))
+        screen.blit(temp_surface, temp_rect)
         weather_surface = font_weather.render(current_weather, True, text_color).convert_alpha()
         weather_surface.set_alpha(128)
-        weather_rect = weather_surface.get_rect(topright=(SCREEN_W - 10, 10))
+        weather_rect = weather_surface.get_rect(topright=(SCREEN_W - 10, 72))
         screen.blit(weather_surface, weather_rect)
 
         pygame.display.flip()
         time.sleep(DISPLAY_TIME)
-
