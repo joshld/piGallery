@@ -7,6 +7,10 @@ import datetime
 import requests
 import subprocess
 from geopy.geocoders import Nominatim
+import sys
+if sys.version_info < (3, 7):
+    print("Python 3.7 or newer is required.")
+    sys.exit(1)
 
 # ---------------- Constants ----------------
 WEATHER_CODES = {

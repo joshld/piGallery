@@ -38,7 +38,32 @@ You can also specify the delay between images (in seconds):
 python gallery.py --delay 15
 ```
 
-### 6. Notes
+
+### 6. Code Quality: Linting and Type Checking
+
+You can use `flake8` for code style/linting and `mypy` for type checking.
+
+#### Install flake8 and mypy
+```sh
+pip install flake8 mypy types-requests
+```
+
+#### Run flake8 (style/lint check)
+```sh
+python3 -m flake8 gallery.py
+```
+
+#### Run mypy (type check)
+```sh
+python3 -m mypy gallery.py
+```
+
+#### (Optional) VS Code Integration
+- Install the "Python" extension in VS Code for built-in linting and type checking support.
+- You can also install the "Flake8" and "Mypy" extensions for enhanced integration.
+
+
+### 7. Notes
 - The script is designed for fullscreen display and will hide the mouse cursor.
 - Weather and time information is displayed on the screen.
 - Some features (like display power control) are specific to Raspberry Pi and may not work on other platforms.
