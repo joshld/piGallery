@@ -194,15 +194,21 @@ class Slideshow:
             self.current_index += 1
             self.current_img = self.history[self.current_index]
         else:
+            # Refresh images every time we reach the end
             if not self.images:
                 self.refresh_images()
-                if not self.images:  # still empty, nothing to do
-                    return
-            self.current_img = self.images.pop()
-            self.history.append(self.current_img)
-            # if len(self.history) > HISTORY_SIZE:
-                # self.history.pop(0)
-            self.current_index = len(self.history) - 1
+
+            if self.images:
+                self.current_img = self.images.pop()
+                self.history.append(self.current_img)
+                self.current_index = len(self.history) - 1
+            elif self.history:
+                # If no new images, loop through history
+                self.current_index = 0
+                self.current_img = self.history[self.current_index]
+            else:
+                # Nothing at all, do nothing
+                self.current_img = None
 
     def prev_image(self):
         if self.current_index > 0:
