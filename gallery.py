@@ -307,15 +307,42 @@ class Slideshow:
 def main():
     parser = argparse.ArgumentParser(description="Fullscreen slideshow")
     parser.add_argument("--delay", type=float, default=10, help="Display time per image in seconds")
+    parser.add_argument(
+        "--window-size",
+        type=str,
+        default="1024x768",
+        help="Window size as WIDTHxHEIGHT, e.g. 1280x720. Default is 1024x768."
+    )
+    parser.add_argument(
+        "--fullscreen",
+        action="store_true",
+        help="Display in fullscreen mode (overrides --window-size if both are set)"
+    )
     args = parser.parse_args()
     display_time = args.delay
+
+    # Parse window size or fullscreen
+    fullscreen = args.fullscreen
+    if not fullscreen:
+        if args.window_size.lower() == "fullscreen":
+            fullscreen = True
+        else:
+            try:
+                width, height = map(int, args.window_size.lower().split("x"))
+                window_size = (width, height)
+            except Exception:
+                print("Invalid --window-size format. Use WIDTHxHEIGHT, e.g. 1280x720, or 'fullscreen'. Falling back to 1024x768.")
+                window_size = (1024, 768)
 
     # Folder with images
     image_folder = IMAGES_DIRECTORY
 
     # Pygame setup
     pygame.init()
-    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    if fullscreen:
+        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    else:
+        screen = pygame.display.set_mode(window_size)
     pygame.mouse.set_visible(False)
 
     slideshow = Slideshow(image_folder, screen, display_time)
