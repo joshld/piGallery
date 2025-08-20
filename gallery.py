@@ -282,6 +282,8 @@ class Slideshow:
                 pygame.display.flip()
             else:
                 self.set_display_power(False)
+                self.screen.fill((0, 0, 0))
+                pygame.display.flip()
 
             start_time = time.time()
             while time.time() - start_time < self.display_time:
