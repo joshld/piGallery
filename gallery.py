@@ -82,6 +82,13 @@ WEATHER_UPDATE_INTERVAL = 15 * 60  # seconds
 
 
 # ---------------- Utility Functions ----------------
+def shutdown():
+    try:
+        # Requires the script to run with sudo or the user must have shutdown privileges
+        subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to shutdown: {e}")
+
 def get_coords_from_place(place_name: str):
     geolocator = Nominatim(user_agent="my_geocoder")
     location = geolocator.geocode(place_name, timeout=3)
@@ -284,6 +291,7 @@ class Slideshow:
                 self.set_display_power(False)
                 self.screen.fill((0, 0, 0))
                 pygame.display.flip()
+                shutdown()
 
             start_time = time.time()
             while time.time() - start_time < self.display_time:
