@@ -358,7 +358,7 @@ class Slideshow:
         while True:
             if self.is_display_on():
                 self.set_display_power(True)
-                # self.next_image()
+                self.next_image()
                 self.draw_image()
                 pygame.display.flip()
             else:
