@@ -26,7 +26,12 @@ DEFAULT_CONFIG = {
         "display_on_time": "05:00",
         "delay": "10",
         "window_size": "1024x768",
-        "fullscreen": "false"
+        "fullscreen": "false",
+        "aspect_ratio_landscape": "1.5",
+        "aspect_ratio_portrait": "0.667",
+        "ui_text_alpha": "192",
+        "image_history_size": "5",
+        "weather_update_seconds": "900"
     }
 }
 
@@ -43,7 +48,27 @@ GALLERY_CONFIG = config["gallery"] if "gallery" in config else DEFAULT_CONFIG["g
 def get_config_value(key, default=None):
     return GALLERY_CONFIG.get(key, default)
 
+# Load additional constants from config.ini, with defaults
+def get_float_config(key, default):
+    try:
+        return float(get_config_value(key, default))
+    except Exception:
+        return default
+
+def get_int_config(key, default):
+    try:
+        return int(get_config_value(key, default))
+    except Exception:
+        return default
+
 # ---------------- Constants ----------------
+AR_LANDSCAPE = get_float_config("aspect_ratio_landscape", 1.5)
+AR_PORTRAIT = get_float_config("aspect_ratio_portrait", 0.667)
+TEXT_ALPHA = get_int_config("ui_text_alpha", 192)
+HISTORY_SIZE = get_int_config("image_history_size", 5)
+WEATHER_UPDATE_INTERVAL = get_int_config("weather_update_seconds", 15 * 60)
+# LOCATION_CITY_SUBURB, IMAGES_DIRECTORY, DISPLAY_OFF_TIME, DISPLAY_ON_TIME are now loaded from config.ini
+
 WEATHER_CODES = {
     0: "Clear sky",
     1: "Mainly clear",
@@ -75,17 +100,23 @@ WEATHER_CODES = {
     99: "Thunderstorm with heavy hail",
 }
 
-AR_LANDSCAPE = 1.5
-AR_PORTRAIT = 0.667
-TEXT_ALPHA = 192
-HISTORY_SIZE = 5
-WEATHER_UPDATE_INTERVAL = 15 * 60  # seconds
-# LOCATION_CITY_SUBURB, IMAGES_DIRECTORY, DISPLAY_OFF_TIME, DISPLAY_ON_TIME are now loaded from config.ini
-
-
 # ---------------- Utility Functions ----------------
-def shutdown():
+def shutdown(timeout_seconds):
     try:
+        if pygame.get_init():
+            screen = pygame.display.get_surface()
+        for remaining in range(timeout_seconds, 0, -1):
+            if screen:
+                screen.fill((0, 0, 0))
+                font = pygame.font.SysFont(None, 48)
+                text = font.render(f"Shutting down in {remaining} seconds...", True, (255, 255, 255))
+                rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
+                screen.blit(text, rect)
+                pygame.display.flip()
+            else:
+                print(f"Shutting down in {remaining} seconds...")
+            time.sleep(1)
+        exit()
         # Requires the script to run with sudo or the user must have shutdown privileges
         subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
     except subprocess.CalledProcessError as e:
@@ -130,10 +161,10 @@ def scale_image(img, screen_w, screen_h):
 
 # ---------------- Slideshow Class ----------------
 class Slideshow:
-    def __init__(self, folder, screen, display_time):
+    def __init__(self, folder, screen, display_time_seconds):
         self.screen = screen
         self.screen_w, self.screen_h = screen.get_size()
-        self.display_time = display_time
+        self.display_time_seconds = display_time_seconds
 
         self.images = []
         self.folder = folder
@@ -283,6 +314,7 @@ class Slideshow:
 
     def run(self):
         clock = pygame.time.Clock()
+        shutdown(0)
         while True:
             if self.is_display_on():
                 self.set_display_power(True)
@@ -293,10 +325,10 @@ class Slideshow:
                 self.set_display_power(False)
                 self.screen.fill((0, 0, 0))
                 pygame.display.flip()
-                shutdown()
+                shutdown(10)
 
             start_time = time.time()
-            while time.time() - start_time < self.display_time:
+            while time.time() - start_time < self.display_time_seconds:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         pygame.quit()
@@ -359,12 +391,12 @@ def main():
 
     # Delay
     if args.delay is not None:
-        display_time = args.delay
+        display_time_seconds = args.delay
     else:
         try:
-            display_time = float(get_config_value("delay", 10))
+            display_time_seconds = float(get_config_value("delay_seconds", 10))
         except Exception:
-            display_time = 10
+            display_time_seconds = 10
 
     # Window size and fullscreen
     fullscreen = args.fullscreen
@@ -398,7 +430,7 @@ def main():
     DISPLAY_ON_TIME = display_on_time
 
     # Pass config values to Slideshow
-    slideshow = Slideshow(images_directory, screen, display_time)
+    slideshow = Slideshow(images_directory, screen, display_time_seconds)
     slideshow.run()
 
 
