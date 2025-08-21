@@ -22,7 +22,20 @@ DEFAULT_CONFIG = {
         "location_city_suburb": "Sydney, Australia",
         "images_directory": "/path/to/your/images/",
         "display_off_time": "23:00",
-        "display_on_time": "05:00"
+        "display_on_time": "05:00",
+        "delay": "10",
+        "window_size": "1024x768",
+        "fullscreen": "false",
+        "aspect_ratio_landscape": "1.5",
+        "aspect_ratio_portrait": "0.667",
+        "ui_text_alpha": "192",
+        "image_history_size": "5",
+        "weather_update_seconds": "900",
+        "show_time": "true",
+        "show_date": "true",
+        "show_temperature": "true",
+        "show_weather_code": "true",
+        "show_filename": "true"
     }
 }
 
@@ -36,12 +49,51 @@ else:
 
 GALLERY_CONFIG = config["gallery"] if "gallery" in config else DEFAULT_CONFIG["gallery"]
 
-LOCATION_CITY_SUBURB = GALLERY_CONFIG["location_city_suburb"]
-IMAGES_DIRECTORY = GALLERY_CONFIG["images_directory"]
-DISPLAY_OFF_TIME = GALLERY_CONFIG["display_off_time"]
-DISPLAY_ON_TIME = GALLERY_CONFIG["display_on_time"]
+# Print all config.ini settings currently being used
+print("[gallery] settings in use:")
+for k, v in GALLERY_CONFIG.items():
+    print(f"  {k} = {v}")
+
+
+def get_config_value(key, default=None):
+    return GALLERY_CONFIG.get(key, default)
+
+
+# Load additional constants from config.ini, with defaults
+def get_float_config(key, default):
+    try:
+        return float(get_config_value(key, default))
+    except Exception:
+        return default
+
+
+def get_int_config(key, default):
+    try:
+        return int(get_config_value(key, default))
+    except Exception:
+        return default
+
+
+def get_bool_config(key, default):
+    val = get_config_value(key, str(default)).lower()
+    return val in ("1", "true", "yes", "on")
+
 
 # ---------------- Constants ----------------
+AR_LANDSCAPE = get_float_config("aspect_ratio_landscape", 1.5)
+AR_PORTRAIT = get_float_config("aspect_ratio_portrait", 0.667)
+TEXT_ALPHA = get_int_config("ui_text_alpha", 192)
+HISTORY_SIZE = get_int_config("image_history_size", 5)
+WEATHER_UPDATE_SECONDS = get_int_config("weather_update_seconds", 15 * 60)
+# LOCATION_CITY_SUBURB, IMAGES_DIRECTORY, DISPLAY_OFF_TIME, DISPLAY_ON_TIME are now loaded from config.ini
+
+# Text overlay display toggles
+SHOW_TIME = get_bool_config("show_time", True)
+SHOW_DATE = get_bool_config("show_date", True)
+SHOW_TEMPERATURE = get_bool_config("show_temperature", True)
+SHOW_WEATHER_CODE = get_bool_config("show_weather_code", True)
+SHOW_FILENAME = get_bool_config("show_filename", True)
+
 WEATHER_CODES = {
     0: "Clear sky",
     1: "Mainly clear",
@@ -73,21 +125,29 @@ WEATHER_CODES = {
     99: "Thunderstorm with heavy hail",
 }
 
-AR_LANDSCAPE = 1.5
-AR_PORTRAIT = 0.667
-TEXT_ALPHA = 192
-HISTORY_SIZE = 5
-WEATHER_UPDATE_INTERVAL = 15 * 60  # seconds
-# LOCATION_CITY_SUBURB, IMAGES_DIRECTORY, DISPLAY_OFF_TIME, DISPLAY_ON_TIME are now loaded from config.ini
-
 
 # ---------------- Utility Functions ----------------
-def shutdown():
+def shutdown(timeout_seconds):
     try:
+        if pygame.get_init():
+            screen = pygame.display.get_surface()
+        for remaining in range(timeout_seconds, 0, -1):
+            if screen:
+                screen.fill((0, 0, 0))
+                font = pygame.font.SysFont(None, 48)
+                text = font.render(f"Shutting down in {remaining} seconds...", True, (255, 255, 255))
+                rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
+                screen.blit(text, rect)
+                pygame.display.flip()
+            else:
+                print(f"Shutting down in {remaining} seconds...")
+            time.sleep(1)
+        exit()
         # Requires the script to run with sudo or the user must have shutdown privileges
         subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
     except subprocess.CalledProcessError as e:
         print(f"Failed to shutdown: {e}")
+
 
 def get_coords_from_place(place_name: str):
     geolocator = Nominatim(user_agent="my_geocoder")
@@ -128,10 +188,10 @@ def scale_image(img, screen_w, screen_h):
 
 # ---------------- Slideshow Class ----------------
 class Slideshow:
-    def __init__(self, folder, screen, display_time):
+    def __init__(self, folder, screen, display_time_seconds):
         self.screen = screen
         self.screen_w, self.screen_h = screen.get_size()
-        self.display_time = display_time
+        self.display_time_seconds = display_time_seconds
 
         self.images = []
         self.folder = folder
@@ -153,19 +213,24 @@ class Slideshow:
 
         # Weather
         self.city_suburb = LOCATION_CITY_SUBURB
-        self.lat, self.long = get_coords_from_place(self.city_suburb)
+        self.lat, self.long = 51.5072, 0.1276
+        if SHOW_TEMPERATURE or SHOW_WEATHER_CODE:
+            self.lat, self.long = get_coords_from_place(self.city_suburb)
         self.current_temp = ""
         self.current_weather = ""
         self.last_weather_update = 0
 
     def update_weather(self):
         now = time.time()
-        if now - self.last_weather_update > WEATHER_UPDATE_INTERVAL:
+        if now - self.last_weather_update > WEATHER_UPDATE_SECONDS:
             temp, wind, code = get_weather(self.lat, self.long)
             if temp is not None:
                 self.current_temp = f"{temp}°C"
                 self.current_weather = f"{WEATHER_CODES[code]}"
             self.last_weather_update = now
+
+    def draw_blank_screen(self):
+        self.screen.fill((0, 0, 0))
 
     def draw_image(self):
         # Skip if file is missing
@@ -175,38 +240,47 @@ class Slideshow:
                 break
             print(f"Missing file: {self.current_img}, skipping...")
             self.next_image()
-        else:
-            return
 
-        img_path = os.path.join(self.folder, self.current_img)
-        img = pygame.image.load(img_path)
-        img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h)
         self.screen.fill((0, 0, 0))
-        self.screen.blit(img_scaled, (x_off, y_off))
+        new_w = 0
+        if self.current_img:
+            img_path = os.path.join(self.folder, self.current_img)
+            img = pygame.image.load(img_path)
+            img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h)
+            self.screen.blit(img_scaled, (x_off, y_off))
+
+        now = datetime.datetime.now()
 
         # filename
-        text = f"{self.current_img} ({new_w}x{self.screen_h})"
-        surf = self.fonts["filename"].render(text, True, self.text_color)
-        rect = surf.get_rect(bottomright=(self.screen_w - 10, self.screen_h - 10))
-        self.screen.blit(surf, rect)
+        if SHOW_FILENAME:
+            text = f"{self.current_img} ({new_w}x{self.screen_h})"
+            surf = self.fonts["filename"].render(text, True, self.text_color)
+            rect = surf.get_rect(bottomright=(self.screen_w - 10, self.screen_h - 10))
+            self.screen.blit(surf, rect)
 
-        # time/date
-        now = datetime.datetime.now()
-        time_surf = self.fonts["time"].render(now.strftime("%I:%M"), True, self.text_color)
-        time_surf.set_alpha(TEXT_ALPHA)
-        self.screen.blit(time_surf, (10, 10))
-        date_surf = self.fonts["date"].render(now.strftime("%d %b %y"), True, self.text_color)
-        date_surf.set_alpha(TEXT_ALPHA)
-        self.screen.blit(date_surf, (10, 72))
+        # time
+        if SHOW_TIME:
+            time_surf = self.fonts["time"].render(now.strftime("%I:%M"), True, self.text_color)
+            time_surf.set_alpha(TEXT_ALPHA)
+            self.screen.blit(time_surf, (10, 10))
+
+        # date
+        if SHOW_DATE:
+            date_surf = self.fonts["date"].render(now.strftime("%d %b %y"), True, self.text_color)
+            date_surf.set_alpha(TEXT_ALPHA)
+            self.screen.blit(date_surf, (10, 72))
 
         # weather
-        self.update_weather()
-        temp_surf = self.fonts["temp"].render(self.current_temp, True, self.text_color)
-        temp_surf.set_alpha(TEXT_ALPHA)
-        self.screen.blit(temp_surf, (self.screen_w - temp_surf.get_width() - 10, 10))
-        weather_surf = self.fonts["weather"].render(self.current_weather, True, self.text_color)
-        weather_surf.set_alpha(TEXT_ALPHA)
-        self.screen.blit(weather_surf, (self.screen_w - weather_surf.get_width() - 10, 72))
+        if SHOW_TEMPERATURE or SHOW_WEATHER_CODE:
+            self.update_weather()
+        if SHOW_TEMPERATURE:
+            temp_surf = self.fonts["temp"].render(self.current_temp, True, self.text_color)
+            temp_surf.set_alpha(TEXT_ALPHA)
+            self.screen.blit(temp_surf, (self.screen_w - temp_surf.get_width() - 10, 10))
+        if SHOW_WEATHER_CODE:
+            weather_surf = self.fonts["weather"].render(self.current_weather, True, self.text_color)
+            weather_surf.set_alpha(TEXT_ALPHA)
+            self.screen.blit(weather_surf, (self.screen_w - weather_surf.get_width() - 10, 72))
 
     def refresh_images(self):
         # Recursively scan for images (supports subfolders)
@@ -284,17 +358,17 @@ class Slideshow:
         while True:
             if self.is_display_on():
                 self.set_display_power(True)
-                self.next_image()
+                # self.next_image()
                 self.draw_image()
                 pygame.display.flip()
             else:
-                self.set_display_power(False)
-                self.screen.fill((0, 0, 0))
+                self.draw_blank_screen()
                 pygame.display.flip()
-                shutdown()
+                self.set_display_power(False)
+                shutdown(10)
 
             start_time = time.time()
-            while time.time() - start_time < self.display_time:
+            while time.time() - start_time < self.display_time_seconds:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         pygame.quit()
@@ -316,11 +390,10 @@ class Slideshow:
 # ---------------- Main ----------------
 def main():
     parser = argparse.ArgumentParser(description="Fullscreen slideshow")
-    parser.add_argument("--delay", type=float, default=10, help="Display time per image in seconds")
+    parser.add_argument("--delay", type=float, help="Display time per image in seconds")
     parser.add_argument(
         "--window-size",
         type=str,
-        default="1024x768",
         help="Window size as WIDTHxHEIGHT, e.g. 1280x720. Default is 1024x768."
     )
     parser.add_argument(
@@ -328,24 +401,60 @@ def main():
         action="store_true",
         help="Display in fullscreen mode (overrides --window-size if both are set)"
     )
+    parser.add_argument(
+        "--location-city-suburb",
+        type=str,
+        help="Location for weather lookups (default from config.ini)"
+    )
+    parser.add_argument(
+        "--images-directory",
+        type=str,
+        help="Directory containing images (default from config.ini)"
+    )
+    parser.add_argument(
+        "--display-off-time",
+        type=str,
+        help="Time to turn display off (default from config.ini)"
+    )
+    parser.add_argument(
+        "--display-on-time",
+        type=str,
+        help="Time to turn display on (default from config.ini)"
+    )
     args = parser.parse_args()
-    display_time = args.delay
 
-    # Parse window size or fullscreen
+    # Load config values, overridden by command-line args if provided
+    location_city_suburb = args.location_city_suburb or get_config_value("location_city_suburb")
+    images_directory = args.images_directory or get_config_value("images_directory")
+    display_off_time = args.display_off_time or get_config_value("display_off_time")
+    display_on_time = args.display_on_time or get_config_value("display_on_time")
+
+    # Delay
+    if args.delay is not None:
+        display_time_seconds = args.delay
+    else:
+        try:
+            display_time_seconds = float(get_config_value("delay_seconds", 10))
+        except Exception:
+            display_time_seconds = 10
+
+    # Window size and fullscreen
     fullscreen = args.fullscreen
+    window_size_str = args.window_size or get_config_value("window_size", "1024x768")
+    fullscreen_config = get_config_value("fullscreen", "false").lower() == "true"
     if not fullscreen:
-        if args.window_size.lower() == "fullscreen":
+        if window_size_str.lower() == "fullscreen":
             fullscreen = True
-        else:
-            try:
-                width, height = map(int, args.window_size.lower().split("x"))
-                window_size = (width, height)
-            except Exception:
-                print("Invalid --window-size format. Use WIDTHxHEIGHT, e.g. 1280x720, or 'fullscreen'. Falling back to 1024x768.")
-                window_size = (1024, 768)
+        elif fullscreen_config:
+            fullscreen = True
 
-    # Folder with images
-    image_folder = IMAGES_DIRECTORY
+    if not fullscreen:
+        try:
+            width, height = map(int, window_size_str.lower().split("x"))
+            window_size = (width, height)
+        except Exception:
+            print("Invalid window size format. Use WIDTHxHEIGHT, e.g. 1280x720. Falling back to 1024x768.")
+            window_size = (1024, 768)
 
     # Pygame setup
     pygame.init()
@@ -355,7 +464,13 @@ def main():
         screen = pygame.display.set_mode(window_size)
     pygame.mouse.set_visible(False)
 
-    slideshow = Slideshow(image_folder, screen, display_time)
+    global LOCATION_CITY_SUBURB, DISPLAY_OFF_TIME, DISPLAY_ON_TIME
+    LOCATION_CITY_SUBURB = location_city_suburb
+    DISPLAY_OFF_TIME = display_off_time
+    DISPLAY_ON_TIME = display_on_time
+
+    # Pass config values to Slideshow
+    slideshow = Slideshow(images_directory, screen, display_time_seconds)
     slideshow.run()
 
 
