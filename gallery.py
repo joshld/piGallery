@@ -203,6 +203,7 @@ class Slideshow:
         self.forward_stack = []
         self.current_index = -1
         self.current_img = None
+        self.total_images = 0
 
         self.fonts = {
             "filename": pygame.font.SysFont("Arial", 14),
@@ -312,7 +313,7 @@ class Slideshow:
             # Refresh images every time we reach the end
             if not self.images:
                 self.refresh_images()
-                total_images = len(self.images)
+                self.total_images = len(self.images)
 
             if self.images:
                 self.current_img = self.images.pop()
@@ -325,7 +326,7 @@ class Slideshow:
             else:
                 # Nothing at all, do nothing
                 self.current_img = None
-        print(f"[Slideshow] Next image {self.current_index+1}/{total_images}: {self.current_img}")
+        print(f"[Slideshow] Next image {self.current_index+1}/{self.total_images}: {self.current_img}")
 
     def prev_image(self):
         if self.current_index > 0:
