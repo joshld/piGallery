@@ -13,7 +13,6 @@ if sys.version_info < (3, 7):
     print("Python 3.7 or newer is required.")
     sys.exit(1)
 
-
 # ---------------- Config ----------------
 import configparser
 
@@ -31,7 +30,12 @@ DEFAULT_CONFIG = {
         "aspect_ratio_portrait": "0.667",
         "ui_text_alpha": "192",
         "image_history_size": "5",
-        "weather_update_seconds": "900"
+        "weather_update_seconds": "900",
+        "show_time": "true",
+        "show_date": "true",
+        "show_temperature": "true",
+        "show_weather_code": "true",
+        "show_filename": "true"
     }
 }
 
@@ -45,8 +49,15 @@ else:
 
 GALLERY_CONFIG = config["gallery"] if "gallery" in config else DEFAULT_CONFIG["gallery"]
 
+# Print all config.ini settings currently being used
+print("[gallery] settings in use:")
+for k, v in GALLERY_CONFIG.items():
+    print(f"  {k} = {v}")
+
+
 def get_config_value(key, default=None):
     return GALLERY_CONFIG.get(key, default)
+
 
 # Load additional constants from config.ini, with defaults
 def get_float_config(key, default):
@@ -55,19 +66,33 @@ def get_float_config(key, default):
     except Exception:
         return default
 
+
 def get_int_config(key, default):
     try:
         return int(get_config_value(key, default))
     except Exception:
         return default
 
+
+def get_bool_config(key, default):
+    val = get_config_value(key, str(default)).lower()
+    return val in ("1", "true", "yes", "on")
+
+
 # ---------------- Constants ----------------
 AR_LANDSCAPE = get_float_config("aspect_ratio_landscape", 1.5)
 AR_PORTRAIT = get_float_config("aspect_ratio_portrait", 0.667)
 TEXT_ALPHA = get_int_config("ui_text_alpha", 192)
 HISTORY_SIZE = get_int_config("image_history_size", 5)
-WEATHER_UPDATE_INTERVAL = get_int_config("weather_update_seconds", 15 * 60)
+WEATHER_UPDATE_SECONDS = get_int_config("weather_update_seconds", 15 * 60)
 # LOCATION_CITY_SUBURB, IMAGES_DIRECTORY, DISPLAY_OFF_TIME, DISPLAY_ON_TIME are now loaded from config.ini
+
+# Text overlay display toggles
+SHOW_TIME = get_bool_config("show_time", True)
+SHOW_DATE = get_bool_config("show_date", True)
+SHOW_TEMPERATURE = get_bool_config("show_temperature", True)
+SHOW_WEATHER_CODE = get_bool_config("show_weather_code", True)
+SHOW_FILENAME = get_bool_config("show_filename", True)
 
 WEATHER_CODES = {
     0: "Clear sky",
@@ -100,6 +125,7 @@ WEATHER_CODES = {
     99: "Thunderstorm with heavy hail",
 }
 
+
 # ---------------- Utility Functions ----------------
 def shutdown(timeout_seconds):
     try:
@@ -121,6 +147,7 @@ def shutdown(timeout_seconds):
         subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
     except subprocess.CalledProcessError as e:
         print(f"Failed to shutdown: {e}")
+
 
 def get_coords_from_place(place_name: str):
     geolocator = Nominatim(user_agent="my_geocoder")
@@ -186,19 +213,24 @@ class Slideshow:
 
         # Weather
         self.city_suburb = LOCATION_CITY_SUBURB
-        self.lat, self.long = get_coords_from_place(self.city_suburb)
+        self.lat, self.long = 51.5072, 0.1276
+        if SHOW_TEMPERATURE or SHOW_WEATHER_CODE:
+            self.lat, self.long = get_coords_from_place(self.city_suburb)
         self.current_temp = ""
         self.current_weather = ""
         self.last_weather_update = 0
 
     def update_weather(self):
         now = time.time()
-        if now - self.last_weather_update > WEATHER_UPDATE_INTERVAL:
+        if now - self.last_weather_update > WEATHER_UPDATE_SECONDS:
             temp, wind, code = get_weather(self.lat, self.long)
             if temp is not None:
                 self.current_temp = f"{temp}°C"
                 self.current_weather = f"{WEATHER_CODES[code]}"
             self.last_weather_update = now
+
+    def draw_blank_screen(self):
+        self.screen.fill((0, 0, 0))
 
     def draw_image(self):
         # Skip if file is missing
@@ -208,38 +240,47 @@ class Slideshow:
                 break
             print(f"Missing file: {self.current_img}, skipping...")
             self.next_image()
-        else:
-            return
 
-        img_path = os.path.join(self.folder, self.current_img)
-        img = pygame.image.load(img_path)
-        img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h)
         self.screen.fill((0, 0, 0))
-        self.screen.blit(img_scaled, (x_off, y_off))
+        new_w = 0
+        if self.current_img:
+            img_path = os.path.join(self.folder, self.current_img)
+            img = pygame.image.load(img_path)
+            img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h)
+            self.screen.blit(img_scaled, (x_off, y_off))
+
+        now = datetime.datetime.now()
 
         # filename
-        text = f"{self.current_img} ({new_w}x{self.screen_h})"
-        surf = self.fonts["filename"].render(text, True, self.text_color)
-        rect = surf.get_rect(bottomright=(self.screen_w - 10, self.screen_h - 10))
-        self.screen.blit(surf, rect)
+        if SHOW_FILENAME:
+            text = f"{self.current_img} ({new_w}x{self.screen_h})"
+            surf = self.fonts["filename"].render(text, True, self.text_color)
+            rect = surf.get_rect(bottomright=(self.screen_w - 10, self.screen_h - 10))
+            self.screen.blit(surf, rect)
 
-        # time/date
-        now = datetime.datetime.now()
-        time_surf = self.fonts["time"].render(now.strftime("%I:%M"), True, self.text_color)
-        time_surf.set_alpha(TEXT_ALPHA)
-        self.screen.blit(time_surf, (10, 10))
-        date_surf = self.fonts["date"].render(now.strftime("%d %b %y"), True, self.text_color)
-        date_surf.set_alpha(TEXT_ALPHA)
-        self.screen.blit(date_surf, (10, 72))
+        # time
+        if SHOW_TIME:
+            time_surf = self.fonts["time"].render(now.strftime("%I:%M"), True, self.text_color)
+            time_surf.set_alpha(TEXT_ALPHA)
+            self.screen.blit(time_surf, (10, 10))
+
+        # date
+        if SHOW_DATE:
+            date_surf = self.fonts["date"].render(now.strftime("%d %b %y"), True, self.text_color)
+            date_surf.set_alpha(TEXT_ALPHA)
+            self.screen.blit(date_surf, (10, 72))
 
         # weather
-        self.update_weather()
-        temp_surf = self.fonts["temp"].render(self.current_temp, True, self.text_color)
-        temp_surf.set_alpha(TEXT_ALPHA)
-        self.screen.blit(temp_surf, (self.screen_w - temp_surf.get_width() - 10, 10))
-        weather_surf = self.fonts["weather"].render(self.current_weather, True, self.text_color)
-        weather_surf.set_alpha(TEXT_ALPHA)
-        self.screen.blit(weather_surf, (self.screen_w - weather_surf.get_width() - 10, 72))
+        if SHOW_TEMPERATURE or SHOW_WEATHER_CODE:
+            self.update_weather()
+        if SHOW_TEMPERATURE:
+            temp_surf = self.fonts["temp"].render(self.current_temp, True, self.text_color)
+            temp_surf.set_alpha(TEXT_ALPHA)
+            self.screen.blit(temp_surf, (self.screen_w - temp_surf.get_width() - 10, 10))
+        if SHOW_WEATHER_CODE:
+            weather_surf = self.fonts["weather"].render(self.current_weather, True, self.text_color)
+            weather_surf.set_alpha(TEXT_ALPHA)
+            self.screen.blit(weather_surf, (self.screen_w - weather_surf.get_width() - 10, 72))
 
     def refresh_images(self):
         # Recursively scan for images (supports subfolders)
@@ -314,17 +355,16 @@ class Slideshow:
 
     def run(self):
         clock = pygame.time.Clock()
-        shutdown(0)
         while True:
             if self.is_display_on():
                 self.set_display_power(True)
-                self.next_image()
+                # self.next_image()
                 self.draw_image()
                 pygame.display.flip()
             else:
-                self.set_display_power(False)
-                self.screen.fill((0, 0, 0))
+                self.draw_blank_screen()
                 pygame.display.flip()
+                self.set_display_power(False)
                 shutdown(10)
 
             start_time = time.time()
