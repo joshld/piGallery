@@ -392,14 +392,13 @@ def main():
         screen = pygame.display.set_mode(window_size)
     pygame.mouse.set_visible(False)
 
-    # Pass config values to Slideshow
-    slideshow = Slideshow(images_directory, screen, display_time)
-    # Patch in config values for display times and location
-    slideshow.city_suburb = location_city_suburb
-    slideshow.lat, slideshow.long = get_coords_from_place(location_city_suburb)
-    global DISPLAY_OFF_TIME, DISPLAY_ON_TIME
+    global LOCATION_CITY_SUBURB, DISPLAY_OFF_TIME, DISPLAY_ON_TIME
+    LOCATION_CITY_SUBURB = location_city_suburb
     DISPLAY_OFF_TIME = display_off_time
     DISPLAY_ON_TIME = display_on_time
+
+    # Pass config values to Slideshow
+    slideshow = Slideshow(images_directory, screen, display_time)
     slideshow.run()
 
 
