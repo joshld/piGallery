@@ -313,7 +313,8 @@ class Slideshow:
             # Refresh images every time we reach the end
             if not self.images:
                 self.refresh_images()
-                self.total_images = len(self.images)
+                if self.images:
+                    self.total_images = len(self.images)
 
             if self.images:
                 self.current_img = self.images.pop()
@@ -333,7 +334,7 @@ class Slideshow:
             self.current_index -= 1
             self.forward_stack.append(self.history[self.current_index])
             self.current_img = self.history[self.current_index]
-            print(f"[Slideshow] Previous image {self.current_index+1}/{len(self.history)}: {self.current_img}")
+            print(f"[Slideshow] Previous image {self.current_index+1}/{self.total_images}: {self.current_img}")
 
     def is_display_on(self):
         now = datetime.datetime.now().time()
