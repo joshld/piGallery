@@ -13,6 +13,7 @@ if sys.version_info < (3, 7):
     print("Python 3.7 or newer is required.")
     sys.exit(1)
 
+
 # ---------------- Config ----------------
 import configparser
 
@@ -22,7 +23,10 @@ DEFAULT_CONFIG = {
         "location_city_suburb": "Sydney, Australia",
         "images_directory": "/path/to/your/images/",
         "display_off_time": "23:00",
-        "display_on_time": "05:00"
+        "display_on_time": "05:00",
+        "delay": "10",
+        "window_size": "1024x768",
+        "fullscreen": "false"
     }
 }
 
@@ -36,10 +40,8 @@ else:
 
 GALLERY_CONFIG = config["gallery"] if "gallery" in config else DEFAULT_CONFIG["gallery"]
 
-LOCATION_CITY_SUBURB = GALLERY_CONFIG["location_city_suburb"]
-IMAGES_DIRECTORY = GALLERY_CONFIG["images_directory"]
-DISPLAY_OFF_TIME = GALLERY_CONFIG["display_off_time"]
-DISPLAY_ON_TIME = GALLERY_CONFIG["display_on_time"]
+def get_config_value(key, default=None):
+    return GALLERY_CONFIG.get(key, default)
 
 # ---------------- Constants ----------------
 WEATHER_CODES = {
@@ -316,11 +318,10 @@ class Slideshow:
 # ---------------- Main ----------------
 def main():
     parser = argparse.ArgumentParser(description="Fullscreen slideshow")
-    parser.add_argument("--delay", type=float, default=10, help="Display time per image in seconds")
+    parser.add_argument("--delay", type=float, help="Display time per image in seconds")
     parser.add_argument(
         "--window-size",
         type=str,
-        default="1024x768",
         help="Window size as WIDTHxHEIGHT, e.g. 1280x720. Default is 1024x768."
     )
     parser.add_argument(
@@ -328,24 +329,60 @@ def main():
         action="store_true",
         help="Display in fullscreen mode (overrides --window-size if both are set)"
     )
+    parser.add_argument(
+        "--location-city-suburb",
+        type=str,
+        help="Location for weather lookups (default from config.ini)"
+    )
+    parser.add_argument(
+        "--images-directory",
+        type=str,
+        help="Directory containing images (default from config.ini)"
+    )
+    parser.add_argument(
+        "--display-off-time",
+        type=str,
+        help="Time to turn display off (default from config.ini)"
+    )
+    parser.add_argument(
+        "--display-on-time",
+        type=str,
+        help="Time to turn display on (default from config.ini)"
+    )
     args = parser.parse_args()
-    display_time = args.delay
 
-    # Parse window size or fullscreen
+    # Load config values, overridden by command-line args if provided
+    location_city_suburb = args.location_city_suburb or get_config_value("location_city_suburb")
+    images_directory = args.images_directory or get_config_value("images_directory")
+    display_off_time = args.display_off_time or get_config_value("display_off_time")
+    display_on_time = args.display_on_time or get_config_value("display_on_time")
+
+    # Delay
+    if args.delay is not None:
+        display_time = args.delay
+    else:
+        try:
+            display_time = float(get_config_value("delay", 10))
+        except Exception:
+            display_time = 10
+
+    # Window size and fullscreen
     fullscreen = args.fullscreen
+    window_size_str = args.window_size or get_config_value("window_size", "1024x768")
+    fullscreen_config = get_config_value("fullscreen", "false").lower() == "true"
     if not fullscreen:
-        if args.window_size.lower() == "fullscreen":
+        if window_size_str.lower() == "fullscreen":
             fullscreen = True
-        else:
-            try:
-                width, height = map(int, args.window_size.lower().split("x"))
-                window_size = (width, height)
-            except Exception:
-                print("Invalid --window-size format. Use WIDTHxHEIGHT, e.g. 1280x720, or 'fullscreen'. Falling back to 1024x768.")
-                window_size = (1024, 768)
+        elif fullscreen_config:
+            fullscreen = True
 
-    # Folder with images
-    image_folder = IMAGES_DIRECTORY
+    if not fullscreen:
+        try:
+            width, height = map(int, window_size_str.lower().split("x"))
+            window_size = (width, height)
+        except Exception:
+            print("Invalid window size format. Use WIDTHxHEIGHT, e.g. 1280x720. Falling back to 1024x768.")
+            window_size = (1024, 768)
 
     # Pygame setup
     pygame.init()
@@ -355,7 +392,14 @@ def main():
         screen = pygame.display.set_mode(window_size)
     pygame.mouse.set_visible(False)
 
-    slideshow = Slideshow(image_folder, screen, display_time)
+    # Pass config values to Slideshow
+    slideshow = Slideshow(images_directory, screen, display_time)
+    # Patch in config values for display times and location
+    slideshow.city_suburb = location_city_suburb
+    slideshow.lat, slideshow.long = get_coords_from_place(location_city_suburb)
+    global DISPLAY_OFF_TIME, DISPLAY_ON_TIME
+    DISPLAY_OFF_TIME = display_off_time
+    DISPLAY_ON_TIME = display_on_time
     slideshow.run()
 
 
