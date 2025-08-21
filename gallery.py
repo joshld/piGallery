@@ -49,6 +49,8 @@ else:
 
 GALLERY_CONFIG = config["gallery"] if "gallery" in config else DEFAULT_CONFIG["gallery"]
 
+print(f"[Startup] Loaded config from {CONFIG_PATH}, using {len(GALLERY_CONFIG)} settings.")
+
 # Print all config.ini settings currently being used
 print("[gallery] settings in use:")
 for k, v in GALLERY_CONFIG.items():
@@ -131,6 +133,7 @@ def shutdown(timeout_seconds):
     try:
         if pygame.get_init():
             screen = pygame.display.get_surface()
+        print(f"[System] Shutdown initiated, timeout={timeout_seconds}s")
         for remaining in range(timeout_seconds, 0, -1):
             if screen:
                 screen.fill((0, 0, 0))
@@ -142,7 +145,6 @@ def shutdown(timeout_seconds):
             else:
                 print(f"Shutting down in {remaining} seconds...")
             time.sleep(1)
-        exit()
         # Requires the script to run with sudo or the user must have shutdown privileges
         subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
     except subprocess.CalledProcessError as e:
@@ -158,6 +160,7 @@ def get_coords_from_place(place_name: str):
 def get_weather(lat=51.5072, lon=-0.1276):
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
     try:
+        print(f"[Weather] Fetching weather for lat={lat}, lon={lon}")
         r = requests.get(url, timeout=5)
         r.raise_for_status()
         weather = r.json()["current_weather"]
@@ -227,6 +230,7 @@ class Slideshow:
             if temp is not None:
                 self.current_temp = f"{temp}°C"
                 self.current_weather = f"{WEATHER_CODES[code]}"
+                print(f"[Weather] Updated: {self.current_temp}, {self.current_weather}")
             self.last_weather_update = now
 
     def draw_blank_screen(self):
@@ -248,6 +252,7 @@ class Slideshow:
             img = pygame.image.load(img_path)
             img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h)
             self.screen.blit(img_scaled, (x_off, y_off))
+            print(f"[Slideshow] Drawing {self.current_img} scaled to {new_w}x{self.screen_h}")
 
         now = datetime.datetime.now()
 
@@ -295,6 +300,7 @@ class Slideshow:
         if new_images:
             random.shuffle(new_images)
             self.images.extend(new_images)
+        print(f"[Slideshow] Found {len(new_images)} new images, total queue={len(self.images)}")
 
     def next_image(self):
         if self.forward_stack:
@@ -318,12 +324,14 @@ class Slideshow:
             else:
                 # Nothing at all, do nothing
                 self.current_img = None
+        print(f"[Slideshow] Next image {self.current_index+1}/{len(self.history)}: {self.current_img}")
 
     def prev_image(self):
         if self.current_index > 0:
             self.current_index -= 1
             self.forward_stack.append(self.history[self.current_index])
             self.current_img = self.history[self.current_index]
+            print(f"[Slideshow] Previous image {self.current_index+1}/{len(self.history)}: {self.current_img}")
 
     def is_display_on(self):
         now = datetime.datetime.now().time()
@@ -344,7 +352,7 @@ class Slideshow:
                 text=True
             )
             current_state = int(result.stdout.strip().split('=')[1])
-
+            print(f"[Display] Requesting display {'ON' if on else 'OFF'}, current state={current_state}")
             if on and current_state == 0:
                 os.system("vcgencmd display_power 1")
             elif not on and current_state == 1:
@@ -354,6 +362,7 @@ class Slideshow:
             print(f"Failed to set display power: {e}")
 
     def run(self):
+        print("[Slideshow] Starting slideshow loop...")
         clock = pygame.time.Clock()
         while True:
             if self.is_display_on():
@@ -374,6 +383,7 @@ class Slideshow:
                         pygame.quit()
                         raise SystemExit
                     if event.type == pygame.KEYDOWN:
+                        print(f"[Input] Key pressed: {pygame.key.name(event.key)}")
                         if event.key == pygame.K_ESCAPE:
                             pygame.quit()
                             raise SystemExit
@@ -455,6 +465,9 @@ def main():
         except Exception:
             print("Invalid window size format. Use WIDTHxHEIGHT, e.g. 1280x720. Falling back to 1024x768.")
             window_size = (1024, 768)
+
+    print(f"[Startup] Overriding config: images_directory={images_directory}, "
+          f"delay={display_time_seconds}s, fullscreen={fullscreen}")
 
     # Pygame setup
     pygame.init()
