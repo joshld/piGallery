@@ -82,19 +82,7 @@ def get_bool_config(key, default):
 
 
 # ---------------- Constants ----------------
-AR_LANDSCAPE = get_float_config("aspect_ratio_landscape", 1.5)
-AR_PORTRAIT = get_float_config("aspect_ratio_portrait", 0.667)
-TEXT_ALPHA = get_int_config("ui_text_alpha", 192)
-HISTORY_SIZE = get_int_config("image_history_size", 5)
-WEATHER_UPDATE_SECONDS = get_int_config("weather_update_seconds", 15 * 60)
-# LOCATION_CITY_SUBURB, IMAGES_DIRECTORY, DISPLAY_OFF_TIME, DISPLAY_ON_TIME are now loaded from config.ini
-
-# Text overlay display toggles
-SHOW_TIME = get_bool_config("show_time", True)
-SHOW_DATE = get_bool_config("show_date", True)
-SHOW_TEMPERATURE = get_bool_config("show_temperature", True)
-SHOW_WEATHER_CODE = get_bool_config("show_weather_code", True)
-SHOW_FILENAME = get_bool_config("show_filename", True)
+# These are now passed via config dictionary to avoid global variables
 
 WEATHER_CODES = {
     0: "Clear sky",
@@ -170,18 +158,18 @@ def get_weather(lat=51.5072, lon=-0.1276):
         return None, None, None
 
 
-def scale_image(img, screen_w, screen_h):
+def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667):
     img_w, img_h = img.get_size()
     if img_w >= img_h:
         scale_factor = screen_h / img_h
         scaled_width = img_w * scale_factor
-        target_width = scaled_width * (screen_w / screen_h / AR_PORTRAIT)
+        target_width = scaled_width * (screen_w / screen_h / ar_portrait)
         new_w = int(min(target_width, screen_w))
         img_scaled = pygame.transform.scale(img, (new_w, screen_h))
     else:
         scale_factor = screen_h / img_h
         scaled_width = img_w * scale_factor
-        target_width = scaled_width * (screen_w / screen_h / AR_LANDSCAPE)
+        target_width = scaled_width * (screen_w / screen_h / ar_landscape)
         new_w = int(min(target_width, screen_w))
         img_scaled = pygame.transform.scale(img, (new_w, screen_h))
     x_offset = (screen_w - new_w) // 2
@@ -191,10 +179,11 @@ def scale_image(img, screen_w, screen_h):
 
 # ---------------- Slideshow Class ----------------
 class Slideshow:
-    def __init__(self, folder, screen, display_time_seconds):
+    def __init__(self, folder, screen, display_time_seconds, config_dict):
         self.screen = screen
         self.screen_w, self.screen_h = screen.get_size()
         self.display_time_seconds = display_time_seconds
+        self.config = config_dict
 
         self.images = []
         self.folder = folder
@@ -216,21 +205,32 @@ class Slideshow:
         self.text_color = (255, 255, 255)
 
         # Weather
-        self.city_suburb = LOCATION_CITY_SUBURB
+        self.city_suburb = config_dict.get('location_city_suburb', 'Sydney, Australia')
         self.lat, self.long = 51.5072, 0.1276
-        if SHOW_TEMPERATURE or SHOW_WEATHER_CODE:
-            self.lat, self.long = get_coords_from_place(self.city_suburb)
+        show_temp = config_dict.get('show_temperature', 'true').lower() == 'true'
+        show_weather = config_dict.get('show_weather_code', 'true').lower() == 'true'
+        if show_temp or show_weather:
+            try:
+                self.lat, self.long = get_coords_from_place(self.city_suburb)
+                if self.lat is None or self.long is None:
+                    print(f"[Warning] Could not geocode {self.city_suburb}, using default coordinates")
+                    self.lat, self.long = 51.5072, 0.1276
+            except Exception as e:
+                print(f"[Warning] Geocoding failed: {e}, using default coordinates")
+                self.lat, self.long = 51.5072, 0.1276
         self.current_temp = ""
         self.current_weather = ""
         self.last_weather_update = 0
 
     def update_weather(self):
         now = time.time()
-        if now - self.last_weather_update > WEATHER_UPDATE_SECONDS:
+        weather_update_interval = int(self.config.get('weather_update_seconds', '900'))
+        if now - self.last_weather_update > weather_update_interval:
             temp, wind, code = get_weather(self.lat, self.long)
-            if temp is not None:
+            if temp is not None and code is not None:
                 self.current_temp = f"{temp}°C"
-                self.current_weather = f"{WEATHER_CODES[code]}"
+                weather_desc = WEATHER_CODES.get(code, f"Unknown ({code})")
+                self.current_weather = weather_desc
                 print(f"[Weather] Updated: {self.current_temp}, {self.current_weather}")
             self.last_weather_update = now
 
@@ -238,54 +238,76 @@ class Slideshow:
         self.screen.fill((0, 0, 0))
 
     def draw_image(self):
-        # Skip if file is missing
-        while self.current_img:
+        # Skip if file is missing, but prevent infinite loops
+        attempts = 0
+        max_attempts = 10
+        while self.current_img and attempts < max_attempts:
             img_path = os.path.join(self.folder, self.current_img)
             if os.path.exists(img_path):
                 break
             print(f"Missing file: {self.current_img}, skipping...")
             self.next_image()
+            attempts += 1
+        
+        if attempts >= max_attempts:
+            print(f"[Error] Too many missing files, stopping image search")
+            self.current_img = None
 
         self.screen.fill((0, 0, 0))
         new_w = 0
         if self.current_img:
             img_path = os.path.join(self.folder, self.current_img)
-            img = pygame.image.load(img_path)
-            img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h)
-            self.screen.blit(img_scaled, (x_off, y_off))
-            print(f"[Slideshow] Drawing {self.current_img} scaled to {new_w}x{self.screen_h}")
+            try:
+                img = pygame.image.load(img_path)
+                ar_landscape = float(self.config.get('aspect_ratio_landscape', '1.5'))
+                ar_portrait = float(self.config.get('aspect_ratio_portrait', '0.667'))
+                img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h, ar_landscape, ar_portrait)
+                self.screen.blit(img_scaled, (x_off, y_off))
+                print(f"[Slideshow] Drawing {self.current_img} scaled to {new_w}x{self.screen_h}")
+            except pygame.error as e:
+                print(f"[Error] Failed to load image {self.current_img}: {e}")
+                self.current_img = None
 
         now = datetime.datetime.now()
 
         # filename
-        if SHOW_FILENAME:
+        show_filename = self.config.get('show_filename', 'true').lower() == 'true'
+        if show_filename and self.current_img:
             text = f"{self.current_img} ({new_w}x{self.screen_h})"
             surf = self.fonts["filename"].render(text, True, self.text_color)
             rect = surf.get_rect(bottomright=(self.screen_w - 10, self.screen_h - 10))
             self.screen.blit(surf, rect)
 
         # time
-        if SHOW_TIME:
+        show_time = self.config.get('show_time', 'true').lower() == 'true'
+        if show_time:
             time_surf = self.fonts["time"].render(now.strftime("%I:%M"), True, self.text_color)
-            time_surf.set_alpha(TEXT_ALPHA)
+            text_alpha = int(self.config.get('ui_text_alpha', '192'))
+            time_surf.set_alpha(text_alpha)
             self.screen.blit(time_surf, (10, 10))
 
         # date
-        if SHOW_DATE:
+        show_date = self.config.get('show_date', 'true').lower() == 'true'
+        if show_date:
             date_surf = self.fonts["date"].render(now.strftime("%d %b %y"), True, self.text_color)
-            date_surf.set_alpha(TEXT_ALPHA)
+            text_alpha = int(self.config.get('ui_text_alpha', '192'))
+            date_surf.set_alpha(text_alpha)
             self.screen.blit(date_surf, (10, 72))
 
         # weather
-        if SHOW_TEMPERATURE or SHOW_WEATHER_CODE:
+        show_temperature = self.config.get('show_temperature', 'true').lower() == 'true'
+        show_weather_code = self.config.get('show_weather_code', 'true').lower() == 'true'
+        if show_temperature or show_weather_code:
             self.update_weather()
-        if SHOW_TEMPERATURE:
+        if show_temperature and self.current_temp:
             temp_surf = self.fonts["temp"].render(self.current_temp, True, self.text_color)
-            temp_surf.set_alpha(TEXT_ALPHA)
+            text_alpha = int(self.config.get('ui_text_alpha', '192'))
+            temp_surf.set_alpha(text_alpha)
             self.screen.blit(temp_surf, (self.screen_w - temp_surf.get_width() - 10, 10))
-        if SHOW_WEATHER_CODE:
+        if show_weather_code and self.current_weather:
             weather_surf = self.fonts["weather"].render(self.current_weather, True, self.text_color)
-            weather_surf.set_alpha(TEXT_ALPHA)
+            text_alpha = int(self.config.get('ui_text_alpha', '192'))
+            weather_surf.set_alpha(text_alpha)
             self.screen.blit(weather_surf, (self.screen_w - weather_surf.get_width() - 10, 72))
 
     def refresh_images(self):
@@ -338,8 +360,15 @@ class Slideshow:
 
     def is_display_on(self):
         now = datetime.datetime.now().time()
-        off_time = datetime.datetime.strptime(DISPLAY_OFF_TIME, "%H:%M").time()
-        on_time = datetime.datetime.strptime(DISPLAY_ON_TIME, "%H:%M").time()
+        display_off_time = self.config.get('display_off_time', '23:00')
+        display_on_time = self.config.get('display_on_time', '05:00')
+        
+        try:
+            off_time = datetime.datetime.strptime(display_off_time, "%H:%M").time()
+            on_time = datetime.datetime.strptime(display_on_time, "%H:%M").time()
+        except ValueError as e:
+            print(f"[Error] Invalid time format in config: {e}")
+            return True  # Default to always on if config is invalid
 
         if on_time < off_time:  # normal case (e.g., 07:00–23:00)
             return on_time <= now < off_time
@@ -367,17 +396,23 @@ class Slideshow:
     def run(self):
         print("[Slideshow] Starting slideshow loop...")
         clock = pygame.time.Clock()
+        display_was_on = True
         while True:
-            if self.is_display_on():
+            display_should_be_on = self.is_display_on()
+            if display_should_be_on:
                 self.set_display_power(True)
                 self.next_image()
                 self.draw_image()
                 pygame.display.flip()
+                display_was_on = True
             else:
+                if display_was_on:
+                    print("[Display] Display off time reached, blanking screen")
+                    display_was_on = False
                 self.draw_blank_screen()
                 pygame.display.flip()
                 self.set_display_power(False)
-                shutdown(10)
+                # Removed automatic shutdown - just blank the display
 
             start_time = time.time()
             while time.time() - start_time < self.display_time_seconds:
@@ -447,7 +482,7 @@ def main():
         display_time_seconds = args.delay
     else:
         try:
-            display_time_seconds = float(get_config_value("delay_seconds", 10))
+            display_time_seconds = float(get_config_value("delay", 10))
         except Exception:
             display_time_seconds = 10
 
@@ -480,13 +515,25 @@ def main():
         screen = pygame.display.set_mode(window_size)
     pygame.mouse.set_visible(False)
 
-    global LOCATION_CITY_SUBURB, DISPLAY_OFF_TIME, DISPLAY_ON_TIME
-    LOCATION_CITY_SUBURB = location_city_suburb
-    DISPLAY_OFF_TIME = display_off_time
-    DISPLAY_ON_TIME = display_on_time
+    # Create config dictionary for Slideshow
+    slideshow_config = {
+        'location_city_suburb': location_city_suburb,
+        'display_off_time': display_off_time,
+        'display_on_time': display_on_time,
+        'show_time': get_config_value('show_time', 'true'),
+        'show_date': get_config_value('show_date', 'true'),
+        'show_temperature': get_config_value('show_temperature', 'true'),
+        'show_weather_code': get_config_value('show_weather_code', 'true'),
+        'show_filename': get_config_value('show_filename', 'true'),
+        'ui_text_alpha': get_config_value('ui_text_alpha', '192'),
+        'weather_update_seconds': get_config_value('weather_update_seconds', '900'),
+        'aspect_ratio_landscape': get_config_value('aspect_ratio_landscape', '1.5'),
+        'aspect_ratio_portrait': get_config_value('aspect_ratio_portrait', '0.667'),
+        'image_history_size': get_config_value('image_history_size', '5')
+    }
 
     # Pass config values to Slideshow
-    slideshow = Slideshow(images_directory, screen, display_time_seconds)
+    slideshow = Slideshow(images_directory, screen, display_time_seconds, slideshow_config)
     slideshow.run()
 
 
