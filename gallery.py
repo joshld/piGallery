@@ -365,7 +365,8 @@ class Slideshow:
         if new_images:
             random.shuffle(new_images)
             self.images.extend(new_images)
-        print(f"[Slideshow] Found {len(new_images)} new images, total queue={len(self.images)}")
+        self.total_images = len(self.images) + len(self.history)
+        print(f"[Slideshow] Found {len(new_images)} new images, total queue={self.total_images}")
 
     def next_image(self):
         if self.forward_stack:
@@ -377,8 +378,6 @@ class Slideshow:
             # Refresh images every time we reach the end
             if not self.images:
                 self.refresh_images()
-                if self.images:
-                    self.total_images = len(self.images)
 
             if self.images:
                 self.current_img = self.images.pop()
@@ -487,7 +486,7 @@ class Slideshow:
 # ---------------- Main ----------------
 def main():
     parser = argparse.ArgumentParser(description="Fullscreen slideshow")
-    parser.add_argument("--delay", type=float, help="Display time per image in seconds")
+    parser.add_argument("--delay", type=int, help="Display time per image in seconds (integer)")
     parser.add_argument(
         "--window-size",
         type=str,
@@ -531,14 +530,14 @@ def main():
         display_time_seconds = args.delay
     else:
         try:
-            display_time_seconds = float(get_config_value("delay_seconds", 10))
+            display_time_seconds = get_int_config("delay_seconds", 10)
         except Exception:
             display_time_seconds = 10
 
     # Window size and fullscreen
     fullscreen = args.fullscreen
     window_size_str = args.window_size or get_config_value("window_size", "1024x768")
-    fullscreen_config = get_config_value("fullscreen", "false").lower() == "true"
+    fullscreen_config = get_bool_config("fullscreen", True)
     if not fullscreen:
         if window_size_str.lower() == "fullscreen":
             fullscreen = True
