@@ -141,8 +141,13 @@ def shutdown(timeout_seconds):
 
 def get_coords_from_place(place_name: str):
     geolocator = Nominatim(user_agent="my_geocoder")
-    location = geolocator.geocode(place_name, timeout=3)
-    return (location.latitude, location.longitude) if location else (None, None)
+    try:
+        # Use shorter timeout to avoid blocking startup
+        location = geolocator.geocode(place_name, timeout=2)
+        return (location.latitude, location.longitude) if location else (None, None)
+    except Exception as e:
+        print(f"[Geocoding] Error: {e}")
+        return (None, None)
 
 
 def get_weather(lat=51.5072, lon=-0.1276):
@@ -204,17 +209,21 @@ class Slideshow:
 
         self.text_color = (255, 255, 255)
 
-        # Weather
+        # Weather - geocode asynchronously to avoid blocking startup
         self.city_suburb = config_dict.get('location_city_suburb', 'Sydney, Australia')
-        self.lat, self.long = 51.5072, 0.1276
+        self.lat, self.long = 51.5072, 0.1276  # Default coordinates (London)
         show_temp = config_dict.get('show_temperature', 'true').lower() == 'true'
         show_weather = config_dict.get('show_weather_code', 'true').lower() == 'true'
         if show_temp or show_weather:
+            # Try geocoding but don't block - will retry later if needed
             try:
+                print(f"[Startup] Geocoding {self.city_suburb}...")
                 self.lat, self.long = get_coords_from_place(self.city_suburb)
                 if self.lat is None or self.long is None:
                     print(f"[Warning] Could not geocode {self.city_suburb}, using default coordinates")
                     self.lat, self.long = 51.5072, 0.1276
+                else:
+                    print(f"[Startup] Geocoded {self.city_suburb} to lat={self.lat}, lon={self.long}")
             except Exception as e:
                 print(f"[Warning] Geocoding failed: {e}, using default coordinates")
                 self.lat, self.long = 51.5072, 0.1276
@@ -255,6 +264,23 @@ class Slideshow:
 
         self.screen.fill((0, 0, 0))
         new_w = 0
+        
+        # Show status message if no images found
+        if not self.current_img:
+            if not os.path.exists(self.folder):
+                status_msg = f"No images found in directory: {self.folder}"
+            elif len(self.images) == 0 and len(self.history) == 0:
+                status_msg = f"No images found in: {self.folder}"
+            else:
+                status_msg = "Loading images..."
+            
+            # Draw status message in center of screen
+            status_font = pygame.font.SysFont(None, 32)
+            status_surf = status_font.render(status_msg, True, (255, 255, 255))
+            status_rect = status_surf.get_rect(center=(self.screen_w // 2, self.screen_h // 2))
+            self.screen.blit(status_surf, status_rect)
+            print(f"[Slideshow] {status_msg}")
+        
         if self.current_img:
             img_path = os.path.join(self.folder, self.current_img)
             try:
@@ -311,15 +337,31 @@ class Slideshow:
             self.screen.blit(weather_surf, (self.screen_w - weather_surf.get_width() - 10, 72))
 
     def refresh_images(self):
+        # Check if directory exists
+        if not os.path.exists(self.folder):
+            print(f"[Error] Images directory does not exist: {self.folder}")
+            return
+        if not os.path.isdir(self.folder):
+            print(f"[Error] Images path is not a directory: {self.folder}")
+            return
+        
         # Recursively scan for images (supports subfolders)
         new_images = []
-        for root, _, files in os.walk(self.folder):
-            for f in files:
-                if f.lower().endswith((".jpg", ".jpeg", ".png")):
-                    # Store relative path from base folder
-                    rel_path = os.path.relpath(os.path.join(root, f), self.folder)
-                    if rel_path not in self.history and rel_path != self.current_img:
-                        new_images.append(rel_path)
+        try:
+            for root, _, files in os.walk(self.folder):
+                for f in files:
+                    if f.lower().endswith((".jpg", ".jpeg", ".png")):
+                        # Store relative path from base folder
+                        rel_path = os.path.relpath(os.path.join(root, f), self.folder)
+                        if rel_path not in self.history and rel_path != self.current_img:
+                            new_images.append(rel_path)
+        except PermissionError as e:
+            print(f"[Error] Permission denied accessing {self.folder}: {e}")
+            return
+        except Exception as e:
+            print(f"[Error] Failed to scan images directory: {e}")
+            return
+            
         if new_images:
             random.shuffle(new_images)
             self.images.extend(new_images)
@@ -395,6 +437,13 @@ class Slideshow:
 
     def run(self):
         print("[Slideshow] Starting slideshow loop...")
+        print(f"[Slideshow] Images directory: {self.folder}")
+        print(f"[Slideshow] Directory exists: {os.path.exists(self.folder)}")
+        
+        # Try to load initial images
+        if not self.images and len(self.history) == 0:
+            self.refresh_images()
+        
         clock = pygame.time.Clock()
         display_was_on = True
         while True:
