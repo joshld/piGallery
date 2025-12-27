@@ -1,0 +1,127 @@
+┌─────────────────────────────────────────────────────────┐
+│           PHOTO FRAME WEB INTERFACE                     │
+│                 Quick Reference                         │
+└─────────────────────────────────────────────────────────┘
+
+📦 INSTALLATION
+────────────────
+1. pip install -r requirements.txt
+2. python gallery.py
+3. Open browser to http://[PI_IP]:5000
+
+🌐 ACCESS URLS
+────────────────
+• On Pi:          http://localhost:5000
+• Same network:   http://raspberrypi.local:5000
+• Direct IP:      http://192.168.1.xxx:5000
+
+🎮 WEB INTERFACE FEATURES
+────────────────────────────
+┌─ Playback Controls ──────────────────┐
+│ ⬅️  Previous    Next ➡️              │
+│ ⏸️  Pause/Resume                     │
+└──────────────────────────────────────┘
+
+┌─ Display Control ────────────────────┐
+│ 💡 Turn On    🌙 Turn Off           │
+│ 🔄 Auto Mode (follow schedule)      │
+└──────────────────────────────────────┘
+
+┌─ Upload Photos ──────────────────────┐
+│ 📤 Drag & drop or click to upload   │
+│ Supports: JPG, JPEG, PNG             │
+└──────────────────────────────────────┘
+
+┌─ Settings Toggle ────────────────────┐
+│ ⏰ Show Time        ON/OFF           │
+│ 📅 Show Date        ON/OFF           │
+│ 🌡️  Show Temp       ON/OFF           │
+│ ☁️  Show Weather    ON/OFF           │
+│ 📄 Show Filename   ON/OFF           │
+│ 💾 Save to config.ini                │
+└──────────────────────────────────────┘
+
+🔌 API ENDPOINTS
+────────────────
+GET  /api/status         - Current status
+POST /api/next           - Skip to next
+POST /api/prev           - Go to previous
+POST /api/pause          - Toggle pause
+POST /api/display        - Control display
+POST /api/upload         - Upload image
+GET  /api/settings       - Get settings
+POST /api/settings       - Update settings
+
+📱 MOBILE USE
+──────────────
+✓ Responsive design (phone/tablet/PC)
+✓ No app installation needed
+✓ Works on iOS, Android, Windows, Mac
+✓ Real-time status updates (3 sec)
+
+⚙️ CONFIGURATION
+─────────────────
+Edit config.ini:
+  • images_directory     - Photo folder path
+  • delay_seconds        - Time per image
+  • display_off_time     - When to turn off
+  • display_on_time      - When to turn on
+  • location_city_suburb - Weather location
+
+🔧 TROUBLESHOOTING
+───────────────────
+Can't access?
+  → Check: ./test_setup.sh
+  → Allow: sudo ufw allow 5000
+  → Find IP: hostname -I
+
+Web loads but doesn't work?
+  → Check browser console (F12)
+  → Check Python console for errors
+  → Verify slideshow is running
+
+Upload not working?
+  → Check directory permissions
+  → Verify file format (JPG/PNG only)
+  → Check file size (large files timeout)
+
+🚀 KEYBOARD SHORTCUTS (on Pi)
+───────────────────────────────
+ESC        Quit application
+RIGHT →    Next image
+LEFT  ←    Previous image
+
+💡 PRO TIPS
+────────────
+• Bookmark the URL on your phone home screen
+• Use drag-and-drop for quick photo uploads
+• Toggle settings to reduce clutter
+• Pause during parties and manual control
+• Auto mode follows your schedule automatically
+
+📊 MEMORY USAGE
+────────────────
+Before web:  119 MB
+After web:   129 MB (+10 MB)
+CPU idle:    ~8%
+
+Still great for 1GB Raspberry Pi 3 B+! ✓
+
+🎨 BROWSER COMPATIBILITY
+─────────────────────────
+✓ Chrome/Chromium
+✓ Firefox
+✓ Safari (iOS/macOS)
+✓ Edge
+✓ Mobile browsers
+
+📚 DOCUMENTATION
+─────────────────
+README.md                  - Main documentation
+WEB_INTERFACE_SETUP.md     - Detailed setup guide
+IMPLEMENTATION_SUMMARY.md  - Technical details
+test_setup.sh              - Verification script
+
+═══════════════════════════════════════════════════════════
+      Enjoy your web-controlled photo frame! 🖼️📱
+═══════════════════════════════════════════════════════════

@@ -1,3 +1,5 @@
 pygame
 requests
 geopy
+flask
+flask-cors
