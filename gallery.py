@@ -25,6 +25,7 @@ DEFAULT_CONFIG = {
     "gallery": {
         "location_city_suburb": "Sydney, Australia",
         "images_directory": "/path/to/your/images/",
+        "upload_directory": "",
         "display_off_time": "23:00",
         "display_on_time": "05:00",
         "delay_seconds": "10",
@@ -655,7 +656,7 @@ def api_display():
 
 @app.route('/api/upload', methods=['POST'])
 def api_upload():
-    """Upload new image"""
+    """Upload new image to separate upload directory"""
     if slideshow_instance is None:
         return jsonify({'error': 'Slideshow not initialized'}), 503
     
@@ -670,15 +671,63 @@ def api_upload():
         return jsonify({'error': 'Invalid file type. Only JPG and PNG allowed'}), 400
     
     filename = secure_filename(file.filename)
-    filepath = os.path.join(slideshow_instance.folder, filename)
-    file.save(filepath)
     
-    print(f"[Web] Uploaded new image: {filename}")
+    # Determine upload directory
+    upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
+    if not upload_dir:
+        # Default: create 'uploaded' subdirectory in images directory
+        upload_dir = os.path.join(slideshow_instance.folder, 'uploaded')
+    else:
+        # Use configured upload directory
+        upload_dir = os.path.expanduser(upload_dir)  # Support ~ for home directory
     
-    # Refresh images to include the new upload
+    # Create upload directory if it doesn't exist
+    try:
+        os.makedirs(upload_dir, exist_ok=True)
+        # Verify directory was actually created
+        if not os.path.exists(upload_dir):
+            return jsonify({'error': f'Failed to create upload directory: {upload_dir}'}), 500
+        if not os.path.isdir(upload_dir):
+            return jsonify({'error': f'Upload path exists but is not a directory: {upload_dir}'}), 500
+        print(f"[Web] Upload directory: {upload_dir}")
+    except PermissionError as e:
+        return jsonify({'error': f'Permission denied creating upload directory: {e}'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Failed to create upload directory: {e}'}), 500
+    
+    # Verify directory is writable
+    try:
+        test_file = os.path.join(upload_dir, '.write_test')
+        with open(test_file, 'w') as f:
+            f.write('test')
+        os.remove(test_file)
+    except Exception as e:
+        return jsonify({'error': f'Upload directory is not writable: {e}'}), 500
+    
+    # Save file to upload directory
+    filepath = os.path.join(upload_dir, filename)
+
+    # Save file to upload directory
+    filepath = os.path.join(upload_dir, filename)
+    
+    # Handle filename conflicts (add number if exists)
+    base_name, ext = os.path.splitext(filename)
+    counter = 1
+    while os.path.exists(filepath):
+        filename = f"{base_name}_{counter}{ext}"
+        filepath = os.path.join(upload_dir, filename)
+        counter += 1
+    
+    try:
+        file.save(filepath)
+        print(f"[Web] Uploaded new image: {filename} to {upload_dir}")
+    except Exception as e:
+        return jsonify({'error': f'Failed to save file: {e}'}), 500
+    
+    # Refresh images to include the new upload (refresh_images scans recursively)
     slideshow_instance.refresh_images()
     
-    return jsonify({'status': 'ok', 'filename': filename})
+    return jsonify({'status': 'ok', 'filename': filename, 'upload_dir': upload_dir})
 
 @app.route('/api/settings', methods=['GET', 'POST'])
 def api_settings():
@@ -700,7 +749,8 @@ def api_settings():
             'aspect_ratio_landscape': slideshow_instance.config.get('aspect_ratio_landscape', '1.5'),
             'aspect_ratio_portrait': slideshow_instance.config.get('aspect_ratio_portrait', '0.667'),
             'ui_text_alpha': slideshow_instance.config.get('ui_text_alpha', '192'),
-            'weather_update_seconds': slideshow_instance.config.get('weather_update_seconds', '900')
+            'weather_update_seconds': slideshow_instance.config.get('weather_update_seconds', '900'),
+            'upload_directory': slideshow_instance.config.get('upload_directory', '')
         })
     
     elif request.method == 'POST':
@@ -740,6 +790,8 @@ def api_settings():
             slideshow_instance.config['ui_text_alpha'] = str(int(data['ui_text_alpha']))
         if 'weather_update_seconds' in data:
             slideshow_instance.config['weather_update_seconds'] = str(int(data['weather_update_seconds']))
+        if 'upload_directory' in data:
+            slideshow_instance.config['upload_directory'] = data['upload_directory'].strip()
         
         # Force a redraw to apply settings immediately
         slideshow_instance.force_redraw = True
@@ -764,7 +816,7 @@ def api_settings():
             for key in ['show_time', 'show_date', 'show_temperature', 'show_weather_code', 
                        'show_filename', 'display_off_time', 'display_on_time',
                        'location_city_suburb', 'aspect_ratio_landscape', 'aspect_ratio_portrait',
-                       'ui_text_alpha', 'weather_update_seconds']:
+                       'ui_text_alpha', 'weather_update_seconds', 'upload_directory']:
                 if key in data:
                     config['gallery'][key] = str(data[key])
             

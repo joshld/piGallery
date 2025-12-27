@@ -390,6 +390,14 @@
                                onchange="updateSetting('delay_seconds', this.value)">
                     </div>
                     <div class="setting-item">
+                        <span>Upload Directory</span>
+                        <input type="text" id="upload-directory" placeholder="Leave empty for default" 
+                               onchange="updateSetting('upload_directory', this.value)" style="width: 200px;">
+                        <small style="display: block; color: #666; margin-top: 5px;">
+                            Empty = images_directory/uploaded/
+                        </small>
+                    </div>
+                    <div class="setting-item">
                         <span>Display On Time</span>
                         <input type="time" id="display-on-time" 
                                onchange="updateSetting('display_on_time', this.value)">
