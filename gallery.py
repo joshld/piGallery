@@ -644,7 +644,12 @@ def api_settings():
             'show_filename': slideshow_instance.config.get('show_filename', 'true'),
             'delay_seconds': slideshow_instance.display_time_seconds,
             'display_off_time': slideshow_instance.config.get('display_off_time', '23:00'),
-            'display_on_time': slideshow_instance.config.get('display_on_time', '05:00')
+            'display_on_time': slideshow_instance.config.get('display_on_time', '05:00'),
+            'location_city_suburb': slideshow_instance.config.get('location_city_suburb', 'Sydney, Australia'),
+            'aspect_ratio_landscape': slideshow_instance.config.get('aspect_ratio_landscape', '1.5'),
+            'aspect_ratio_portrait': slideshow_instance.config.get('aspect_ratio_portrait', '0.667'),
+            'ui_text_alpha': slideshow_instance.config.get('ui_text_alpha', '192'),
+            'weather_update_seconds': slideshow_instance.config.get('weather_update_seconds', '900')
         })
     
     elif request.method == 'POST':
@@ -652,21 +657,38 @@ def api_settings():
         
         # Update config values
         if 'show_time' in data:
-            slideshow_instance.config['show_time'] = data['show_time']
+            slideshow_instance.config['show_time'] = str(data['show_time']).lower()
         if 'show_date' in data:
-            slideshow_instance.config['show_date'] = data['show_date']
+            slideshow_instance.config['show_date'] = str(data['show_date']).lower()
         if 'show_temperature' in data:
-            slideshow_instance.config['show_temperature'] = data['show_temperature']
+            slideshow_instance.config['show_temperature'] = str(data['show_temperature']).lower()
         if 'show_weather_code' in data:
-            slideshow_instance.config['show_weather_code'] = data['show_weather_code']
+            slideshow_instance.config['show_weather_code'] = str(data['show_weather_code']).lower()
         if 'show_filename' in data:
-            slideshow_instance.config['show_filename'] = data['show_filename']
+            slideshow_instance.config['show_filename'] = str(data['show_filename']).lower()
         if 'delay_seconds' in data:
             slideshow_instance.display_time_seconds = int(data['delay_seconds'])
         if 'display_off_time' in data:
             slideshow_instance.config['display_off_time'] = data['display_off_time']
         if 'display_on_time' in data:
             slideshow_instance.config['display_on_time'] = data['display_on_time']
+        if 'location_city_suburb' in data:
+            slideshow_instance.config['location_city_suburb'] = data['location_city_suburb']
+            # Re-geocode the location
+            slideshow_instance.city_suburb = data['location_city_suburb']
+            lat, lon = get_coords_from_place(data['location_city_suburb'])
+            if lat and lon:
+                slideshow_instance.lat = lat
+                slideshow_instance.long = lon
+                print(f"[Web] Updated location to {data['location_city_suburb']}: lat={lat}, lon={lon}")
+        if 'aspect_ratio_landscape' in data:
+            slideshow_instance.config['aspect_ratio_landscape'] = str(data['aspect_ratio_landscape'])
+        if 'aspect_ratio_portrait' in data:
+            slideshow_instance.config['aspect_ratio_portrait'] = str(data['aspect_ratio_portrait'])
+        if 'ui_text_alpha' in data:
+            slideshow_instance.config['ui_text_alpha'] = str(int(data['ui_text_alpha']))
+        if 'weather_update_seconds' in data:
+            slideshow_instance.config['weather_update_seconds'] = str(int(data['weather_update_seconds']))
         
         # Optionally save to config.ini
         save_to_config = data.get('save_to_config', False)
@@ -680,7 +702,9 @@ def api_settings():
             
             # Update config file
             for key in ['show_time', 'show_date', 'show_temperature', 'show_weather_code', 
-                       'show_filename', 'display_off_time', 'display_on_time']:
+                       'show_filename', 'display_off_time', 'display_on_time',
+                       'location_city_suburb', 'aspect_ratio_landscape', 'aspect_ratio_portrait',
+                       'ui_text_alpha', 'weather_update_seconds']:
                 if key in data:
                     config['gallery'][key] = str(data[key])
             

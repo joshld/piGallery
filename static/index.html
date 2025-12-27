@@ -363,6 +363,46 @@
                         <span>Show Filename</span>
                         <div class="toggle-switch" id="toggle-filename" onclick="toggleSetting('show_filename', this)"></div>
                     </div>
+                    <div class="setting-item">
+                        <span>Delay (seconds)</span>
+                        <input type="number" id="delay-seconds" min="1" max="3600" value="30" 
+                               onchange="updateSetting('delay_seconds', this.value)">
+                    </div>
+                    <div class="setting-item">
+                        <span>Display On Time</span>
+                        <input type="time" id="display-on-time" 
+                               onchange="updateSetting('display_on_time', this.value)">
+                    </div>
+                    <div class="setting-item">
+                        <span>Display Off Time</span>
+                        <input type="time" id="display-off-time" 
+                               onchange="updateSetting('display_off_time', this.value)">
+                    </div>
+                    <div class="setting-item">
+                        <span>Location (City)</span>
+                        <input type="text" id="location-city" placeholder="Sydney, Australia" 
+                               onchange="updateSetting('location_city_suburb', this.value)" style="width: 200px;">
+                    </div>
+                    <div class="setting-item">
+                        <span>UI Text Alpha (0-255)</span>
+                        <input type="number" id="ui-text-alpha" min="0" max="255" value="192" 
+                               onchange="updateSetting('ui_text_alpha', this.value)">
+                    </div>
+                    <div class="setting-item">
+                        <span>Aspect Ratio (Landscape)</span>
+                        <input type="number" id="aspect-landscape" step="0.1" min="0.5" max="3.0" value="1.5" 
+                               onchange="updateSetting('aspect_ratio_landscape', this.value)">
+                    </div>
+                    <div class="setting-item">
+                        <span>Aspect Ratio (Portrait)</span>
+                        <input type="number" id="aspect-portrait" step="0.1" min="0.1" max="1.0" value="0.667" 
+                               onchange="updateSetting('aspect_ratio_portrait', this.value)">
+                    </div>
+                    <div class="setting-item">
+                        <span>Weather Update (seconds)</span>
+                        <input type="number" id="weather-update" min="60" max="3600" value="900" 
+                               onchange="updateSetting('weather_update_seconds', this.value)">
+                    </div>
                 </div>
                 <button class="btn-success btn-full" onclick="saveSettings()">💾 Save Settings</button>
             </div>
@@ -426,9 +466,40 @@
                 updateToggle('toggle-temp', settings.show_temperature === 'true');
                 updateToggle('toggle-weather', settings.show_weather_code === 'true');
                 updateToggle('toggle-filename', settings.show_filename === 'true');
+
+                // Update input fields
+                if (document.getElementById('delay-seconds')) {
+                    document.getElementById('delay-seconds').value = settings.delay_seconds || 30;
+                }
+                if (document.getElementById('display-on-time')) {
+                    document.getElementById('display-on-time').value = settings.display_on_time || '05:00';
+                }
+                if (document.getElementById('display-off-time')) {
+                    document.getElementById('display-off-time').value = settings.display_off_time || '23:00';
+                }
+                if (document.getElementById('location-city')) {
+                    document.getElementById('location-city').value = settings.location_city_suburb || '';
+                }
+                if (document.getElementById('ui-text-alpha')) {
+                    document.getElementById('ui-text-alpha').value = settings.ui_text_alpha || 192;
+                }
+                if (document.getElementById('aspect-landscape')) {
+                    document.getElementById('aspect-landscape').value = settings.aspect_ratio_landscape || 1.5;
+                }
+                if (document.getElementById('aspect-portrait')) {
+                    document.getElementById('aspect-portrait').value = settings.aspect_ratio_portrait || 0.667;
+                }
+                if (document.getElementById('weather-update')) {
+                    document.getElementById('weather-update').value = settings.weather_update_seconds || 900;
+                }
             } catch (error) {
                 console.error('Failed to load settings:', error);
             }
+        }
+
+        function updateSetting(key, value) {
+            settings[key] = value;
+            // Optionally auto-save, or wait for "Save Settings" button
         }
 
         function updateToggle(id, active) {
@@ -448,10 +519,24 @@
 
         async function saveSettings() {
             try {
+                // Collect all settings from form
+                const allSettings = {
+                    ...settings,
+                    delay_seconds: parseInt(document.getElementById('delay-seconds')?.value || settings.delay_seconds),
+                    display_on_time: document.getElementById('display-on-time')?.value || settings.display_on_time,
+                    display_off_time: document.getElementById('display-off-time')?.value || settings.display_off_time,
+                    location_city_suburb: document.getElementById('location-city')?.value || settings.location_city_suburb,
+                    ui_text_alpha: parseInt(document.getElementById('ui-text-alpha')?.value || settings.ui_text_alpha),
+                    aspect_ratio_landscape: parseFloat(document.getElementById('aspect-landscape')?.value || settings.aspect_ratio_landscape),
+                    aspect_ratio_portrait: parseFloat(document.getElementById('aspect-portrait')?.value || settings.aspect_ratio_portrait),
+                    weather_update_seconds: parseInt(document.getElementById('weather-update')?.value || settings.weather_update_seconds),
+                    save_to_config: true
+                };
+                
                 const response = await fetch('/api/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ...settings, save_to_config: true })
+                    body: JSON.stringify(allSettings)
                 });
                 
                 if (response.ok) {
