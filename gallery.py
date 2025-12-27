@@ -471,9 +471,6 @@ class Slideshow:
         # Try to load initial images
         if not self.images and len(self.history) == 0:
             self.refresh_images()
-            # Load the first image immediately
-            if self.images:
-                self.next_image()
         
         clock = pygame.time.Clock()
         display_was_on = True
@@ -607,6 +604,7 @@ def api_next():
     
     with slideshow_instance.control_lock:
         slideshow_instance.next_image()
+        slideshow_instance.force_redraw = True  # Force immediate redraw
     
     return jsonify({'status': 'ok', 'current_image': slideshow_instance.current_img})
 
@@ -618,6 +616,7 @@ def api_prev():
     
     with slideshow_instance.control_lock:
         slideshow_instance.prev_image()
+        slideshow_instance.force_redraw = True  # Force immediate redraw
     
     return jsonify({'status': 'ok', 'current_image': slideshow_instance.current_img})
 
