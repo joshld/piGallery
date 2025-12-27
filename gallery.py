@@ -215,6 +215,7 @@ class Slideshow:
         self.paused = False
         self.manual_display_override = None  # None = auto, True = force on, False = force off
         self.control_lock = threading.Lock()
+        self.force_redraw = False
 
         self.fonts = {
             "filename": pygame.font.SysFont("Arial", 14),
@@ -481,6 +482,12 @@ class Slideshow:
             if display_should_be_on:
                 self.set_display_power(True)
                 
+                # Check if we need to force a redraw (settings changed)
+                if self.force_redraw:
+                    self.draw_image()
+                    pygame.display.flip()
+                    self.force_redraw = False
+
                 # Only advance if not paused
                 if not self.paused:
                     self.next_image()
@@ -499,6 +506,12 @@ class Slideshow:
             # Wait for display_time_seconds, handling events (original structure)
             start_time = time.time()
             while time.time() - start_time < self.display_time_seconds:
+                # Check for forced redraw during wait (for settings changes)
+                if self.force_redraw and display_should_be_on:
+                    self.draw_image()
+                    pygame.display.flip()
+                    self.force_redraw = False
+
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         pygame.quit()
@@ -690,6 +703,15 @@ def api_settings():
         if 'weather_update_seconds' in data:
             slideshow_instance.config['weather_update_seconds'] = str(int(data['weather_update_seconds']))
         
+        # Force a redraw to apply settings immediately
+        slideshow_instance.force_redraw = True
+
+        # If aspect ratios changed, need to reload current image
+        if 'aspect_ratio_landscape' in data or 'aspect_ratio_portrait' in data:
+            # Clear cached image so it reloads with new aspect ratios
+            if hasattr(slideshow_instance, '_cached_image_name'):
+                slideshow_instance._cached_image_name = None
+
         # Optionally save to config.ini
         save_to_config = data.get('save_to_config', False)
         if save_to_config:

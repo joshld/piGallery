@@ -274,8 +274,8 @@
 <body>
     <div class="container">
         <header>
-            <h1>🖼️ Photo Frame Control</h1>
-            <p>Control your digital photo frame from anywhere</p>
+            <h1>🖼️ piGallery Web Control</h1>
+            <p>Control the piGallery from anywhere on the network</p>
         </header>
 
         <div class="alert" id="alert"></div>
@@ -384,6 +384,11 @@
                                onchange="updateSetting('location_city_suburb', this.value)" style="width: 200px;">
                     </div>
                     <div class="setting-item">
+                        <span>Weather Update (seconds)</span>
+                        <input type="number" id="weather-update" min="60" max="3600" value="900" 
+                               onchange="updateSetting('weather_update_seconds', this.value)">
+                    </div>
+                    <div class="setting-item">
                         <span>UI Text Alpha (0-255)</span>
                         <input type="number" id="ui-text-alpha" min="0" max="255" value="192" 
                                onchange="updateSetting('ui_text_alpha', this.value)">
@@ -397,11 +402,6 @@
                         <span>Aspect Ratio (Portrait)</span>
                         <input type="number" id="aspect-portrait" step="0.1" min="0.1" max="1.0" value="0.667" 
                                onchange="updateSetting('aspect_ratio_portrait', this.value)">
-                    </div>
-                    <div class="setting-item">
-                        <span>Weather Update (seconds)</span>
-                        <input type="number" id="weather-update" min="60" max="3600" value="900" 
-                               onchange="updateSetting('weather_update_seconds', this.value)">
                     </div>
                 </div>
                 <button class="btn-success btn-full" onclick="saveSettings()">💾 Save Settings</button>
@@ -526,10 +526,10 @@
                     display_on_time: document.getElementById('display-on-time')?.value || settings.display_on_time,
                     display_off_time: document.getElementById('display-off-time')?.value || settings.display_off_time,
                     location_city_suburb: document.getElementById('location-city')?.value || settings.location_city_suburb,
+                    weather_update_seconds: parseInt(document.getElementById('weather-update')?.value || settings.weather_update_seconds),
                     ui_text_alpha: parseInt(document.getElementById('ui-text-alpha')?.value || settings.ui_text_alpha),
                     aspect_ratio_landscape: parseFloat(document.getElementById('aspect-landscape')?.value || settings.aspect_ratio_landscape),
                     aspect_ratio_portrait: parseFloat(document.getElementById('aspect-portrait')?.value || settings.aspect_ratio_portrait),
-                    weather_update_seconds: parseInt(document.getElementById('weather-update')?.value || settings.weather_update_seconds),
                     save_to_config: true
                 };
                 
