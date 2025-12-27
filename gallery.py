@@ -23,7 +23,7 @@ DEFAULT_CONFIG = {
         "images_directory": "/path/to/your/images/",
         "display_off_time": "23:00",
         "display_on_time": "05:00",
-        "delay": "10",
+        "delay_seconds": "10",
         "window_size": "1024x768",
         "fullscreen": "false",
         "aspect_ratio_landscape": "1.5",
@@ -531,7 +531,7 @@ def main():
         display_time_seconds = args.delay
     else:
         try:
-            display_time_seconds = float(get_config_value("delay", 10))
+            display_time_seconds = float(get_config_value("delay_seconds", 10))
         except Exception:
             display_time_seconds = 10
 
