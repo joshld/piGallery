@@ -452,6 +452,9 @@ class Slideshow:
             elif not on and current_state == 1:
                 os.system("vcgencmd display_power 0")
             # else: already in desired state
+        except FileNotFoundError:
+            # Not on Raspberry Pi - silently skip
+            pass
         except Exception as e:
             print(f"Failed to set display power: {e}")
 
