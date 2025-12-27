@@ -475,21 +475,18 @@ class Slideshow:
         
         clock = pygame.time.Clock()
         display_was_on = True
-        last_auto_advance = time.time()
         
         while True:
             display_should_be_on = self.is_display_on()
             if display_should_be_on:
                 self.set_display_power(True)
                 
-                # Only auto-advance if not paused
-                if not self.paused and (time.time() - last_auto_advance >= self.display_time_seconds):
-                    with self.control_lock:
-                        self.next_image()
-                    last_auto_advance = time.time()
+                # Only advance if not paused
+                if not self.paused:
+                    self.next_image()
+                    self.draw_image()
+                    pygame.display.flip()
                 
-                self.draw_image()
-                pygame.display.flip()
                 display_was_on = True
             else:
                 if display_was_on:
@@ -498,28 +495,31 @@ class Slideshow:
                 self.draw_blank_screen()
                 pygame.display.flip()
                 self.set_display_power(False)
-                # Removed automatic shutdown - just blank the display
 
-            # Handle events without busy-waiting
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    raise SystemExit
-                if event.type == pygame.KEYDOWN:
-                    print(f"[Input] Key pressed: {pygame.key.name(event.key)}")
-                    if event.key == pygame.K_ESCAPE:
+            # Wait for display_time_seconds, handling events (original structure)
+            start_time = time.time()
+            while time.time() - start_time < self.display_time_seconds:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
                         pygame.quit()
                         raise SystemExit
-                    elif event.key == pygame.K_RIGHT:
-                        with self.control_lock:
-                            self.next_image()
-                        last_auto_advance = time.time()
-                    elif event.key == pygame.K_LEFT:
-                        with self.control_lock:
-                            self.prev_image()
-                        last_auto_advance = time.time()
-            
-            clock.tick(10)  # 10 FPS is plenty for static images
+                    if event.type == pygame.KEYDOWN:
+                        print(f"[Input] Key pressed: {pygame.key.name(event.key)}")
+                        if event.key == pygame.K_ESCAPE:
+                            pygame.quit()
+                            raise SystemExit
+                        elif event.key == pygame.K_RIGHT:
+                            start_time = 0
+                            break
+                        elif event.key == pygame.K_LEFT:
+                            with self.control_lock:
+                                self.prev_image()
+                            if display_should_be_on:
+                                self.draw_image()
+                                pygame.display.flip()
+                            start_time = 0
+                            break
+                clock.tick(60)
 
 
 # ---------------- Web API Endpoints ----------------
