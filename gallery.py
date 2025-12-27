@@ -296,7 +296,10 @@ class Slideshow:
             status_surf = status_font.render(status_msg, True, (255, 255, 255))
             status_rect = status_surf.get_rect(center=(self.screen_w // 2, self.screen_h // 2))
             self.screen.blit(status_surf, status_rect)
-            print(f"[Slideshow] {status_msg}")
+            # Only print once, not every frame
+            if not hasattr(self, '_last_status_msg') or self._last_status_msg != status_msg:
+                print(f"[Slideshow] {status_msg}")
+                self._last_status_msg = status_msg
         
         if self.current_img:
             img_path = os.path.join(self.folder, self.current_img)
@@ -466,6 +469,9 @@ class Slideshow:
         # Try to load initial images
         if not self.images and len(self.history) == 0:
             self.refresh_images()
+            # Load the first image immediately
+            if self.images:
+                self.next_image()
         
         clock = pygame.time.Clock()
         display_was_on = True
