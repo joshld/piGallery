@@ -8,6 +8,10 @@ import requests
 import subprocess
 from geopy.geocoders import Nominatim
 import sys
+import threading
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
+from werkzeug.utils import secure_filename
 
 if sys.version_info < (3, 7):
     print("Python 3.7 or newer is required.")
@@ -182,6 +186,14 @@ def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667):
     return img_scaled, x_offset, y_offset, new_w
 
 
+# ---------------- Web Server Setup ----------------
+app = Flask(__name__, static_folder='static')
+CORS(app)
+
+# Global reference to slideshow instance (set in main)
+slideshow_instance = None
+
+
 # ---------------- Slideshow Class ----------------
 class Slideshow:
     def __init__(self, folder, screen, display_time_seconds, config_dict):
@@ -198,6 +210,11 @@ class Slideshow:
         self.current_index = -1
         self.current_img = None
         self.total_images = 0
+        
+        # Web control state
+        self.paused = False
+        self.manual_display_override = None  # None = auto, True = force on, False = force off
+        self.control_lock = threading.Lock()
 
         self.fonts = {
             "filename": pygame.font.SysFont("Arial", 14),
@@ -400,6 +417,10 @@ class Slideshow:
             print(f"[Slideshow] Previous image {self.current_index+1}/{self.total_images}: {self.current_img}")
 
     def is_display_on(self):
+        # Check for manual override first
+        if self.manual_display_override is not None:
+            return self.manual_display_override
+            
         now = datetime.datetime.now().time()
         display_off_time = self.config.get('display_off_time', '23:00')
         display_on_time = self.config.get('display_on_time', '05:00')
@@ -445,11 +466,19 @@ class Slideshow:
         
         clock = pygame.time.Clock()
         display_was_on = True
+        last_auto_advance = time.time()
+        
         while True:
             display_should_be_on = self.is_display_on()
             if display_should_be_on:
                 self.set_display_power(True)
-                self.next_image()
+                
+                # Only auto-advance if not paused
+                if not self.paused and (time.time() - last_auto_advance >= self.display_time_seconds):
+                    with self.control_lock:
+                        self.next_image()
+                    last_auto_advance = time.time()
+                
                 self.draw_image()
                 pygame.display.flip()
                 display_was_on = True
@@ -462,25 +491,206 @@ class Slideshow:
                 self.set_display_power(False)
                 # Removed automatic shutdown - just blank the display
 
-            start_time = time.time()
-            while time.time() - start_time < self.display_time_seconds:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
+            # Handle events without busy-waiting
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    raise SystemExit
+                if event.type == pygame.KEYDOWN:
+                    print(f"[Input] Key pressed: {pygame.key.name(event.key)}")
+                    if event.key == pygame.K_ESCAPE:
                         pygame.quit()
                         raise SystemExit
-                    if event.type == pygame.KEYDOWN:
-                        print(f"[Input] Key pressed: {pygame.key.name(event.key)}")
-                        if event.key == pygame.K_ESCAPE:
-                            pygame.quit()
-                            raise SystemExit
-                        elif event.key == pygame.K_RIGHT:
-                            start_time = 0
-                            break
-                        elif event.key == pygame.K_LEFT:
+                    elif event.key == pygame.K_RIGHT:
+                        with self.control_lock:
+                            self.next_image()
+                        last_auto_advance = time.time()
+                    elif event.key == pygame.K_LEFT:
+                        with self.control_lock:
                             self.prev_image()
-                            start_time = 0
-                            break
-                clock.tick(60)
+                        last_auto_advance = time.time()
+            
+            clock.tick(10)  # 10 FPS is plenty for static images
+
+
+# ---------------- Web API Endpoints ----------------
+
+@app.route('/')
+def index():
+    return send_from_directory('static', 'index.html')
+
+@app.route('/api/status')
+def api_status():
+    """Get current slideshow status"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    return jsonify({
+        'current_image': slideshow_instance.current_img,
+        'current_index': slideshow_instance.current_index + 1,
+        'total_images': slideshow_instance.total_images,
+        'temperature': slideshow_instance.current_temp,
+        'weather': slideshow_instance.current_weather,
+        'time': datetime.datetime.now().strftime("%I:%M %p"),
+        'date': datetime.datetime.now().strftime("%d %b %Y"),
+        'paused': slideshow_instance.paused,
+        'display_on': slideshow_instance.is_display_on(),
+        'manual_override': slideshow_instance.manual_display_override
+    })
+
+@app.route('/api/next', methods=['POST'])
+def api_next():
+    """Go to next image"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    with slideshow_instance.control_lock:
+        slideshow_instance.next_image()
+    
+    return jsonify({'status': 'ok', 'current_image': slideshow_instance.current_img})
+
+@app.route('/api/prev', methods=['POST'])
+def api_prev():
+    """Go to previous image"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    with slideshow_instance.control_lock:
+        slideshow_instance.prev_image()
+    
+    return jsonify({'status': 'ok', 'current_image': slideshow_instance.current_img})
+
+@app.route('/api/pause', methods=['POST'])
+def api_pause():
+    """Toggle pause state"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    slideshow_instance.paused = not slideshow_instance.paused
+    status = 'paused' if slideshow_instance.paused else 'playing'
+    print(f"[Web] Slideshow {status}")
+    
+    return jsonify({'status': 'ok', 'paused': slideshow_instance.paused})
+
+@app.route('/api/display', methods=['POST'])
+def api_display():
+    """Control display on/off"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    data = request.json
+    action = data.get('action')  # 'on', 'off', or 'auto'
+    
+    if action == 'on':
+        slideshow_instance.manual_display_override = True
+    elif action == 'off':
+        slideshow_instance.manual_display_override = False
+    elif action == 'auto':
+        slideshow_instance.manual_display_override = None
+    else:
+        return jsonify({'error': 'Invalid action'}), 400
+    
+    print(f"[Web] Display set to: {action}")
+    return jsonify({'status': 'ok', 'action': action})
+
+@app.route('/api/upload', methods=['POST'])
+def api_upload():
+    """Upload new image"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    if not file.filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+        return jsonify({'error': 'Invalid file type. Only JPG and PNG allowed'}), 400
+    
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(slideshow_instance.folder, filename)
+    file.save(filepath)
+    
+    print(f"[Web] Uploaded new image: {filename}")
+    
+    # Refresh images to include the new upload
+    slideshow_instance.refresh_images()
+    
+    return jsonify({'status': 'ok', 'filename': filename})
+
+@app.route('/api/settings', methods=['GET', 'POST'])
+def api_settings():
+    """Get or update settings"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    if request.method == 'GET':
+        return jsonify({
+            'show_time': slideshow_instance.config.get('show_time', 'true'),
+            'show_date': slideshow_instance.config.get('show_date', 'true'),
+            'show_temperature': slideshow_instance.config.get('show_temperature', 'true'),
+            'show_weather_code': slideshow_instance.config.get('show_weather_code', 'true'),
+            'show_filename': slideshow_instance.config.get('show_filename', 'true'),
+            'delay_seconds': slideshow_instance.display_time_seconds,
+            'display_off_time': slideshow_instance.config.get('display_off_time', '23:00'),
+            'display_on_time': slideshow_instance.config.get('display_on_time', '05:00')
+        })
+    
+    elif request.method == 'POST':
+        data = request.json
+        
+        # Update config values
+        if 'show_time' in data:
+            slideshow_instance.config['show_time'] = data['show_time']
+        if 'show_date' in data:
+            slideshow_instance.config['show_date'] = data['show_date']
+        if 'show_temperature' in data:
+            slideshow_instance.config['show_temperature'] = data['show_temperature']
+        if 'show_weather_code' in data:
+            slideshow_instance.config['show_weather_code'] = data['show_weather_code']
+        if 'show_filename' in data:
+            slideshow_instance.config['show_filename'] = data['show_filename']
+        if 'delay_seconds' in data:
+            slideshow_instance.display_time_seconds = int(data['delay_seconds'])
+        if 'display_off_time' in data:
+            slideshow_instance.config['display_off_time'] = data['display_off_time']
+        if 'display_on_time' in data:
+            slideshow_instance.config['display_on_time'] = data['display_on_time']
+        
+        # Optionally save to config.ini
+        save_to_config = data.get('save_to_config', False)
+        if save_to_config:
+            config = configparser.ConfigParser()
+            if os.path.exists(CONFIG_PATH):
+                config.read(CONFIG_PATH)
+            
+            if 'gallery' not in config:
+                config['gallery'] = {}
+            
+            # Update config file
+            for key in ['show_time', 'show_date', 'show_temperature', 'show_weather_code', 
+                       'show_filename', 'display_off_time', 'display_on_time']:
+                if key in data:
+                    config['gallery'][key] = str(data[key])
+            
+            if 'delay_seconds' in data:
+                config['gallery']['delay_seconds'] = str(data['delay_seconds'])
+            
+            with open(CONFIG_PATH, 'w') as f:
+                config.write(f)
+            
+            print("[Web] Settings saved to config.ini")
+        
+        print(f"[Web] Settings updated: {data}")
+        return jsonify({'status': 'ok'})
+
+
+def start_web_server(host='0.0.0.0', port=5000):
+    """Start Flask web server in background thread"""
+    print(f"[Web] Starting web server on http://{host}:{port}")
+    app.run(host=host, port=port, debug=False, threaded=True)
 
 
 # ---------------- Main ----------------
@@ -582,6 +792,17 @@ def main():
 
     # Pass config values to Slideshow
     slideshow = Slideshow(images_directory, screen, display_time_seconds, slideshow_config)
+    
+    # Set global reference for web API
+    global slideshow_instance
+    slideshow_instance = slideshow
+    
+    # Start web server in background thread
+    web_thread = threading.Thread(target=start_web_server, kwargs={'host': '0.0.0.0', 'port': 5000}, daemon=True)
+    web_thread.start()
+    print("[Startup] Web interface available at http://0.0.0.0:5000")
+    
+    # Run slideshow (this blocks)
     slideshow.run()
 
 
