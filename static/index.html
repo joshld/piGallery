@@ -618,7 +618,15 @@
                                 html += `<div class="directory-item" onclick="loadDirectories('${escapedPath}')">${dir}</div>`;
                             } else if (currentBrowsePath) {
                                 // Regular directory - construct full path
-                                const separator = currentBrowsePath.endsWith('\\') || currentBrowsePath.endsWith('/') ? '' : '\\';
+                                // Determine separator based on current path format
+                                let separator = '/';
+                                if (currentBrowsePath.includes('\\') && !currentBrowsePath.includes('/')) {
+                                    // Windows path
+                                    separator = '\\';
+                                }
+                                
+                                // Only add separator if path doesn't already end with one
+                                const needsSeparator = !currentBrowsePath.endsWith('/') && !currentBrowsePath.endsWith('\\');
                                 const fullPath = `${currentBrowsePath}${separator}${dir}`;
                                 const escapedPath = fullPath.replace(/'/g, "\\'").replace(/\\/g, '\\\\');
                                 html += `<div class="directory-item" onclick="loadDirectories('${escapedPath}')">${dir}</div>`;
