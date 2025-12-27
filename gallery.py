@@ -201,10 +201,10 @@ class Slideshow:
 
         self.fonts = {
             "filename": pygame.font.SysFont("Arial", 14),
-            "time": pygame.font.SysFont(None, 96),
-            "date": pygame.font.SysFont(None, 42),
-            "temp": pygame.font.SysFont(None, 96),
-            "weather": pygame.font.SysFont(None, 42),
+            "time": pygame.font.SysFont(None, 132),
+            "date": pygame.font.SysFont(None, 72),
+            "temp": pygame.font.SysFont(None, 132),
+            "weather": pygame.font.SysFont(None, 72),
         }
 
         self.text_color = (255, 255, 255)
@@ -318,7 +318,7 @@ class Slideshow:
             date_surf = self.fonts["date"].render(now.strftime("%d %b %y"), True, self.text_color)
             text_alpha = int(self.config.get('ui_text_alpha', '192'))
             date_surf.set_alpha(text_alpha)
-            self.screen.blit(date_surf, (10, 72))
+            self.screen.blit(date_surf, (10, 90))
 
         # weather
         show_temperature = self.config.get('show_temperature', 'true').lower() == 'true'
@@ -334,7 +334,7 @@ class Slideshow:
             weather_surf = self.fonts["weather"].render(self.current_weather, True, self.text_color)
             text_alpha = int(self.config.get('ui_text_alpha', '192'))
             weather_surf.set_alpha(text_alpha)
-            self.screen.blit(weather_surf, (self.screen_w - weather_surf.get_width() - 10, 72))
+            self.screen.blit(weather_surf, (self.screen_w - weather_surf.get_width() - 10, 90))
 
     def refresh_images(self):
         # Check if directory exists
