@@ -304,7 +304,22 @@ class Slideshow:
                 self._last_status_msg = status_msg
         
         if self.current_img:
-            img_path = os.path.join(self.folder, self.current_img)
+            # Check if this is an uploaded image (starts with "uploaded/")
+            if self.current_img.startswith("uploaded/"):
+                # Get upload directory
+                upload_dir = self.config.get('upload_directory', '').strip()
+                if upload_dir:
+                    upload_dir = os.path.expanduser(upload_dir)
+                    # Remove "uploaded/" prefix to get actual path
+                    actual_path = self.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
+                    img_path = os.path.join(upload_dir, actual_path)
+                else:
+                    # Fallback: treat as subdirectory of main folder
+                    img_path = os.path.join(self.folder, self.current_img)
+            else:
+                # Regular image in main directory
+                img_path = os.path.join(self.folder, self.current_img)
+
             try:
                 img = pygame.image.load(img_path)
                 ar_landscape = float(self.config.get('aspect_ratio_landscape', '1.5'))
@@ -370,6 +385,7 @@ class Slideshow:
         # Recursively scan for images (supports subfolders)
         new_images = []
         try:
+            # Scan main images directory
             for root, _, files in os.walk(self.folder):
                 for f in files:
                     if f.lower().endswith((".jpg", ".jpeg", ".png")):
@@ -377,6 +393,37 @@ class Slideshow:
                         rel_path = os.path.relpath(os.path.join(root, f), self.folder)
                         if rel_path not in self.history and rel_path != self.current_img:
                             new_images.append(rel_path)
+            
+            # Also scan upload directory if it's separate from images directory
+            upload_dir = self.config.get('upload_directory', '').strip()
+            if upload_dir:
+                upload_dir = os.path.expanduser(upload_dir)
+                if os.path.exists(upload_dir) and os.path.isdir(upload_dir):
+                    # Check if upload_dir is within self.folder (already scanned by os.walk)
+                    try:
+                        # Normalize paths for comparison
+                        main_folder_abs = os.path.abspath(self.folder)
+                        upload_dir_abs = os.path.abspath(upload_dir)
+                        
+                        # Check if upload_dir is a subdirectory of main folder
+                        common_path = os.path.commonpath([main_folder_abs, upload_dir_abs])
+                        is_subdirectory = os.path.abspath(common_path) == main_folder_abs
+                    except (ValueError, OSError):
+                        # Paths are on different drives (Windows) or can't be compared
+                        is_subdirectory = False
+                    
+                    if not is_subdirectory:
+                        # Upload directory is separate, scan it too
+                        print(f"[Slideshow] Also scanning upload directory: {upload_dir}")
+                        for root, _, files in os.walk(upload_dir):
+                            for f in files:
+                                if f.lower().endswith((".jpg", ".jpeg", ".png")):
+                                    # Store as relative path from upload_dir, with "uploaded/" prefix
+                                    rel_path = os.path.relpath(os.path.join(root, f), upload_dir)
+                                    # Use a prefix to distinguish uploaded images
+                                    upload_rel_path = os.path.join("uploaded", rel_path).replace("\\", "/")
+                                    if upload_rel_path not in self.history and upload_rel_path != self.current_img:
+                                        new_images.append(upload_rel_path)
         except PermissionError as e:
             print(f"[Error] Permission denied accessing {self.folder}: {e}")
             return
@@ -558,6 +605,51 @@ def api_status():
         'manual_override': slideshow_instance.manual_display_override
     })
 
+@app.route('/api/directories', methods=['GET'])
+def api_directories():
+    """List directories for folder selection"""
+    path = request.args.get('path', '')
+    
+    if not path:
+        # Return root directories
+        if sys.platform == 'win32':
+            # Windows: list drive letters
+            import string
+            drives = [f"{d}:\\" for d in string.ascii_uppercase if os.path.exists(f"{d}:\\")]
+            return jsonify({'directories': drives, 'current_path': ''})
+        else:
+            # Unix/Linux: start from home directory
+            home = os.path.expanduser('~')
+            return jsonify({'directories': [home, '/'], 'current_path': ''})
+    
+    # Expand user path (~)
+    path = os.path.expanduser(path)
+    
+    if not os.path.exists(path):
+        return jsonify({'error': 'Path does not exist'}), 404
+    
+    if not os.path.isdir(path):
+        return jsonify({'error': 'Path is not a directory'}), 400
+    
+    try:
+        # List directories only
+        dirs = []
+        for item in os.listdir(path):
+            item_path = os.path.join(path, item)
+            if os.path.isdir(item_path):
+                dirs.append(item)
+        
+        dirs.sort()
+        return jsonify({
+            'directories': dirs,
+            'current_path': path,
+            'parent_path': os.path.dirname(path) if path != os.path.dirname(path) else None
+        })
+    except PermissionError:
+        return jsonify({'error': 'Permission denied'}), 403
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/image/preview')
 def api_image_preview():
     """Get current image as thumbnail preview"""
@@ -572,7 +664,18 @@ def api_image_preview():
         from flask import send_file
         import io
         
-        img_path = os.path.join(slideshow_instance.folder, slideshow_instance.current_img)
+        # Check if this is an uploaded image
+        if slideshow_instance.current_img.startswith("uploaded/"):
+            upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
+            if upload_dir:
+                upload_dir = os.path.expanduser(upload_dir)
+                actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
+                img_path = os.path.join(upload_dir, actual_path)
+            else:
+                img_path = os.path.join(slideshow_instance.folder, slideshow_instance.current_img)
+        else:
+            img_path = os.path.join(slideshow_instance.folder, slideshow_instance.current_img)
+
         if not os.path.exists(img_path):
             return jsonify({'error': 'Image file not found'}), 404
         
@@ -588,9 +691,18 @@ def api_image_preview():
         return send_file(img_bytes, mimetype='image/jpeg')
     except ImportError:
         # Fallback: serve original image if PIL not available
-        img_path = os.path.join(slideshow_instance.folder, slideshow_instance.current_img)
-        if os.path.exists(img_path):
-            return send_from_directory(slideshow_instance.folder, slideshow_instance.current_img)
+        if slideshow_instance.current_img.startswith("uploaded/"):
+            upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
+            if upload_dir:
+                upload_dir = os.path.expanduser(upload_dir)
+                actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
+                img_path = os.path.join(upload_dir, actual_path)
+                if os.path.exists(img_path):
+                    return send_from_directory(upload_dir, actual_path)
+        else:
+            img_path = os.path.join(slideshow_instance.folder, slideshow_instance.current_img)
+            if os.path.exists(img_path):
+                return send_from_directory(slideshow_instance.folder, slideshow_instance.current_img)
         return jsonify({'error': 'Image not found'}), 404
     except Exception as e:
         print(f"[Web] Error generating preview: {e}")
@@ -749,7 +861,8 @@ def api_settings():
             'aspect_ratio_portrait': slideshow_instance.config.get('aspect_ratio_portrait', '0.667'),
             'ui_text_alpha': slideshow_instance.config.get('ui_text_alpha', '192'),
             'weather_update_seconds': slideshow_instance.config.get('weather_update_seconds', '900'),
-            'upload_directory': slideshow_instance.config.get('upload_directory', '')
+            'upload_directory': slideshow_instance.config.get('upload_directory', ''),
+            'images_directory': slideshow_instance.folder
         })
     
     elif request.method == 'POST':
@@ -791,6 +904,22 @@ def api_settings():
             slideshow_instance.config['weather_update_seconds'] = str(int(data['weather_update_seconds']))
         if 'upload_directory' in data:
             slideshow_instance.config['upload_directory'] = data['upload_directory'].strip()
+        if 'images_directory' in data:
+            # Update images directory (requires restart to take full effect)
+            new_dir = data['images_directory'].strip()
+            if os.path.exists(new_dir) and os.path.isdir(new_dir):
+                slideshow_instance.folder = new_dir
+                slideshow_instance.config['images_directory'] = new_dir
+                # Refresh images from new directory
+                slideshow_instance.images = []
+                slideshow_instance.history = []
+                slideshow_instance.current_index = -1
+                slideshow_instance.refresh_images()
+                if slideshow_instance.images:
+                    slideshow_instance.next_image()
+                print(f"[Web] Images directory changed to: {new_dir}")
+            else:
+                return jsonify({'error': 'Invalid directory path'}), 400
         
         # Force a redraw to apply settings immediately
         slideshow_instance.force_redraw = True
@@ -815,7 +944,7 @@ def api_settings():
             for key in ['show_time', 'show_date', 'show_temperature', 'show_weather_code', 
                        'show_filename', 'display_off_time', 'display_on_time',
                        'location_city_suburb', 'aspect_ratio_landscape', 'aspect_ratio_portrait',
-                       'ui_text_alpha', 'weather_update_seconds', 'upload_directory']:
+                       'ui_text_alpha', 'weather_update_seconds', 'upload_directory', 'images_directory']:
                 if key in data:
                     config['gallery'][key] = str(data[key])
             
