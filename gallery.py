@@ -560,6 +560,44 @@ def api_status():
         'manual_override': slideshow_instance.manual_display_override
     })
 
+@app.route('/api/image/preview')
+def api_image_preview():
+    """Get current image as thumbnail preview"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    if not slideshow_instance.current_img:
+        return jsonify({'error': 'No image loaded'}), 404
+    
+    try:
+        from PIL import Image
+        from flask import send_file
+        import io
+        
+        img_path = os.path.join(slideshow_instance.folder, slideshow_instance.current_img)
+        if not os.path.exists(img_path):
+            return jsonify({'error': 'Image file not found'}), 404
+        
+        # Create thumbnail (max 400x400, maintains aspect ratio)
+        img = Image.open(img_path)
+        img.thumbnail((400, 400), Image.Resampling.LANCZOS)
+        
+        # Convert to bytes
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format='JPEG', quality=85)
+        img_bytes.seek(0)
+        
+        return send_file(img_bytes, mimetype='image/jpeg')
+    except ImportError:
+        # Fallback: serve original image if PIL not available
+        img_path = os.path.join(slideshow_instance.folder, slideshow_instance.current_img)
+        if os.path.exists(img_path):
+            return send_from_directory(slideshow_instance.folder, slideshow_instance.current_img)
+        return jsonify({'error': 'Image not found'}), 404
+    except Exception as e:
+        print(f"[Web] Error generating preview: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/next', methods=['POST'])
 def api_next():
     """Go to next image"""
