@@ -51,7 +51,7 @@ DEFAULT_CONFIG = {
         "show_weather_code": "true",
         "show_filename": "true",
         "show_caption": "true",
-        "shutdown_on_display_off": "false",
+        "shutdown_on_display_off": "true",
         "shutdown_countdown_seconds": "10"
     },
     "telegram": {
@@ -1816,7 +1816,7 @@ def api_settings():
             'weather_update_seconds': slideshow_instance.config.get('weather_update_seconds', '900'),
             'upload_directory': slideshow_instance.config.get('upload_directory', ''),
             'images_directory': slideshow_instance.folder,
-            'shutdown_on_display_off': slideshow_instance.config.get('shutdown_on_display_off', 'false'),
+            'shutdown_on_display_off': slideshow_instance.config.get('shutdown_on_display_off', 'true'),
             'shutdown_countdown_seconds': slideshow_instance.config.get('shutdown_countdown_seconds', '10')
         })
     
@@ -1923,7 +1923,7 @@ def api_settings():
             if telegram_notifier and old_val != new_val:
                 telegram_notifier.notify_settings_change('upload_directory', old_val or '(empty)', new_val or '(empty)')
         if 'shutdown_on_display_off' in data:
-            old_val = slideshow_instance.config.get('shutdown_on_display_off', 'false')
+            old_val = slideshow_instance.config.get('shutdown_on_display_off', 'true')
             new_val = str(data['shutdown_on_display_off']).lower()
             slideshow_instance.config['shutdown_on_display_off'] = new_val
             if telegram_notifier and old_val != new_val:
@@ -2106,7 +2106,7 @@ def main():
         'aspect_ratio_landscape': get_config_value('aspect_ratio_landscape', '1.5'),
         'aspect_ratio_portrait': get_config_value('aspect_ratio_portrait', '0.667'),
         'image_history_size': get_config_value('image_history_size', '5'),
-        'shutdown_on_display_off': get_config_value('shutdown_on_display_off', 'false'),
+        'shutdown_on_display_off': get_config_value('shutdown_on_display_off', 'true'),
         'shutdown_countdown_seconds': get_config_value('shutdown_countdown_seconds', '10')
     }
 

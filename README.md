@@ -80,7 +80,7 @@ The first time you run the script, it will create a `config.ini` file with defau
 - `delay_seconds` - Time between images (default: 10)
 - `display_off_time` - When to turn display off (default: 23:00)
 - `display_on_time` - When to turn display on (default: 05:00)
-- `shutdown_on_display_off` - Automatically shutdown Pi at off-time (default: false)
+- `shutdown_on_display_off` - Automatically shutdown Pi at off-time (default: true for power savings)
 - `shutdown_countdown_seconds` - Countdown before shutdown (default: 10)
 - `location_city_suburb` - Location for weather data
 - Display toggles (show_time, show_date, show_temperature, etc.)
@@ -220,7 +220,9 @@ Edit `config.ini`:
 - When enabled, the Pi will shut down when `display_off_time` is reached
 - A countdown timer is displayed before shutdown
 - Telegram notification is sent before shutdown (if configured)
-- Disabled by default to allow 24/7 remote access via web interface
+- **Enabled by default** to save power during off-hours
+- Disable if you need 24/7 remote access via web interface
+- **Power savings**: ~5-6W × 8 hours = 40-48Wh per day (~$15-20/year)
 
 ### Troubleshooting
 **Can't access web interface?**
@@ -253,7 +255,61 @@ Edit `config.ini`:
 - Pause during parties for manual control
 - Auto mode follows your schedule automatically
 
-### 9. Notes
+### 9. Power Management & Auto-Wake Solutions
+
+When `shutdown_on_display_off = true` (recommended for power savings), the Pi will shut down at the configured off-time. To automatically power it back on, you have several options:
+
+#### Option 1: Smart Plug with Timer (Recommended - Easy & Cheap)
+**Cost:** $10-25 | **Difficulty:** Easy
+- Use a WiFi/Bluetooth smart plug with scheduling
+- Set it to turn off at display_off_time + 15 minutes (after shutdown completes)
+- Set it to turn on at display_on_time - 5 minutes (before display should turn on)
+- **Examples:** TP-Link Kasa, Wemo, Sonoff
+- **Pros:** No hardware changes, works with any Pi, remote control via app
+- **Cons:** Requires WiFi/hub, costs $10-25
+
+#### Option 2: Mechanical Timer Outlet (Budget Option)
+**Cost:** $5-10 | **Difficulty:** Easy  
+- Simple 24-hour mechanical timer plug
+- Set on/off times with physical pins/dial
+- **Pros:** Very cheap, no WiFi needed, reliable
+- **Cons:** No remote control, manual adjustment needed for schedule changes
+- **Examples:** GE 24-Hour Mechanical Timer
+
+#### Option 3: RTC (Real-Time Clock) HAT + Wake Alarm (Advanced)
+**Cost:** $10-20 | **Difficulty:** Moderate
+- Install an RTC HAT (e.g., DS3231, PCF8523)
+- Configure wake alarm in software
+- Pi can wake itself at scheduled time
+- **Pros:** No external hardware, precise timing
+- **Cons:** Requires hardware installation, software configuration, not all Pi models supported
+- **Setup guide:** https://learn.adafruit.com/adding-a-real-time-clock-to-raspberry-pi
+
+#### Option 4: Keep Pi Running (No Power Savings)
+**Cost:** $0 | **Power cost:** ~$30-40/year
+- Set `shutdown_on_display_off = false`
+- Display turns off but Pi stays on
+- **Pros:** 24/7 remote access, no wake-up hardware needed
+- **Cons:** Wastes power, higher electricity bill
+
+#### Recommended Setup for Maximum Power Savings:
+1. Enable automatic shutdown: `shutdown_on_display_off = true`
+2. Use a smart plug or mechanical timer
+3. Set timer to:
+   - **Turn OFF:** 23:15 (15 min after shutdown completes at 23:00)
+   - **Turn ON:** 04:55 (5 min before display_on_time at 05:00)
+4. Pi boots automatically, gallery starts via systemd service
+5. **Total savings:** ~$15-20/year in electricity (pays for timer in 6-12 months)
+
+#### Alternative: Partial Power Savings (Keep Remote Access)
+If you need remote access during off-hours but still want some power savings:
+- Set `shutdown_on_display_off = false`
+- Display powers off via HDMI (saves ~2-3W on the display side)
+- Pi stays on consuming ~2-3W
+- **Savings:** ~$10-15/year (less but still worthwhile)
+- **Benefit:** Full remote access 24/7 for uploads, settings, monitoring
+
+### 10. Notes
 - The script is designed for fullscreen display and will hide the mouse cursor.
 - Weather and time information is displayed on the screen.
 - Some features (like display power control) are specific to Raspberry Pi and may not work on other platforms.
