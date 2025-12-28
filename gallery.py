@@ -909,7 +909,8 @@ class Slideshow:
                     if f.lower().endswith((".jpg", ".jpeg", ".png")):
                         # Store relative path from base folder
                         rel_path = os.path.relpath(os.path.join(root, f), self.folder)
-                        if rel_path not in self.history and rel_path != self.current_img:
+                        # Check if image is already in queue, history, or is current image
+                        if rel_path not in self.images and rel_path not in self.history and rel_path != self.current_img:
                             new_images.append(rel_path)
             
             # Also scan upload directory if it's separate from images directory
@@ -940,7 +941,8 @@ class Slideshow:
                                     rel_path = os.path.relpath(os.path.join(root, f), upload_dir)
                                     # Use a prefix to distinguish uploaded images
                                     upload_rel_path = os.path.join("uploaded", rel_path).replace("\\", "/")
-                                    if upload_rel_path not in self.history and upload_rel_path != self.current_img:
+                                    # Check if image is already in queue, history, or is current image
+                                    if upload_rel_path not in self.images and upload_rel_path not in self.history and upload_rel_path != self.current_img:
                                         new_images.append(upload_rel_path)
         except PermissionError as e:
             print(f"[Error] Permission denied accessing {self.folder}: {e}")
