@@ -51,6 +51,18 @@
 - [ ] Pagination if >20 images
 - [ ] Refresh image list after deletion
 
+### 8. Image Display Order/Sorting
+- [ ] Sort options in settings (dropdown/selector)
+- [ ] Random (current default)
+- [ ] Date taken (from EXIF metadata)
+- [ ] Date created (file creation date)
+- [ ] Date modified (file modified date)
+- [ ] Filename (alphabetical)
+- [ ] File size (smallest/largest first)
+- [ ] Reverse order option
+- [ ] Save sort preference to config
+- [ ] Apply sorting when refreshing images
+
 ---
 
 ## 📝 Notes
