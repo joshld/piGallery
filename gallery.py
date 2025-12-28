@@ -952,8 +952,6 @@ def api_display():
 @app.route('/api/upload', methods=['POST'])
 def api_upload():
     """Upload new image to separate upload directory"""
-    global telegram_notifier
-    
     if slideshow_instance is None:
         return jsonify({'error': 'Slideshow not initialized'}), 503
     
@@ -1036,8 +1034,6 @@ def api_upload():
 @app.route('/api/settings', methods=['GET', 'POST'])
 def api_settings():
     """Get or update settings"""
-    global telegram_notifier
-    
     if slideshow_instance is None:
         return jsonify({'error': 'Slideshow not initialized'}), 503
     
