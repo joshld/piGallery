@@ -451,6 +451,19 @@
             border-radius: 10px;
         }
 
+        .playback-controls-below-preview {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .playback-controls-below-preview button {
+            flex: 0 0 auto;
+            min-width: 120px;
+        }
+
         #image-preview {
             max-width: 100%;
             max-height: 400px;
@@ -532,12 +545,17 @@
             }
 
             .setting-item-row {
-                flex-wrap: wrap;
+                flex-wrap: nowrap;
             }
 
             .setting-item-row > span {
-                flex: 0 0 100%;
-                margin-bottom: 5px;
+                flex: 1 1 auto;
+                min-width: 0;
+                font-size: 0.9em;
+            }
+
+            .toggle-switch {
+                flex-shrink: 0;
             }
 
             .setting-controls {
@@ -589,12 +607,20 @@
                     <div class="status-value" id="status-paused">Playing</div>
                 </div>
             </div>
-            <div class="current-image-info" id="current-image">No image loaded</div>
             <div class="image-preview-container">
-                <img id="image-preview" src="" alt="Current image preview" 
-                     style="max-width: 100%; max-height: 400px; border-radius: 10px; 
-                            box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: none;"
-                     onclick="showFullImage()" title="Click to view full-size image">
+                <h3 style="margin-bottom: 15px; color: #667eea; font-size: 1.1em;">📸 Current Image</h3>
+                <div class="current-image-info" id="current-image" style="margin-bottom: 15px; color: #666; font-size: 0.95em;">No image loaded</div>
+                <div style="display: flex; justify-content: center; align-items: center; width: 100%;">
+                    <img id="image-preview" src="" alt="Current image preview" 
+                         style="max-width: 100%; max-height: 400px; border-radius: 10px; 
+                                box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: none;"
+                         onclick="showFullImage()" title="Click to view full-size image">
+                </div>
+                <div class="playback-controls-below-preview">
+                    <button class="btn-primary" onclick="previousImage()">⬅️ Previous</button>
+                    <button class="btn-warning" onclick="togglePause()" id="pauseBtn">⏸️ Pause</button>
+                    <button class="btn-primary" onclick="nextImage()">Next ➡️</button>
+                </div>
             </div>
 
             <div id="imageModal" class="image-modal" onclick="closeFullImage(event)">
@@ -606,14 +632,6 @@
         </div>
 
         <div class="controls">
-            <div class="control-card">
-                <h2>🎮 Playback Controls</h2>
-                <div class="button-group">
-                    <button class="btn-primary" onclick="previousImage()">⬅️ Previous</button>
-                    <button class="btn-primary" onclick="nextImage()">Next ➡️</button>
-                </div>
-                <button class="btn-warning btn-full" onclick="togglePause()" id="pauseBtn">⏸️ Pause</button>
-            </div>
 
             <div class="control-card">
                 <h2>💡 Display Control</h2>
