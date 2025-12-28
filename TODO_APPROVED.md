@@ -63,6 +63,18 @@
 - [ ] Save sort preference to config
 - [ ] Apply sorting when refreshing images
 
+### 9. Feedback/Suggestions System
+- [ ] "Send Feedback" button in web UI
+- [ ] Feedback form modal (type, title, description)
+- [ ] Feedback types: Bug Report, Feature Request, Question, General
+- [ ] GitHub Issues API integration (create issue automatically)
+- [ ] Rate limiting (prevent spam)
+- [ ] Confirmation message with link to created issue
+- [ ] Store GitHub token in config.ini
+- [ ] Optional: Email fallback if GitHub API unavailable
+- [ ] User feedback history view
+- [ ] Anonymous submission option
+
 ---
 
 ## 📝 Notes
