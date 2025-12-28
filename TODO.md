@@ -18,6 +18,34 @@
 - [ ] Restart button option
 - [ ] Require sudo permissions handling
 
+### 2a. Error Detection & Reporting System ⭐ NEW
+- [ ] Structured error logging (timestamp, error type, stack trace)
+- [ ] Error log viewer in web UI
+- [ ] Error categories (file system, network, display, etc.)
+- [ ] Automatic error capture (unhandled exceptions)
+- [ ] Error notification alerts (email, web UI banner)
+- [ ] Error statistics dashboard
+- [ ] Export error logs (download as JSON/CSV)
+- [ ] Error search and filtering
+- [ ] Clear/archive old errors
+- [ ] Debug mode with verbose logging
+- [ ] Error rate limiting (prevent log spam)
+- [ ] Context capture (system state at time of error)
+
+### 2b. Delete Uploaded Images ⭐ NEW
+- [ ] Identify uploaded vs original images
+- [ ] Delete button in web UI (uploaded images only)
+- [ ] Confirmation dialog before delete
+- [ ] Bulk delete option (select multiple)
+- [ ] Move to trash instead of permanent delete
+- [ ] Trash/recycle bin viewer
+- [ ] Restore from trash option
+- [ ] Auto-cleanup trash after X days
+- [ ] Delete protection for original images
+- [ ] Warning if trying to delete non-uploaded images
+- [ ] Disk space freed indicator
+- [ ] Delete history/audit log
+
 ### 3. Web UI Color Schemes
 - [ ] Light mode (current)
 - [ ] Dark mode
@@ -327,7 +355,9 @@
 5. **Dark mode for web UI** (2 hours, better UX)
 6. **Image captions from .txt files** (2 hours, easy to implement)
 7. **Simple fade transition** (2 hours, looks professional)
-8. **Delete image button** (1 hour, useful feature)
+8. **Delete uploaded images button** (2 hours, safety + useful) ⭐ NEW
+9. **Basic error logging** (1 hour, debugging essential) ⭐ NEW
+10. **Error log viewer** (2 hours, see what went wrong) ⭐ NEW
 
 ---
 
@@ -369,6 +399,8 @@
 - Dark mode
 - Basic transitions
 - Live settings preview
+- Error detection & logging ⭐ NEW
+- Delete uploaded images ⭐ NEW
 
 ### Should Have (v1.5)
 - Video support
