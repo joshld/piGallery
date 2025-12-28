@@ -75,6 +75,47 @@
 - [ ] User feedback history view
 - [ ] Anonymous submission option
 
+### 10. Telegram Integration (Full Featured)
+**Phase 1 - Status Updates TO Telegram:**
+- [ ] Setup Telegram bot via BotFather
+- [ ] Send status updates to group/channel
+- [ ] Startup/shutdown notifications
+- [ ] Error notifications (immediate alerts)
+- [ ] Image change notifications (configurable frequency)
+- [ ] Upload notifications
+- [ ] Settings change notifications
+- [ ] System alerts (low memory, high CPU, high temp)
+- [ ] Daily summary reports
+- [ ] Configure notification types in settings
+
+**Phase 2 - Commands FROM Telegram:**
+- [ ] Receive and process Telegram commands
+- [ ] `/next` - Skip to next image
+- [ ] `/prev` - Go to previous image
+- [ ] `/pause` - Toggle pause/play
+- [ ] `/status` - Get current status
+- [ ] `/weather` - Force weather update
+- [ ] `/shutdown` - Safe shutdown with confirmation
+- [ ] `/restart` - Restart gallery
+- [ ] `/photo` - Send current image to Telegram
+- [ ] `/help` - List all available commands
+
+**Phase 3 - Advanced Features:**
+- [ ] `/upload` - Upload photo from Telegram to gallery
+- [ ] `/settings <key> <value>` - Change settings
+- [ ] `/sort <type>` - Change image sorting
+- [ ] `/delay <seconds>` - Change display delay
+- [ ] User authentication (whitelist user IDs)
+- [ ] Rate limiting for commands
+- [ ] Command history/audit log
+- [ ] Scheduled status updates (hourly/daily)
+
+**Configuration:**
+- [ ] Store bot token and chat ID in config.ini
+- [ ] Configure notification preferences
+- [ ] Security settings (allowed users, rate limits)
+- [ ] Add python-telegram-bot to requirements.txt
+
 ---
 
 ## 📝 Notes
