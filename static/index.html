@@ -718,9 +718,26 @@
                 <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
                     <p style="font-size: 1.2em; margin-bottom: 10px;">📁 Click or Drop Files Here</p>
                     <p style="color: #666;">JPG, JPEG, PNG supported</p>
-                    <input type="file" id="fileInput" accept="image/jpeg,image/jpg,image/png" multiple onchange="uploadFiles(this.files)">
+                    <input type="file" id="fileInput" accept="image/jpeg,image/jpg,image/png" multiple onchange="handleFileSelect(this.files)">
                 </div>
-                <div id="uploadStatus"></div>
+                
+                <div id="uploadPreview" style="display: none; margin-top: 20px;">
+                    <h3 style="font-size: 1.1em; color: #667eea; margin-bottom: 15px;">📋 Files Ready to Upload</h3>
+                    <div id="fileList" style="margin-bottom: 15px; max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 8px; background: #f8f9fa; width: 100%; box-sizing: border-box;"></div>
+                    
+                    <div style="margin-top: 15px;">
+                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">✏️ Caption (optional - applies to all uploaded files)</label>
+                        <textarea id="upload-caption" placeholder="Enter a caption to add to all uploaded photos..." 
+                                  style="width: 100%; min-height: 60px; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 0.95em; font-family: inherit; resize: vertical; box-sizing: border-box;"></textarea>
+                    </div>
+                    
+                    <div style="margin-top: 15px; display: flex; gap: 8px; justify-content: center;">
+                        <button class="btn-success" onclick="uploadSelectedFiles()" id="uploadBtn" style="padding: 8px 16px; font-size: 0.9em;">📤 Upload All</button>
+                        <button class="btn-secondary" onclick="clearFileSelection()" style="padding: 8px 16px; font-size: 0.9em;">🗑️ Clear</button>
+                    </div>
+                </div>
+                
+                <div id="uploadStatus" style="margin-top: 15px;"></div>
                 
                 <div style="margin-top: 25px; padding-top: 25px; border-top: 1px solid #eee;">
                     <h3 style="font-size: 1.3em; color: #667eea; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #667eea;">📁 Directories</h3>
@@ -990,7 +1007,7 @@
             uploadArea.addEventListener('drop', (e) => {
                 e.preventDefault();
                 uploadArea.classList.remove('dragover');
-                uploadFiles(e.dataTransfer.files);
+                handleFileSelect(e.dataTransfer.files);
             });
         });
 
@@ -1456,13 +1473,170 @@
             }
         }
 
-        async function uploadFiles(files) {
-            const uploadStatus = document.getElementById('uploadStatus');
-            uploadStatus.innerHTML = '';
+        // Store selected files for preview
+        let selectedFiles = [];
 
+        function handleFileSelect(files) {
+            // Add new files to the selection
             for (let file of files) {
+                // Check if file is already in the list
+                if (!selectedFiles.find(f => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified)) {
+                    selectedFiles.push(file);
+                }
+            }
+            updateFilePreview();
+        }
+
+        function updateFilePreview() {
+            const previewDiv = document.getElementById('uploadPreview');
+            const fileListDiv = document.getElementById('fileList');
+            
+            if (selectedFiles.length === 0) {
+                previewDiv.style.display = 'none';
+                return;
+            }
+            
+            previewDiv.style.display = 'block';
+            fileListDiv.innerHTML = '';
+            
+            selectedFiles.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.style.cssText = 'display: flex; align-items: center; gap: 6px; padding: 6px 8px; margin-bottom: 4px; background: white; border-radius: 5px; border: 1px solid #e0e0e0; min-width: 0; width: 100%; box-sizing: border-box;';
+                
+                // Store original filename and extension
+                const originalName = file.name;
+                const lastDot = originalName.lastIndexOf('.');
+                const baseName = lastDot > 0 ? originalName.substring(0, lastDot) : originalName;
+                const extension = lastDot > 0 ? originalName.substring(lastDot) : '';
+                const displayName = file.customName || originalName;
+                
+                const fileInfoContainer = document.createElement('div');
+                fileInfoContainer.style.cssText = 'flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;';
+                
+                const fileInfo = document.createElement('span');
+                fileInfo.style.cssText = 'flex: 1; color: #333; font-size: 0.9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; cursor: pointer;';
+                const fileSize = (file.size / 1024 / 1024).toFixed(2);
+                fileInfo.textContent = `${displayName} (${fileSize} MB)`;
+                fileInfo.title = `Click to rename: ${displayName} (${fileSize} MB)`;
+                
+                // Make filename editable on click
+                const startEdit = () => {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    // Use current custom name or original base name
+                    const currentBaseName = file.customName ? file.customName.substring(0, file.customName.lastIndexOf('.')) : baseName;
+                    input.value = currentBaseName;
+                    input.style.cssText = 'flex: 1; padding: 2px 4px; border: 1px solid #667eea; border-radius: 3px; font-size: 0.9em; min-width: 0;';
+                    input.style.width = '100%';
+                    
+                    const saveRename = () => {
+                        const newName = input.value.trim();
+                        if (newName && newName.length > 0) {
+                            // Only update if name actually changed
+                            const newFullName = newName + extension;
+                            if (newFullName !== originalName) {
+                                file.customName = newFullName;
+                                fileInfo.textContent = `${file.customName} (${fileSize} MB)`;
+                                fileInfo.title = `Click to rename: ${file.customName} (${fileSize} MB)`;
+                            } else {
+                                // Reverted to original, clear custom name
+                                file.customName = null;
+                                fileInfo.textContent = `${originalName} (${fileSize} MB)`;
+                                fileInfo.title = `Click to rename: ${originalName} (${fileSize} MB)`;
+                            }
+                        } else {
+                            // Empty name, revert to original
+                            file.customName = null;
+                            fileInfo.textContent = `${originalName} (${fileSize} MB)`;
+                            fileInfo.title = `Click to rename: ${originalName} (${fileSize} MB)`;
+                        }
+                        fileInfoContainer.replaceChild(fileInfo, input);
+                        // Re-attach click handler
+                        fileInfo.onclick = startEdit;
+                    };
+                    
+                    const cancelRename = () => {
+                        fileInfoContainer.replaceChild(fileInfo, input);
+                        // Re-attach click handler
+                        fileInfo.onclick = startEdit;
+                    };
+                    
+                    input.onblur = saveRename;
+                    input.onkeydown = (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            saveRename();
+                        } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            cancelRename();
+                        }
+                    };
+                    
+                    fileInfoContainer.replaceChild(input, fileInfo);
+                    input.focus();
+                    input.select();
+                };
+                
+                fileInfo.onclick = startEdit;
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.textContent = '×';
+                removeBtn.style.cssText = 'background: #dc3545; color: white; border: none; border-radius: 2px; padding: 0; margin: 0; cursor: pointer; font-size: 12px; font-weight: bold; flex-shrink: 0; width: 16px !important; height: 16px !important; min-width: 16px !important; max-width: 16px !important; line-height: 1; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;';
+                removeBtn.title = 'Remove file';
+                removeBtn.onclick = () => {
+                    selectedFiles.splice(index, 1);
+                    updateFilePreview();
+                };
+                
+                fileInfoContainer.appendChild(fileInfo);
+                fileItem.appendChild(fileInfoContainer);
+                fileItem.appendChild(removeBtn);
+                fileListDiv.appendChild(fileItem);
+            });
+        }
+
+        function clearFileSelection() {
+            selectedFiles = [];
+            document.getElementById('fileInput').value = '';
+            const captionInput = document.getElementById('upload-caption');
+            if (captionInput) {
+                captionInput.value = '';
+            }
+            updateFilePreview();
+            document.getElementById('uploadStatus').innerHTML = '';
+        }
+
+        async function uploadSelectedFiles() {
+            if (selectedFiles.length === 0) {
+                showAlert('No files selected', 'error');
+                return;
+            }
+
+            const uploadStatus = document.getElementById('uploadStatus');
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadStatus.innerHTML = '';
+            
+            // Disable upload button during upload
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '⏳ Uploading...';
+
+            // Get caption from input field (applies to all files)
+            const captionInput = document.getElementById('upload-caption');
+            const caption = captionInput ? captionInput.value.trim() : '';
+
+            let successCount = 0;
+            let failCount = 0;
+
+            for (let file of selectedFiles) {
                 const formData = new FormData();
-                formData.append('file', file);
+                // Use custom name if set, otherwise use original filename
+                const fileName = file.customName || file.name;
+                // Create a new File object with the custom name if renamed
+                const fileToUpload = file.customName ? new File([file], fileName, { type: file.type, lastModified: file.lastModified }) : file;
+                formData.append('file', fileToUpload);
+                if (caption) {
+                    formData.append('caption', caption);
+                }
 
                 try {
                     uploadStatus.innerHTML += `<p>Uploading ${file.name}...</p>`;
@@ -1472,19 +1646,36 @@
                     });
 
                     if (response.ok) {
-                        uploadStatus.innerHTML += `<p style="color: green;">✅ ${file.name} uploaded successfully!</p>`;
-                        showAlert(`Uploaded ${file.name}`, 'success');
+                        const data = await response.json();
+                        const captionMsg = caption ? ' with caption' : '';
+                        uploadStatus.innerHTML += `<p style="color: green;">✅ ${file.name} uploaded successfully${captionMsg}!</p>`;
+                        successCount++;
                     } else {
                         const data = await response.json();
                         uploadStatus.innerHTML += `<p style="color: red;">❌ ${file.name}: ${data.error}</p>`;
+                        failCount++;
                     }
                 } catch (error) {
                     uploadStatus.innerHTML += `<p style="color: red;">❌ ${file.name}: ${error.message}</p>`;
+                    failCount++;
                 }
             }
 
-            // Clear file input
-            document.getElementById('fileInput').value = '';
+            // Re-enable upload button
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = '📤 Upload All';
+
+            // Show summary
+            if (successCount > 0) {
+                showAlert(`Successfully uploaded ${successCount} file(s)${failCount > 0 ? `, ${failCount} failed` : ''}`, failCount > 0 ? 'error' : 'success');
+            } else {
+                showAlert('Upload failed for all files', 'error');
+            }
+
+            // Clear selection after successful upload
+            if (failCount === 0) {
+                clearFileSelection();
+            }
             
             // Refresh status after upload
             setTimeout(updateStatus, 1000);
@@ -1533,3 +1724,4 @@
     </script>
 </body>
 </html>
+

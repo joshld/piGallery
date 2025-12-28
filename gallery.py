@@ -1729,9 +1729,6 @@ def api_upload():
     
     # Save file to upload directory
     filepath = os.path.join(upload_dir, filename)
-
-    # Save file to upload directory
-    filepath = os.path.join(upload_dir, filename)
     
     # Handle filename conflicts (add number if exists)
     base_name, ext = os.path.splitext(filename)
@@ -1750,6 +1747,19 @@ def api_upload():
             telegram_notifier.notify_error(error_msg, f"Upload: {filename}")
         return jsonify({'error': error_msg}), 500
     
+    # If caption provided, save it to image metadata
+    caption = request.form.get('caption', '').strip()
+    if caption:
+        try:
+            success = set_image_caption(filepath, caption)
+            if success:
+                print(f"[Web] Added caption to uploaded image: {filename}")
+            else:
+                print(f"[Web] Warning: Failed to save caption to {filename}")
+        except Exception as e:
+            print(f"[Web] Error saving caption to {filename}: {e}")
+            # Don't fail the upload if caption saving fails
+    
     # Refresh images to include the new upload (refresh_images scans recursively)
     slideshow_instance.refresh_images()
     
@@ -1757,7 +1767,7 @@ def api_upload():
     if telegram_notifier:
         telegram_notifier.notify_upload(filename)
     
-    return jsonify({'status': 'ok', 'filename': filename, 'upload_dir': upload_dir})
+    return jsonify({'status': 'ok', 'filename': filename, 'upload_dir': upload_dir, 'caption_added': bool(caption)})
 
 @app.route('/api/settings', methods=['GET', 'POST'])
 def api_settings():
