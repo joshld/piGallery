@@ -6,7 +6,7 @@ Displays a slideshow of photos on a Raspberry Pi (or any computer) with a connec
 
 - 📸 Automatic slideshow with configurable timing
 - 🌡️ Weather and time display
-- 🌓 Auto display on/off scheduling
+- 🌓 Auto display on/off scheduling (with optional automatic shutdown)
 - 🎮 **Web interface for remote control**
 - 📱 Mobile-friendly control panel
 - ⚙️ Live settings adjustment
@@ -80,6 +80,8 @@ The first time you run the script, it will create a `config.ini` file with defau
 - `delay_seconds` - Time between images (default: 10)
 - `display_off_time` - When to turn display off (default: 23:00)
 - `display_on_time` - When to turn display on (default: 05:00)
+- `shutdown_on_display_off` - Automatically shutdown Pi at off-time (default: false)
+- `shutdown_countdown_seconds` - Countdown before shutdown (default: 10)
 - `location_city_suburb` - Location for weather data
 - Display toggles (show_time, show_date, show_temperature, etc.)
 
@@ -210,7 +212,15 @@ Edit `config.ini`:
 - `delay_seconds` - Time per image
 - `display_off_time` - When to turn display off (e.g., 23:00)
 - `display_on_time` - When to turn display on (e.g., 05:00)
+- `shutdown_on_display_off` - Auto shutdown Pi at off-time (true/false)
+- `shutdown_countdown_seconds` - Countdown before shutdown (default: 10)
 - `location_city_suburb` - Weather location
+
+**Note on Automatic Shutdown:**
+- When enabled, the Pi will shut down when `display_off_time` is reached
+- A countdown timer is displayed before shutdown
+- Telegram notification is sent before shutdown (if configured)
+- Disabled by default to allow 24/7 remote access via web interface
 
 ### Troubleshooting
 **Can't access web interface?**
