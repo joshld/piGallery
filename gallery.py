@@ -49,7 +49,8 @@ DEFAULT_CONFIG = {
         "show_date": "true",
         "show_temperature": "true",
         "show_weather_code": "true",
-        "show_filename": "true"
+        "show_filename": "true",
+        "show_caption": "true"
     },
     "telegram": {
         "bot_token": "",
@@ -673,7 +674,12 @@ class Slideshow:
             "date": pygame.font.SysFont(None, 72),
             "temp": pygame.font.SysFont(None, 132),
             "weather": pygame.font.SysFont(None, 72),
+            "caption": pygame.font.SysFont(None, 48),  # Caption font - medium size for readability
         }
+        
+        # Cache for current image caption to avoid re-reading on every frame
+        self._cached_caption = None
+        self._cached_caption_image = None
 
         self.text_color = (255, 255, 255)
 
@@ -827,6 +833,63 @@ class Slideshow:
             text_alpha = int(self.config.get('ui_text_alpha', '192'))
             weather_surf.set_alpha(text_alpha)
             self.screen.blit(weather_surf, (self.screen_w - weather_surf.get_width() - 10, 90))
+        
+        # caption overlay
+        show_caption = self.config.get('show_caption', 'true').lower() == 'true'
+        if show_caption and self.current_img:
+            # Check if we need to reload caption (image changed)
+            if self._cached_caption_image != self.current_img:
+                # Get image path
+                if self.current_img.startswith("uploaded/"):
+                    upload_dir = self.config.get('upload_directory', '').strip()
+                    if upload_dir:
+                        upload_dir = os.path.expanduser(upload_dir)
+                        actual_path = self.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
+                        img_path = os.path.join(upload_dir, actual_path)
+                    else:
+                        img_path = os.path.join(self.folder, self.current_img)
+                else:
+                    img_path = os.path.join(self.folder, self.current_img)
+                
+                # Read caption from metadata
+                self._cached_caption = get_image_caption(img_path)
+                self._cached_caption_image = self.current_img
+            
+            # Display caption if it exists
+            if self._cached_caption:
+                # Word wrap caption if it's too long (max ~60 chars per line for readability)
+                max_chars_per_line = 60
+                words = self._cached_caption.split()
+                lines = []
+                current_line = ""
+                
+                for word in words:
+                    if len(current_line) + len(word) + 1 <= max_chars_per_line:
+                        current_line += (" " if current_line else "") + word
+                    else:
+                        if current_line:
+                            lines.append(current_line)
+                        current_line = word
+                if current_line:
+                    lines.append(current_line)
+                
+                # Limit to 3 lines max to avoid taking up too much screen space
+                if len(lines) > 3:
+                    lines = lines[:3]
+                    lines[2] = lines[2][:57] + "..."
+                
+                # Render each line
+                line_height = 55
+                start_y = self.screen_h - (len(lines) * line_height) - 20  # Bottom of screen with padding
+                
+                for i, line in enumerate(lines):
+                    caption_surf = self.fonts["caption"].render(line, True, self.text_color)
+                    text_alpha = int(self.config.get('ui_text_alpha', '192'))
+                    caption_surf.set_alpha(text_alpha)
+                    # Center horizontally
+                    x_pos = (self.screen_w - caption_surf.get_width()) // 2
+                    y_pos = start_y + (i * line_height)
+                    self.screen.blit(caption_surf, (x_pos, y_pos))
 
     def refresh_images(self):
         # Check if directory exists
@@ -1212,6 +1275,228 @@ def get_image_path():
     
     return img_path if os.path.exists(img_path) else None
 
+def get_image_caption(img_path):
+    """Read caption from image metadata (EXIF/IPTC/XMP)
+    Returns caption string or None if not found"""
+    try:
+        from PIL import Image
+        from PIL.ExifTags import TAGS
+        from PIL import IptcImagePlugin
+        
+        if not os.path.exists(img_path):
+            return None
+        
+        img = Image.open(img_path)
+        caption = None
+        
+        # Try EXIF UserComment (tag 37510) - this is the "Comments" field
+        # Use piexif for better UserComment reading support
+        try:
+            import piexif
+            with open(img_path, 'rb') as f:
+                exif_dict = piexif.load(f.read())
+            if 'Exif' in exif_dict and piexif.ExifIFD.UserComment in exif_dict['Exif']:
+                comment_data = exif_dict['Exif'][piexif.ExifIFD.UserComment]
+                if comment_data:
+                    if isinstance(comment_data, bytes):
+                        # UserComment format: encoding prefix (e.g., "ASCII\0\0\0" or "UNICODE\0\0\0\0") + text
+                        # Try to decode, skipping encoding prefix if present
+                        try:
+                            # Check for common encoding prefixes
+                            if comment_data.startswith(b'ASCII\x00\x00\x00'):
+                                caption = comment_data[8:].decode('ascii', errors='replace').strip()
+                            elif comment_data.startswith(b'UNICODE\x00\x00\x00\x00'):
+                                caption = comment_data[12:].decode('utf-16', errors='replace').strip()
+                            elif comment_data.startswith(b'JIS\x00\x00\x00\x00\x00'):
+                                caption = comment_data[8:].decode('shift_jis', errors='replace').strip()
+                            else:
+                                # Try UTF-8 directly
+                                caption = comment_data.decode('utf-8', errors='replace').strip()
+                            if caption:
+                                return caption
+                        except Exception:
+                            pass
+                    elif isinstance(comment_data, str):
+                        return comment_data.strip()
+        except ImportError:
+            # piexif not available, try PIL
+            pass
+        except Exception:
+            pass
+        
+        # Fallback: Try PIL's getexif() for UserComment
+        try:
+            exif = img.getexif()
+            if exif and 37510 in exif:
+                caption = exif[37510]
+                if caption:
+                    if isinstance(caption, str):
+                        return caption.strip()
+                    elif isinstance(caption, bytes):
+                        # Try to decode, handling encoding prefix
+                        if caption.startswith(b'ASCII\x00\x00\x00'):
+                            return caption[8:].decode('ascii', errors='replace').strip()
+                        else:
+                            return caption.decode('utf-8', errors='replace').strip()
+        except Exception:
+            pass
+        
+        # Try EXIF ImageDescription (tag 270) as fallback
+        try:
+            exif = img.getexif()
+            if exif:
+                # EXIF ImageDescription is tag 270
+                if 270 in exif:
+                    caption = exif[270]
+                    if caption and isinstance(caption, str) and caption.strip():
+                        return caption.strip()
+        except Exception:
+            pass
+        
+        # Try IPTC Caption-Abstract
+        try:
+            iptc = IptcImagePlugin.getiptcinfo(img)
+            if iptc:
+                # IPTC Caption-Abstract is tag (2, 120)
+                if (2, 120) in iptc:
+                    caption_data = iptc[(2, 120)]
+                    if caption_data:
+                        # IPTC data can be bytes, string, or list
+                        if isinstance(caption_data, bytes):
+                            caption = caption_data.decode('utf-8', errors='replace').strip()
+                        elif isinstance(caption_data, str):
+                            caption = caption_data.strip()
+                        elif isinstance(caption_data, (list, tuple)) and len(caption_data) > 0:
+                            # Take first element if it's a list
+                            first_item = caption_data[0]
+                            if isinstance(first_item, bytes):
+                                caption = first_item.decode('utf-8', errors='replace').strip()
+                            elif isinstance(first_item, str):
+                                caption = first_item.strip()
+                            else:
+                                caption = str(first_item).strip()
+                        else:
+                            caption = str(caption_data).strip()
+                        
+                        if caption and len(caption) > 0:
+                            return caption
+        except Exception as e:
+            # Silently fail IPTC reading - not all images have IPTC data
+            pass
+        
+        # Try XMP (if available via Pillow)
+        try:
+            # XMP data might be in the image info
+            if hasattr(img, 'info') and 'exif' in img.info:
+                # Some XMP data might be embedded in EXIF
+                pass
+        except Exception:
+            pass
+        
+        return None
+    except Exception as e:
+        print(f"[Caption] Error reading caption from {img_path}: {e}")
+        return None
+
+def set_image_caption(img_path, caption):
+    """Write caption to image metadata (EXIF/IPTC)
+    Returns True if successful, False otherwise
+    
+    Note: PIL's EXIF writing is limited. For best results, use piexif library.
+    This function will try piexif first, then fall back to PIL's basic capabilities."""
+    try:
+        from PIL import Image
+        from PIL.ExifTags import TAGS
+        
+        if not os.path.exists(img_path):
+            return False
+        
+        # Try using piexif library (better EXIF support)
+        try:
+            import piexif
+            import tempfile
+            import shutil
+            
+            # Read current EXIF data (or create new if none exists)
+            try:
+                with open(img_path, 'rb') as f:
+                    exif_dict = piexif.load(f.read())
+            except Exception:
+                # No existing EXIF, create new dict
+                exif_dict = {'0th': {}, 'Exif': {}, 'GPS': {}, '1st': {}, 'thumbnail': None}
+            
+            # Set UserComment (tag 37510 in Exif IFD) - this is the "Comments" field in image viewers
+            # UserComment format: 8-byte encoding identifier + text bytes
+            # Format: "ASCII\0\0\0" + text (for ASCII) or "UNICODE\0\0\0\0" + text (for Unicode)
+            if 'Exif' not in exif_dict:
+                exif_dict['Exif'] = {}
+            
+            if caption:
+                # Use ASCII encoding prefix for better compatibility
+                # Format: "ASCII\0\0\0" (8 bytes) + text bytes
+                caption_bytes = caption.encode('utf-8')
+                user_comment = b'ASCII\x00\x00\x00' + caption_bytes
+            else:
+                user_comment = b'ASCII\x00\x00\x00'
+            
+            exif_dict['Exif'][piexif.ExifIFD.UserComment] = user_comment
+            
+            # Convert EXIF dict to bytes
+            exif_bytes = piexif.dump(exif_dict)
+            
+            # Read original image data
+            with open(img_path, 'rb') as f:
+                img_data = f.read()
+            
+            # Create temporary file for output
+            temp_fd, temp_path = tempfile.mkstemp(suffix='.jpg')
+            try:
+                os.close(temp_fd)
+                
+                # Insert EXIF into image and write to temp file
+                piexif.insert(exif_bytes, img_data, temp_path)
+                
+                # Replace original file with updated one
+                shutil.move(temp_path, img_path)
+                return True
+            except Exception as e:
+                # Clean up temp file on error
+                try:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                except:
+                    pass
+                raise e
+        except ImportError:
+            # piexif not available, try PIL's basic approach
+            # Note: PIL's EXIF writing is very limited
+            print("[Caption] piexif not available. Install with: pip install piexif for better EXIF support.")
+            
+            # For now, we'll save a note that piexif is recommended
+            # PIL can read EXIF but writing is problematic without piexif
+            return False
+        except Exception as e:
+            print(f"[Caption] Error using piexif: {e}, trying PIL fallback...")
+            # Fall through to PIL attempt below
+            pass
+        
+        # Fallback: Try PIL (limited support)
+        try:
+            img = Image.open(img_path)
+            img_format = img.format or 'JPEG'
+            
+            # PIL's EXIF writing is very limited - we can't easily modify existing EXIF
+            # For now, just return False and recommend piexif
+            print(f"[Caption] PIL cannot reliably write EXIF. Install piexif for full support.")
+            return False
+        except Exception as e:
+            print(f"[Caption] Error with PIL fallback: {e}")
+            return False
+            
+    except Exception as e:
+        print(f"[Caption] Error setting caption for {img_path}: {e}")
+        return False
+
 @app.route('/api/image/preview')
 def api_image_preview():
     """Get current image as thumbnail preview"""
@@ -1281,6 +1566,58 @@ def api_image_full():
             return send_from_directory(slideshow_instance.folder, slideshow_instance.current_img)
     except Exception as e:
         print(f"[Web] Error serving full image: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/image/caption', methods=['GET'])
+def api_get_caption():
+    """Get caption from current image metadata"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    if not slideshow_instance.current_img:
+        return jsonify({'error': 'No image loaded'}), 404
+    
+    try:
+        img_path = get_image_path()
+        if not img_path:
+            return jsonify({'error': 'Image file not found'}), 404
+        
+        caption = get_image_caption(img_path)
+        return jsonify({'status': 'ok', 'caption': caption or ''})
+    except Exception as e:
+        print(f"[Web] Error getting caption: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/image/caption', methods=['POST'])
+def api_set_caption():
+    """Set caption in current image metadata"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    if not slideshow_instance.current_img:
+        return jsonify({'error': 'No image loaded'}), 404
+    
+    try:
+        data = request.get_json()
+        if data is None:
+            return jsonify({'error': 'Invalid JSON'}), 400
+        
+        caption = data.get('caption', '').strip()
+        img_path = get_image_path()
+        if not img_path:
+            return jsonify({'error': 'Image file not found'}), 404
+        
+        # Check if file is writable
+        if not os.access(img_path, os.W_OK):
+            return jsonify({'error': 'Image file is not writable'}), 403
+        
+        success = set_image_caption(img_path, caption)
+        if success:
+            return jsonify({'status': 'ok', 'message': 'Caption saved successfully'})
+        else:
+            return jsonify({'error': 'Failed to save caption. Make sure piexif is installed: pip install piexif'}), 500
+    except Exception as e:
+        print(f"[Web] Error setting caption: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/next', methods=['POST'])
@@ -1392,9 +1729,6 @@ def api_upload():
     
     # Save file to upload directory
     filepath = os.path.join(upload_dir, filename)
-
-    # Save file to upload directory
-    filepath = os.path.join(upload_dir, filename)
     
     # Handle filename conflicts (add number if exists)
     base_name, ext = os.path.splitext(filename)
@@ -1413,6 +1747,19 @@ def api_upload():
             telegram_notifier.notify_error(error_msg, f"Upload: {filename}")
         return jsonify({'error': error_msg}), 500
     
+    # If caption provided, save it to image metadata
+    caption = request.form.get('caption', '').strip()
+    if caption:
+        try:
+            success = set_image_caption(filepath, caption)
+            if success:
+                print(f"[Web] Added caption to uploaded image: {filename}")
+            else:
+                print(f"[Web] Warning: Failed to save caption to {filename}")
+        except Exception as e:
+            print(f"[Web] Error saving caption to {filename}: {e}")
+            # Don't fail the upload if caption saving fails
+    
     # Refresh images to include the new upload (refresh_images scans recursively)
     slideshow_instance.refresh_images()
     
@@ -1420,7 +1767,7 @@ def api_upload():
     if telegram_notifier:
         telegram_notifier.notify_upload(filename)
     
-    return jsonify({'status': 'ok', 'filename': filename, 'upload_dir': upload_dir})
+    return jsonify({'status': 'ok', 'filename': filename, 'upload_dir': upload_dir, 'caption_added': bool(caption)})
 
 @app.route('/api/settings', methods=['GET', 'POST'])
 def api_settings():
@@ -1435,6 +1782,7 @@ def api_settings():
             'show_temperature': slideshow_instance.config.get('show_temperature', 'true'),
             'show_weather_code': slideshow_instance.config.get('show_weather_code', 'true'),
             'show_filename': slideshow_instance.config.get('show_filename', 'true'),
+            'show_caption': slideshow_instance.config.get('show_caption', 'true'),
             'delay_seconds': slideshow_instance.display_time_seconds,
             'display_off_time': slideshow_instance.config.get('display_off_time', '23:00'),
             'display_on_time': slideshow_instance.config.get('display_on_time', '05:00'),
@@ -1482,6 +1830,12 @@ def api_settings():
             slideshow_instance.config['show_filename'] = new_val
             if telegram_notifier and old_val != new_val:
                 telegram_notifier.notify_settings_change('show_filename', old_val, new_val)
+        if 'show_caption' in data:
+            old_val = slideshow_instance.config.get('show_caption', 'true')
+            new_val = str(data['show_caption']).lower()
+            slideshow_instance.config['show_caption'] = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('show_caption', old_val, new_val)
         if 'delay_seconds' in data:
             old_val = slideshow_instance.display_time_seconds
             new_val = int(data['delay_seconds'])
@@ -1547,21 +1901,26 @@ def api_settings():
             # Update images directory (requires restart to take full effect)
             old_val = slideshow_instance.folder
             new_dir = data['images_directory'].strip()
-            if os.path.exists(new_dir) and os.path.isdir(new_dir):
-                slideshow_instance.folder = new_dir
-                slideshow_instance.config['images_directory'] = new_dir
-                # Refresh images from new directory
-                slideshow_instance.images = []
-                slideshow_instance.history = []
-                slideshow_instance.current_index = -1
-                slideshow_instance.refresh_images()
-                if slideshow_instance.images:
-                    slideshow_instance.next_image()
-                print(f"[Web] Images directory changed to: {new_dir}")
-                if telegram_notifier and old_val != new_dir:
-                    telegram_notifier.notify_settings_change('images_directory', old_val, new_dir)
+            # Only refresh if the directory actually changed
+            if new_dir != old_val:
+                if os.path.exists(new_dir) and os.path.isdir(new_dir):
+                    slideshow_instance.folder = new_dir
+                    slideshow_instance.config['images_directory'] = new_dir
+                    # Refresh images from new directory
+                    slideshow_instance.images = []
+                    slideshow_instance.history = []
+                    slideshow_instance.current_index = -1
+                    slideshow_instance.refresh_images()
+                    if slideshow_instance.images:
+                        slideshow_instance.next_image()
+                    print(f"[Web] Images directory changed to: {new_dir}")
+                    if telegram_notifier and old_val != new_dir:
+                        telegram_notifier.notify_settings_change('images_directory', old_val, new_dir)
+                else:
+                    return jsonify({'error': 'Invalid directory path'}), 400
             else:
-                return jsonify({'error': 'Invalid directory path'}), 400
+                # Directory hasn't changed, just update config without refreshing
+                slideshow_instance.config['images_directory'] = new_dir
         
         # Force a redraw to apply settings immediately
         slideshow_instance.force_redraw = True
@@ -1584,7 +1943,7 @@ def api_settings():
             
             # Update config file
             for key in ['show_time', 'show_date', 'show_temperature', 'show_weather_code', 
-                       'show_filename', 'display_off_time', 'display_on_time',
+                       'show_filename', 'show_caption', 'display_off_time', 'display_on_time',
                        'location_city_suburb', 'aspect_ratio_landscape', 'aspect_ratio_portrait',
                        'ui_text_alpha', 'weather_update_seconds', 'upload_directory', 'images_directory']:
                 if key in data:
@@ -1703,6 +2062,7 @@ def main():
         'show_temperature': get_config_value('show_temperature', 'true'),
         'show_weather_code': get_config_value('show_weather_code', 'true'),
         'show_filename': get_config_value('show_filename', 'true'),
+        'show_caption': get_config_value('show_caption', 'true'),
         'ui_text_alpha': get_config_value('ui_text_alpha', '192'),
         'weather_update_seconds': get_config_value('weather_update_seconds', '900'),
         'aspect_ratio_landscape': get_config_value('aspect_ratio_landscape', '1.5'),

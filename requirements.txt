@@ -4,4 +4,6 @@ geopy
 flask
 flask-cors
 psutil
+Pillow
+piexif
 # python-telegram-bot (only needed for Phase 2 - receiving commands from Telegram)
