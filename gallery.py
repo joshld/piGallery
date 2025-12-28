@@ -650,6 +650,25 @@ def api_directories():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+def get_image_path():
+    """Helper function to get the current image path"""
+    if slideshow_instance is None or not slideshow_instance.current_img:
+        return None
+    
+    # Check if this is an uploaded image
+    if slideshow_instance.current_img.startswith("uploaded/"):
+        upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
+        if upload_dir:
+            upload_dir = os.path.expanduser(upload_dir)
+            actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
+            img_path = os.path.join(upload_dir, actual_path)
+        else:
+            img_path = os.path.join(slideshow_instance.folder, slideshow_instance.current_img)
+    else:
+        img_path = os.path.join(slideshow_instance.folder, slideshow_instance.current_img)
+    
+    return img_path if os.path.exists(img_path) else None
+
 @app.route('/api/image/preview')
 def api_image_preview():
     """Get current image as thumbnail preview"""
@@ -664,19 +683,8 @@ def api_image_preview():
         from flask import send_file
         import io
         
-        # Check if this is an uploaded image
-        if slideshow_instance.current_img.startswith("uploaded/"):
-            upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
-            if upload_dir:
-                upload_dir = os.path.expanduser(upload_dir)
-                actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
-                img_path = os.path.join(upload_dir, actual_path)
-            else:
-                img_path = os.path.join(slideshow_instance.folder, slideshow_instance.current_img)
-        else:
-            img_path = os.path.join(slideshow_instance.folder, slideshow_instance.current_img)
-
-        if not os.path.exists(img_path):
+        img_path = get_image_path()
+        if not img_path:
             return jsonify({'error': 'Image file not found'}), 404
         
         # Create thumbnail (max 400x400, maintains aspect ratio)
@@ -691,21 +699,45 @@ def api_image_preview():
         return send_file(img_bytes, mimetype='image/jpeg')
     except ImportError:
         # Fallback: serve original image if PIL not available
+        img_path = get_image_path()
+        if img_path:
+            if slideshow_instance.current_img.startswith("uploaded/"):
+                upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
+                if upload_dir:
+                    upload_dir = os.path.expanduser(upload_dir)
+                    actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
+                    return send_from_directory(upload_dir, actual_path)
+            else:
+                return send_from_directory(slideshow_instance.folder, slideshow_instance.current_img)
+        return jsonify({'error': 'Image not found'}), 404
+    except Exception as e:
+        print(f"[Web] Error generating preview: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/image/full')
+def api_image_full():
+    """Get current image at full resolution"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    if not slideshow_instance.current_img:
+        return jsonify({'error': 'No image loaded'}), 404
+    
+    try:
+        img_path = get_image_path()
+        if not img_path:
+            return jsonify({'error': 'Image file not found'}), 404
+        
         if slideshow_instance.current_img.startswith("uploaded/"):
             upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
             if upload_dir:
                 upload_dir = os.path.expanduser(upload_dir)
                 actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
-                img_path = os.path.join(upload_dir, actual_path)
-                if os.path.exists(img_path):
-                    return send_from_directory(upload_dir, actual_path)
+                return send_from_directory(upload_dir, actual_path)
         else:
-            img_path = os.path.join(slideshow_instance.folder, slideshow_instance.current_img)
-            if os.path.exists(img_path):
-                return send_from_directory(slideshow_instance.folder, slideshow_instance.current_img)
-        return jsonify({'error': 'Image not found'}), 404
+            return send_from_directory(slideshow_instance.folder, slideshow_instance.current_img)
     except Exception as e:
-        print(f"[Web] Error generating preview: {e}")
+        print(f"[Web] Error serving full image: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/next', methods=['POST'])
