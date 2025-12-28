@@ -1901,21 +1901,26 @@ def api_settings():
             # Update images directory (requires restart to take full effect)
             old_val = slideshow_instance.folder
             new_dir = data['images_directory'].strip()
-            if os.path.exists(new_dir) and os.path.isdir(new_dir):
-                slideshow_instance.folder = new_dir
-                slideshow_instance.config['images_directory'] = new_dir
-                # Refresh images from new directory
-                slideshow_instance.images = []
-                slideshow_instance.history = []
-                slideshow_instance.current_index = -1
-                slideshow_instance.refresh_images()
-                if slideshow_instance.images:
-                    slideshow_instance.next_image()
-                print(f"[Web] Images directory changed to: {new_dir}")
-                if telegram_notifier and old_val != new_dir:
-                    telegram_notifier.notify_settings_change('images_directory', old_val, new_dir)
+            # Only refresh if the directory actually changed
+            if new_dir != old_val:
+                if os.path.exists(new_dir) and os.path.isdir(new_dir):
+                    slideshow_instance.folder = new_dir
+                    slideshow_instance.config['images_directory'] = new_dir
+                    # Refresh images from new directory
+                    slideshow_instance.images = []
+                    slideshow_instance.history = []
+                    slideshow_instance.current_index = -1
+                    slideshow_instance.refresh_images()
+                    if slideshow_instance.images:
+                        slideshow_instance.next_image()
+                    print(f"[Web] Images directory changed to: {new_dir}")
+                    if telegram_notifier and old_val != new_dir:
+                        telegram_notifier.notify_settings_change('images_directory', old_val, new_dir)
+                else:
+                    return jsonify({'error': 'Invalid directory path'}), 400
             else:
-                return jsonify({'error': 'Invalid directory path'}), 400
+                # Directory hasn't changed, just update config without refreshing
+                slideshow_instance.config['images_directory'] = new_dir
         
         # Force a redraw to apply settings immediately
         slideshow_instance.force_redraw = True
