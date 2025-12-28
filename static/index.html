@@ -35,6 +35,44 @@
             margin-bottom: 10px;
         }
 
+        .tab-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .tab-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            font-size: 1.1em;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 10px 10px 0 0;
+            transition: all 0.3s;
+            margin-bottom: -2px;
+        }
+
+        .tab-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .tab-button.active {
+            background: white;
+            color: #667eea;
+            border-bottom: 2px solid white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         .status-bar {
             background: white;
             border-radius: 15px;
@@ -593,6 +631,12 @@
 
         <div class="alert" id="alert"></div>
 
+        <div class="tab-container">
+            <button class="tab-button active" onclick="switchTab('status')">📊 Status</button>
+            <button class="tab-button" onclick="switchTab('system')">💻 System</button>
+        </div>
+
+        <div id="tab-status" class="tab-content active">
         <div class="status-bar">
             <h2 style="margin-bottom: 15px; color: #667eea;">📊 Current Status</h2>
             <div class="status-grid">
@@ -856,6 +900,35 @@
                 </div>
             </div>
         </div>
+        </div>
+
+        <div id="tab-system" class="tab-content">
+            <div class="status-bar">
+                <h2 style="margin-bottom: 15px; color: #667eea;">💻 System Resources</h2>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-label">💾 Free Memory</div>
+                        <div class="status-value" id="status-memory">-- MB</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">⚡ CPU Usage</div>
+                        <div class="status-value" id="status-cpu">--%</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">🌡️ CPU Temperature</div>
+                        <div class="status-value" id="status-cpu-temp">--°C</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">💿 Free Disk Space</div>
+                        <div class="status-value" id="status-disk-free">-- GB</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">📊 Disk Used</div>
+                        <div class="status-value" id="status-disk-used">--%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -999,6 +1072,24 @@
             }
         }
 
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            
+            // Activate selected button
+            event.target.classList.add('active');
+        }
+
         async function updateStatus() {
             try {
                 const response = await fetch('/api/status');
@@ -1011,6 +1102,32 @@
                 document.getElementById('status-index').textContent = `${data.current_index} / ${data.total_images}`;
                 document.getElementById('status-paused').textContent = data.paused ? 'Paused' : 'Playing';
                 document.getElementById('current-image').textContent = data.current_image || 'No image loaded';
+                
+                // Update system stats if available
+                if (data.system) {
+                    const sys = data.system;
+                    const memoryEl = document.getElementById('status-memory');
+                    const cpuEl = document.getElementById('status-cpu');
+                    const tempEl = document.getElementById('status-cpu-temp');
+                    const diskFreeEl = document.getElementById('status-disk-free');
+                    const diskUsedEl = document.getElementById('status-disk-used');
+                    
+                    if (memoryEl && sys.memory_free_mb !== undefined) {
+                        memoryEl.textContent = `${sys.memory_free_mb} MB`;
+                    }
+                    if (cpuEl && sys.cpu_percent !== undefined) {
+                        cpuEl.textContent = `${sys.cpu_percent}%`;
+                    }
+                    if (tempEl && sys.cpu_temp !== undefined) {
+                        tempEl.textContent = `${sys.cpu_temp}°C`;
+                    }
+                    if (diskFreeEl && sys.disk_free_gb !== undefined) {
+                        diskFreeEl.textContent = `${sys.disk_free_gb} GB`;
+                    }
+                    if (diskUsedEl && sys.disk_used_percent !== undefined) {
+                        diskUsedEl.textContent = `${sys.disk_used_percent}%`;
+                    }
+                }
                 
                 // Update image preview only when image changes
                 const previewImg = document.getElementById('image-preview');
