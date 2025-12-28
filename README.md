@@ -249,6 +249,7 @@ piGallery uses **GitHub Issues** for tracking features, bugs, and improvements. 
 
 #### View Planned Features
 - **Browse all issues:** https://github.com/joshld/piGallery/issues
+- **Visual project board:** https://github.com/joshld/piGallery/projects (Kanban-style tracking)
 - **View by priority:** Look for ⭐ emoji in issue titles
 - **Track progress:** Each issue shows completion percentage
 
@@ -276,7 +277,10 @@ gh issue view 14
 git commit -m "Add Telegram status updates for #14"
 ```
 
-For more details, see **[GITHUB_TODO_GUIDE.md](GITHUB_TODO_GUIDE.md)** for a complete guide on using GitHub Issues for task tracking.
+#### Documentation
+- **[GITHUB_TODO_GUIDE.md](GITHUB_TODO_GUIDE.md)** - Complete guide on using GitHub Issues
+- **[GITHUB_PROJECT_BOARD_GUIDE.md](GITHUB_PROJECT_BOARD_GUIDE.md)** - Visual Kanban board setup
+- **[PROJECT_BOARD_MOCKUP.md](PROJECT_BOARD_MOCKUP.md)** - See how the board looks
 
 ### 10. Notes
 - The script is designed for fullscreen display and will hide the mouse cursor.

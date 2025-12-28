@@ -206,9 +206,28 @@ gh issue list --web
 
 ---
 
+## 📊 Want a Visual Project Board?
+
+GitHub Projects provides a beautiful Kanban board view for tracking your issues!
+
+See **`GITHUB_PROJECT_BOARD_GUIDE.md`** for:
+- Complete setup instructions
+- Visual mockups of how it looks
+- Table and Roadmap views
+- Mobile experience
+- Advanced features
+
+Or jump straight to creating one:
+👉 https://github.com/joshld/piGallery/projects/new
+
+**Preview:** See `PROJECT_BOARD_MOCKUP.md` for visual examples!
+
+---
+
 ## 🔗 Quick Links
 
 - **All Issues**: https://github.com/joshld/piGallery/issues
+- **Create Project Board**: https://github.com/joshld/piGallery/projects/new
 - **Issue #14 (Telegram)**: https://github.com/joshld/piGallery/issues/14
 - **Create New Issue**: `gh issue create`
 - **GitHub CLI Docs**: https://cli.github.com/manual/gh_issue
