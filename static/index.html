@@ -73,11 +73,25 @@
             margin-bottom: 20px;
         }
 
+        .control-card.wide {
+            max-width: 500px;
+        }
+
+        @media (max-width: 768px) {
+            .control-card.wide {
+                max-width: 100%;
+            }
+        }
+
         .control-card {
             background: white;
             border-radius: 15px;
             padding: 25px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden; /* Prevent content from overflowing */
+            box-sizing: border-box;
+            width: 100%;
+            max-width: 100%;
         }
 
         .control-card h2 {
@@ -168,18 +182,66 @@
 
         .settings-group {
             margin-bottom: 20px;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            overflow: hidden; /* Prevent overflow */
         }
 
         .setting-item {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px 0;
             border-bottom: 1px solid #eee;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            overflow: visible; /* Allow content to be visible */
         }
 
         .setting-item:last-child {
             border-bottom: none;
+        }
+
+        .setting-item-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 100%;
+            gap: 10px;
+            box-sizing: border-box;
+            overflow: hidden; /* Prevent overflow */
+        }
+
+        .setting-item-row > span {
+            font-weight: 500;
+            color: #333;
+            flex: 1 1 auto;
+            min-width: 0;
+            flex-shrink: 0;
+            overflow: visible;
+            white-space: nowrap;
+        }
+
+        .setting-item-complex {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .setting-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex: 1 1 0;
+            min-width: 0;
+            max-width: 100%;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: visible; /* Allow content to be visible */
         }
 
         .toggle-switch {
@@ -190,6 +252,7 @@
             border-radius: 15px;
             cursor: pointer;
             transition: background 0.3s;
+            flex-shrink: 0; /* Don't shrink toggle switches */
         }
 
         .toggle-switch.active {
@@ -213,12 +276,74 @@
         }
 
         input[type="number"],
+        input[type="text"] {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            font-family: inherit;
+            width: 140px;
+            box-sizing: border-box;
+            color: #333;
+            background: #fff;
+            text-align: center;
+            margin: 0 auto;
+        }
+
+        input[type="text"]#location-city {
+            width: 100%;
+            margin: 0;
+        }
+
         input[type="time"] {
             padding: 8px 12px;
             border: 2px solid #ddd;
             border-radius: 8px;
             font-size: 1em;
-            width: 100px;
+            font-family: inherit;
+            width: 140px;
+            box-sizing: border-box;
+            color: #333;
+            background: #fff;
+            text-align: center;
+            margin: 0 auto;
+        }
+
+        input[type="number"]:focus,
+        input[type="time"]:focus,
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .browse-button {
+            padding: 0;
+            background: transparent;
+            color: #667eea;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1.2em;
+            width: 28px;
+            height: 28px;
+            min-width: 28px;
+            max-width: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 28px;
+            transition: opacity 0.3s;
+            box-sizing: border-box;
+            line-height: 1;
+            margin-top: 3px;
+        }
+
+        .browse-button:hover {
+            opacity: 0.7;
+        }
+
+        .browse-button:active {
+            transform: scale(0.95);
         }
 
         .alert {
@@ -347,6 +472,24 @@
                 grid-template-columns: 1fr;
             }
 
+            .control-card {
+                width: 100%;
+                max-width: 100%;
+            }
+
+            .setting-item-row {
+                flex-wrap: wrap;
+            }
+
+            .setting-item-row > span {
+                flex: 0 0 100%;
+                margin-bottom: 5px;
+            }
+
+            .setting-controls {
+                width: 100%;
+            }
+
             button {
                 min-width: 100px;
                 padding: 12px 20px;
@@ -427,111 +570,137 @@
                     <input type="file" id="fileInput" accept="image/jpeg,image/jpg,image/png" multiple onchange="uploadFiles(this.files)">
                 </div>
                 <div id="uploadStatus"></div>
+                
+                <div style="margin-top: 25px; padding-top: 25px; border-top: 1px solid #eee;">
+                    <h3 style="font-size: 1.3em; color: #667eea; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #667eea;">📁 Directories</h3>
+                    <div class="settings-group">
+                        <div class="setting-item">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                <label style="font-weight: 500; color: #333; flex: 1;">Images Directory</label>
+                                <button onclick="browseDirectory('images-directory')" class="browse-button" 
+                                        title="Browse for directory">
+                                    📁
+                                </button>
+                            </div>
+                            <input type="text" id="images-directory" placeholder="/path/to/images" 
+                                   onchange="updateSetting('images_directory', this.value)"
+                                   title="Click to edit or use browse button"
+                                   style="width: 100%; padding: 8px 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em; color: #333; background: #fff; box-sizing: border-box; text-align: center;">
+                        </div>
+                        <div class="setting-item">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                <label style="font-weight: 500; color: #333; flex: 1;">Upload Directory</label>
+                                <button onclick="browseDirectory('upload-directory')" class="browse-button"
+                                        title="Browse for directory">
+                                    📁
+                                </button>
+                            </div>
+                            <input type="text" id="upload-directory" placeholder="Leave empty for default" 
+                                   onchange="updateSetting('upload_directory', this.value)"
+                                   title="Click to edit or use browse button"
+                                   style="width: 100%; padding: 8px 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em; color: #333; background: #fff; box-sizing: border-box; text-align: center;">
+                            <small style="display: block; color: #666; margin-top: 8px;">
+                                (default: [ImagesDirectory]/uploaded/)
+                            </small>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="control-card">
-                <h2>⚙️ Display Settings</h2>
+                <h2>👁️ Display Options</h2>
                 <div class="settings-group">
                     <div class="setting-item">
-                        <span>Show Time</span>
-                        <div class="toggle-switch" id="toggle-time" onclick="toggleSetting('show_time', this)"></div>
+                        <div class="setting-item-row">
+                            <span>Show Time</span>
+                            <div class="toggle-switch" id="toggle-time" onclick="toggleSetting('show_time', this)"></div>
+                        </div>
                     </div>
                     <div class="setting-item">
-                        <span>Show Date</span>
-                        <div class="toggle-switch" id="toggle-date" onclick="toggleSetting('show_date', this)"></div>
+                        <div class="setting-item-row">
+                            <span>Show Date</span>
+                            <div class="toggle-switch" id="toggle-date" onclick="toggleSetting('show_date', this)"></div>
+                        </div>
                     </div>
                     <div class="setting-item">
-                        <span>Show Temperature</span>
-                        <div class="toggle-switch" id="toggle-temp" onclick="toggleSetting('show_temperature', this)"></div>
+                        <div class="setting-item-row">
+                            <span>Show Temperature</span>
+                            <div class="toggle-switch" id="toggle-temp" onclick="toggleSetting('show_temperature', this)"></div>
+                        </div>
                     </div>
                     <div class="setting-item">
-                        <span>Show Weather</span>
-                        <div class="toggle-switch" id="toggle-weather" onclick="toggleSetting('show_weather_code', this)"></div>
+                        <div class="setting-item-row">
+                            <span>Show Weather</span>
+                            <div class="toggle-switch" id="toggle-weather" onclick="toggleSetting('show_weather_code', this)"></div>
+                        </div>
                     </div>
                     <div class="setting-item">
-                        <span>Show Filename</span>
-                        <div class="toggle-switch" id="toggle-filename" onclick="toggleSetting('show_filename', this)"></div>
+                        <div class="setting-item-row">
+                            <span>Show Filename</span>
+                            <div class="toggle-switch" id="toggle-filename" onclick="toggleSetting('show_filename', this)"></div>
+                        </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="control-card wide">
+                <h2>⚙️ Advanced Settings</h2>
+                <div class="settings-group">
                     <div class="setting-item">
-                        <span>Delay (seconds)</span>
+                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Delay (seconds)</label>
                         <input type="number" id="delay-seconds" min="1" max="3600" value="30" 
                                onchange="updateSetting('delay_seconds', this.value)">
                     </div>
                     <div class="setting-item">
-                        <span>Images Directory</span>
-                        <div style="display: flex; gap: 5px; align-items: center;">
-                            <input type="text" id="images-directory" placeholder="/path/to/images" 
-                                   style="flex: 1; width: 200px;"
-                                   onchange="updateSetting('images_directory', this.value)">
-                            <button onclick="browseDirectory('images-directory')" 
-                                    style="padding: 8px 15px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                                📁 Browse
-                            </button>
-                        </div>
-                    </div>
-                    <div class="setting-item">
-                        <span>Upload Directory</span>
-                        <div style="display: flex; gap: 5px; align-items: center;">
-                            <input type="text" id="upload-directory" placeholder="Leave empty for default" 
-                                   style="flex: 1; width: 200px;"
-                                   onchange="updateSetting('upload_directory', this.value)">
-                            <button onclick="browseDirectory('upload-directory')" 
-                                    style="padding: 8px 15px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                                📁 Browse
-                            </button>
-                        </div>
-                        <small style="display: block; color: #666; margin-top: 5px;">
-                            Empty = images_directory/uploaded/
-                        </small>
-                    </div>
-                    <div id="directoryModal" class="modal">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h2>Select Directory</h2>
-                                <span class="close" onclick="closeDirectoryBrowser()">&times;</span>
-                            </div>
-                            <div id="directoryBrowser">
-                                <p>Loading directories...</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="setting-item">
-                        <span>Display On Time</span>
+                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Display On Time</label>
                         <input type="time" id="display-on-time" 
                                onchange="updateSetting('display_on_time', this.value)">
                     </div>
                     <div class="setting-item">
-                        <span>Display Off Time</span>
+                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Display Off Time</label>
                         <input type="time" id="display-off-time" 
                                onchange="updateSetting('display_off_time', this.value)">
                     </div>
                     <div class="setting-item">
-                        <span>Location (City)</span>
+                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Location (City)</label>
                         <input type="text" id="location-city" placeholder="Sydney, Australia" 
-                               onchange="updateSetting('location_city_suburb', this.value)" style="width: 200px;">
+                               onchange="updateSetting('location_city_suburb', this.value)"
+                               style="width: 100%;">
                     </div>
                     <div class="setting-item">
-                        <span>Weather Update (seconds)</span>
+                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Weather Update (seconds)</label>
                         <input type="number" id="weather-update" min="60" max="3600" value="900" 
                                onchange="updateSetting('weather_update_seconds', this.value)">
                     </div>
                     <div class="setting-item">
-                        <span>UI Text Alpha (0-255)</span>
+                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">UI Text Alpha (0-255)</label>
                         <input type="number" id="ui-text-alpha" min="0" max="255" value="192" 
                                onchange="updateSetting('ui_text_alpha', this.value)">
                     </div>
                     <div class="setting-item">
-                        <span>Aspect Ratio (Landscape)</span>
+                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Aspect Ratio (Landscape)</label>
                         <input type="number" id="aspect-landscape" step="0.1" min="0.5" max="3.0" value="1.5" 
                                onchange="updateSetting('aspect_ratio_landscape', this.value)">
                     </div>
                     <div class="setting-item">
-                        <span>Aspect Ratio (Portrait)</span>
+                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Aspect Ratio (Portrait)</label>
                         <input type="number" id="aspect-portrait" step="0.1" min="0.1" max="1.0" value="0.667" 
                                onchange="updateSetting('aspect_ratio_portrait', this.value)">
                     </div>
                 </div>
                 <button class="btn-success btn-full" onclick="saveSettings()">💾 Save Settings</button>
+            </div>
+
+            <div id="directoryModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>Select Directory</h2>
+                        <span class="close" onclick="closeDirectoryBrowser()">&times;</span>
+                    </div>
+                    <div id="directoryBrowser">
+                        <p>Loading directories...</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
