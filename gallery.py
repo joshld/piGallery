@@ -669,6 +669,10 @@ class Slideshow:
         self.manual_display_override = None  # None = auto, True = force on, False = force off
         self.control_lock = threading.Lock()
         self.force_redraw = False
+        
+        # Countdown tracking for web UI
+        self.image_display_start_time = time.time()
+        self.time_remaining = display_time_seconds
 
         self.fonts = {
             "filename": pygame.font.SysFont("Arial", 14),
@@ -1066,6 +1070,8 @@ class Slideshow:
                     self.next_image()
                     self.draw_image()
                     pygame.display.flip()
+                    # Reset countdown timer
+                    self.image_display_start_time = time.time()
                 
                 display_was_on = True
             else:
@@ -1192,6 +1198,10 @@ def api_status():
     except Exception as e:
         print(f"[API] Error getting system stats: {e}")
     
+    # Calculate time remaining until next image
+    elapsed = time.time() - slideshow_instance.image_display_start_time
+    time_remaining = max(0, slideshow_instance.display_time_seconds - int(elapsed))
+    
     response = {
         'current_image': slideshow_instance.current_img,
         'current_index': slideshow_instance.current_index + 1,
@@ -1202,7 +1212,9 @@ def api_status():
         'date': datetime.datetime.now().strftime("%d %b %Y"),
         'paused': slideshow_instance.paused,
         'display_on': slideshow_instance.is_display_on(),
-        'manual_override': slideshow_instance.manual_display_override
+        'manual_override': slideshow_instance.manual_display_override,
+        'time_remaining': time_remaining,
+        'delay_seconds': slideshow_instance.display_time_seconds
     }
     
     if system_stats:
@@ -1652,6 +1664,7 @@ def api_next():
     with slideshow_instance.control_lock:
         slideshow_instance.next_image()
         slideshow_instance.force_redraw = True  # Force immediate redraw
+        slideshow_instance.image_display_start_time = time.time()  # Reset countdown
     
     return jsonify({'status': 'ok', 'current_image': slideshow_instance.current_img})
 
@@ -1664,6 +1677,7 @@ def api_prev():
     with slideshow_instance.control_lock:
         slideshow_instance.prev_image()
         slideshow_instance.force_redraw = True  # Force immediate redraw
+        slideshow_instance.image_display_start_time = time.time()  # Reset countdown
     
     return jsonify({'status': 'ok', 'current_image': slideshow_instance.current_img})
 
@@ -1865,6 +1879,8 @@ def api_settings():
             old_val = slideshow_instance.display_time_seconds
             new_val = int(data['delay_seconds'])
             slideshow_instance.display_time_seconds = new_val
+            # Reset countdown timer when delay changes
+            slideshow_instance.image_display_start_time = time.time()
             if telegram_notifier and old_val != new_val:
                 telegram_notifier.notify_settings_change('delay_seconds', str(old_val), str(new_val))
         if 'display_off_time' in data:

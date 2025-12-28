@@ -664,6 +664,10 @@
                     <div class="status-label">▶️ State</div>
                     <div class="status-value" id="status-paused">Playing</div>
                 </div>
+                <div class="status-item">
+                    <div class="status-label">⏱️ Next Image In</div>
+                    <div class="status-value" id="status-countdown">--s</div>
+                </div>
             </div>
             <div class="image-preview-container">
                 <h3 style="margin-bottom: 15px; color: #667eea; font-size: 1.1em;">📸 Current Image</h3>
@@ -990,10 +994,17 @@
         let isPaused = false;
 
         // Initialize
+        let countdownInterval = null;
+        let lastKnownTimeRemaining = 0;
+        let lastUpdateTime = Date.now();
+
         document.addEventListener('DOMContentLoaded', function() {
             updateStatus();
             loadSettings();
             setInterval(updateStatus, 3000); // Update every 3 seconds
+            
+            // Update countdown every second
+            countdownInterval = setInterval(updateCountdown, 1000);
 
             // Drag and drop
             const uploadArea = document.getElementById('uploadArea');
@@ -1177,6 +1188,29 @@
             }
         }
 
+        function updateCountdown() {
+            // Don't update countdown if we don't have valid data yet
+            if (lastKnownTimeRemaining === 0 && lastUpdateTime === 0) {
+                return;
+            }
+            
+            // Calculate time elapsed since last API update
+            const now = Date.now();
+            const elapsed = Math.floor((now - lastUpdateTime) / 1000);
+            const remaining = Math.max(0, lastKnownTimeRemaining - elapsed);
+            
+            const countdownEl = document.getElementById('status-countdown');
+            if (countdownEl && countdownEl.textContent !== 'Paused') {
+                if (remaining > 0) {
+                    countdownEl.textContent = `${remaining}s`;
+                    countdownEl.style.color = remaining <= 5 ? '#e74c3c' : '#2ecc71'; // Red when < 5s
+                } else {
+                    countdownEl.textContent = '0s';
+                    countdownEl.style.color = '#e74c3c';
+                }
+            }
+        }
+
         async function updateStatus() {
             try {
                 const response = await fetch('/api/status');
@@ -1189,6 +1223,21 @@
                 document.getElementById('status-index').textContent = `${data.current_index} / ${data.total_images}`;
                 document.getElementById('status-paused').textContent = data.paused ? 'Paused' : 'Playing';
                 document.getElementById('current-image').textContent = data.current_image || 'No image loaded';
+                
+                // Update countdown tracking
+                if (data.time_remaining !== undefined) {
+                    lastKnownTimeRemaining = data.time_remaining;
+                    lastUpdateTime = Date.now();
+                    
+                    // Show "Paused" instead of countdown when paused
+                    const countdownEl = document.getElementById('status-countdown');
+                    if (data.paused && countdownEl) {
+                        countdownEl.textContent = 'Paused';
+                        countdownEl.style.color = '#f39c12';
+                    } else {
+                        updateCountdown(); // Immediately update display
+                    }
+                }
                 
                 // Update system stats if available
                 if (data.system) {
