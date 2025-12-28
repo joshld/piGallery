@@ -13,6 +13,13 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    print("[Warning] psutil not available. System monitoring disabled.")
+
 if sys.version_info < (3, 7):
     print("Python 3.7 or newer is required.")
     sys.exit(1)
@@ -304,6 +311,212 @@ class TelegramNotifier:
             alert_message += f"\n📊 Current: {value}"
         alert_message += f"\n📅 {datetime.datetime.now().strftime('%H:%M:%S')}"
         self._send_message(alert_message)
+
+
+# ---------------- System Monitoring ----------------
+
+
+def get_cpu_temperature():
+    """Get CPU temperature (Raspberry Pi specific, very lightweight)"""
+    # Try Raspberry Pi vcgencmd first (native, no dependencies)
+    try:
+        result = subprocess.run(['vcgencmd', 'measure_temp'], 
+                              capture_output=True, text=True, timeout=1)
+        if result.returncode == 0:
+            temp_str = result.stdout.strip()
+            # Extract temperature value (format: "temp=45.2'C")
+            temp = float(temp_str.split('=')[1].split("'")[0])
+            return temp
+    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError, IndexError):
+        pass
+    
+    # Fallback to psutil only if available (for non-Pi systems)
+    if PSUTIL_AVAILABLE:
+        try:
+            temps = psutil.sensors_temperatures()
+            if temps:
+                for name, entries in temps.items():
+                    if entries:
+                        return entries[0].current
+        except Exception:
+            pass
+    
+    return None
+
+
+def get_memory_info():
+    """Get memory info - lightweight on Linux, psutil on Windows/Mac"""
+    # Try lightweight /proc/meminfo on Linux first
+    try:
+        with open('/proc/meminfo', 'r') as f:
+            meminfo = f.read()
+            # Parse MemAvailable (preferred) or MemFree
+            for line in meminfo.split('\n'):
+                if line.startswith('MemAvailable:'):
+                    # Format: "MemAvailable:    123456 kB"
+                    kb = int(line.split()[1])
+                    return kb / 1024  # Convert to MB
+                elif line.startswith('MemFree:'):
+                    kb = int(line.split()[1])
+                    return kb / 1024
+    except (FileNotFoundError, ValueError, IndexError):
+        pass
+    
+    # Fallback to psutil (works on Windows, Mac, and Linux)
+    if PSUTIL_AVAILABLE:
+        try:
+            mem = psutil.virtual_memory()
+            return mem.available / (1024 * 1024)
+        except Exception:
+            pass
+    
+    return None
+
+
+def get_cpu_usage():
+    """Get CPU usage - lightweight on Linux, psutil on Windows/Mac"""
+    # Try lightweight /proc/stat on Linux first
+    try:
+        with open('/proc/stat', 'r') as f:
+            line = f.readline()
+            # Format: "cpu  1234 0 5678 9012 0 0 0 0 0 0"
+            parts = line.split()
+            if len(parts) >= 8:
+                # Calculate CPU usage from idle time
+                user = int(parts[1])
+                nice = int(parts[2])
+                system = int(parts[3])
+                idle = int(parts[4])
+                iowait = int(parts[5])
+                
+                total = user + nice + system + idle + iowait
+                if total > 0:
+                    # Return non-idle percentage
+                    non_idle = user + nice + system + iowait
+                    return (non_idle / total) * 100
+    except (FileNotFoundError, ValueError, IndexError):
+        pass
+    
+    # Fallback to psutil (works on Windows, Mac, and Linux)
+    if PSUTIL_AVAILABLE:
+        try:
+            return psutil.cpu_percent(interval=0.1)  # Short interval for lighter check
+        except Exception:
+            pass
+    
+    return None
+
+
+def get_disk_usage(path='/'):
+    """Get disk usage - lightweight on Linux, psutil on Windows/Mac"""
+    # Try lightweight df command on Linux first
+    try:
+        result = subprocess.run(['df', '-B', '1', path], 
+                              capture_output=True, text=True, timeout=2)
+        if result.returncode == 0:
+            lines = result.stdout.strip().split('\n')
+            if len(lines) >= 2:
+                # Parse the header and data line
+                # Format: "Filesystem      1B-blocks       Used Available Use% Mounted on"
+                #         "/dev/mmcblk0p2 7122513920 5904424960 835575808  88% /"
+                parts = lines[1].split()
+                if len(parts) >= 4:
+                    total = int(parts[1])
+                    used = int(parts[2])
+                    available = int(parts[3])
+                    percent_used = (used / total) * 100 if total > 0 else 0
+                    return {
+                        'total': total,
+                        'used': used,
+                        'available': available,
+                        'percent_used': percent_used
+                    }
+    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError, IndexError):
+        pass
+    
+    # Fallback to psutil (works on Windows, Mac, and Linux)
+    if PSUTIL_AVAILABLE:
+        try:
+            usage = psutil.disk_usage(path)
+            return {
+                'total': usage.total,
+                'used': usage.used,
+                'available': usage.free,
+                'percent_used': usage.percent
+            }
+        except Exception:
+            pass
+    
+    return None
+
+
+def monitor_system_resources(telegram_notifier, check_interval=120):
+    """Monitor system resources using lightweight native OS commands"""
+    # Alert thresholds
+    MEMORY_THRESHOLD_MB = 100  # Alert if less than 100 MB free
+    CPU_THRESHOLD_PERCENT = 80  # Alert if CPU > 80% for sustained period
+    TEMP_THRESHOLD_C = 80  # Alert if temperature > 80°C
+    
+    # State tracking to avoid spam
+    last_alert_time = {
+        'memory': 0,
+        'cpu': 0,
+        'temperature': 0
+    }
+    alert_cooldown = 300  # 5 minutes between alerts of same type
+    cpu_high_count = 0  # Count consecutive high CPU readings
+    last_cpu_total = None  # For calculating CPU delta
+    
+    print("[System Monitor] Starting lightweight system resource monitoring")
+    
+    while True:
+        try:
+            now = time.time()
+            
+            # Check memory (lightweight /proc/meminfo)
+            free_mb = get_memory_info()
+            if free_mb is not None and free_mb < MEMORY_THRESHOLD_MB:
+                if now - last_alert_time['memory'] > alert_cooldown:
+                    telegram_notifier.notify_system_alert(
+                        'memory',
+                        f"Low memory: {free_mb:.1f} MB free (threshold: {MEMORY_THRESHOLD_MB} MB)",
+                        f"{free_mb:.1f} MB free"
+                    )
+                    last_alert_time['memory'] = now
+            
+            # Check CPU (lightweight /proc/stat, non-blocking)
+            cpu_percent = get_cpu_usage()
+            if cpu_percent is not None:
+                if cpu_percent > CPU_THRESHOLD_PERCENT:
+                    cpu_high_count += 1
+                    # Alert if high for 3 consecutive checks
+                    if cpu_high_count >= 3 and now - last_alert_time['cpu'] > alert_cooldown:
+                        telegram_notifier.notify_system_alert(
+                            'cpu',
+                            f"High CPU usage: {cpu_percent:.1f}% (threshold: {CPU_THRESHOLD_PERCENT}%)",
+                            f"{cpu_percent:.1f}%"
+                        )
+                        last_alert_time['cpu'] = now
+                        cpu_high_count = 0
+                else:
+                    cpu_high_count = 0
+            
+            # Check temperature (lightweight vcgencmd on Pi)
+            temp = get_cpu_temperature()
+            if temp is not None and temp > TEMP_THRESHOLD_C:
+                if now - last_alert_time['temperature'] > alert_cooldown:
+                    telegram_notifier.notify_system_alert(
+                        'temperature',
+                        f"High temperature: {temp:.1f}°C (threshold: {TEMP_THRESHOLD_C}°C)",
+                        f"{temp:.1f}°C"
+                    )
+                    last_alert_time['temperature'] = now
+            
+            time.sleep(check_interval)
+            
+        except Exception as e:
+            print(f"[System Monitor] Error: {e}")
+            time.sleep(check_interval)
 
 
 def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667):
@@ -724,11 +937,11 @@ class Slideshow:
                         elif event.key == pygame.K_LEFT:
                             with self.control_lock:
                                 self.prev_image()
-                            if display_should_be_on:
-                                self.draw_image()
-                                pygame.display.flip()
-                            start_time = 0
-                            break
+                                if display_should_be_on:
+                                    self.draw_image()
+                                    pygame.display.flip()
+                                start_time = 0
+                                break
                 clock.tick(60)
 
 
@@ -744,7 +957,29 @@ def api_status():
     if slideshow_instance is None:
         return jsonify({'error': 'Slideshow not initialized'}), 503
     
-    return jsonify({
+    # Get system stats
+    system_stats = {}
+    try:
+        memory = get_memory_info()
+        if memory is not None:
+            system_stats['memory_free_mb'] = round(memory, 1)
+        
+        cpu = get_cpu_usage()
+        if cpu is not None:
+            system_stats['cpu_percent'] = round(cpu, 1)
+        
+        temp = get_cpu_temperature()
+        if temp is not None:
+            system_stats['cpu_temp'] = round(temp, 1)
+        
+        disk = get_disk_usage()
+        if disk is not None:
+            system_stats['disk_free_gb'] = round(disk['available'] / (1024 * 1024 * 1024), 2)
+            system_stats['disk_used_percent'] = round(disk['percent_used'], 1)
+    except Exception as e:
+        print(f"[API] Error getting system stats: {e}")
+    
+    response = {
         'current_image': slideshow_instance.current_img,
         'current_index': slideshow_instance.current_index + 1,
         'total_images': slideshow_instance.total_images,
@@ -755,7 +990,12 @@ def api_status():
         'paused': slideshow_instance.paused,
         'display_on': slideshow_instance.is_display_on(),
         'manual_override': slideshow_instance.manual_display_override
-    })
+    }
+    
+    if system_stats:
+        response['system'] = system_stats
+    
+    return jsonify(response)
 
 @app.route('/api/directories', methods=['GET'])
 def api_directories():
@@ -1317,7 +1557,7 @@ def main():
     # Initialize Telegram notifier
     global telegram_notifier
     telegram_notifier = TelegramNotifier(TELEGRAM_CONFIG)
-    
+
     # Pass config values to Slideshow
     slideshow = Slideshow(images_directory, screen, display_time_seconds, slideshow_config, telegram_notifier)
     
@@ -1333,6 +1573,17 @@ def main():
     web_thread = threading.Thread(target=start_web_server, kwargs={'host': '0.0.0.0', 'port': 5000}, daemon=True)
     web_thread.start()
     print("[Startup] Web interface available at http://0.0.0.0:5000")
+    
+    # Start system monitoring in background thread (lightweight, works without psutil)
+    if telegram_notifier:
+        monitor_thread = threading.Thread(
+            target=monitor_system_resources, 
+            args=(telegram_notifier,),
+            kwargs={'check_interval': 120},  # Check every 2 minutes (lighter)
+            daemon=True
+        )
+        monitor_thread.start()
+        print("[Startup] System monitoring started (lightweight mode)")
     
     # Run slideshow (this blocks)
     try:

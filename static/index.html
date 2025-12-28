@@ -35,6 +35,44 @@
             margin-bottom: 10px;
         }
 
+        .tab-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .tab-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            font-size: 1.1em;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 10px 10px 0 0;
+            transition: all 0.3s;
+            margin-bottom: -2px;
+        }
+
+        .tab-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .tab-button.active {
+            background: white;
+            color: #667eea;
+            border-bottom: 2px solid white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         .status-bar {
             background: white;
             border-radius: 15px;
@@ -275,7 +313,6 @@
             left: 33px;
         }
 
-        input[type="number"],
         input[type="text"] {
             padding: 8px 12px;
             border: 2px solid #ddd;
@@ -286,13 +323,28 @@
             box-sizing: border-box;
             color: #333;
             background: #fff;
+            text-align: left;
+            margin: 0;
+        }
+
+        input[type="number"] {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            font-family: inherit;
+            width: 140px;
+            box-sizing: border-box;
+            color: #333;
+            background: #fff;
             text-align: center;
-            margin: 0 auto;
+            margin: 0;
         }
 
         input[type="text"]#location-city {
             width: 100%;
             margin: 0;
+            text-align: left;
         }
 
         input[type="time"] {
@@ -305,8 +357,8 @@
             box-sizing: border-box;
             color: #333;
             background: #fff;
-            text-align: center;
-            margin: 0 auto;
+            text-align: left;
+            margin: 0;
         }
 
         input[type="number"]:focus,
@@ -579,6 +631,12 @@
 
         <div class="alert" id="alert"></div>
 
+        <div class="tab-container">
+            <button class="tab-button active" onclick="switchTab('status')">📊 Status</button>
+            <button class="tab-button" onclick="switchTab('system')">💻 System</button>
+        </div>
+
+        <div id="tab-status" class="tab-content active">
         <div class="status-bar">
             <h2 style="margin-bottom: 15px; color: #667eea;">📊 Current Status</h2>
             <div class="status-grid">
@@ -665,7 +723,7 @@
                             <input type="text" id="images-directory" placeholder="/path/to/images" 
                                    onchange="updateSetting('images_directory', this.value)"
                                    title="Click to edit or use browse button"
-                                   style="width: 100%; padding: 8px 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em; color: #333; background: #fff; box-sizing: border-box; text-align: center;">
+                                   style="width: 100%; padding: 8px 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em; color: #333; background: #fff; box-sizing: border-box; text-align: left;">
                         </div>
                         <div class="setting-item">
                             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
@@ -678,9 +736,9 @@
                             <input type="text" id="upload-directory" placeholder="Leave empty for default" 
                                    onchange="updateSetting('upload_directory', this.value)"
                                    title="Click to edit or use browse button"
-                                   style="width: 100%; padding: 8px 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em; color: #333; background: #fff; box-sizing: border-box; text-align: center;">
+                                   style="width: 100%; padding: 8px 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em; color: #333; background: #fff; box-sizing: border-box; text-align: left;">
                             <small style="display: block; color: #666; margin-top: 8px;">
-                                (default: [ImagesDirectory]/uploaded/)
+                                default: [ImagesDirectory]/uploaded/
                             </small>
                         </div>
                     </div>
@@ -727,6 +785,71 @@
                 <h2>⚙️ Advanced Settings</h2>
                 <div class="settings-group">
                     <div class="setting-item">
+                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Location (City)</label>
+                        <input type="text" id="location-city" list="location-list" placeholder="City, State, Country" 
+                               onchange="updateSetting('location_city_suburb', this.value)"
+                               style="width: 100%;">
+                        <datalist id="location-list">
+                            <!-- City only examples -->
+                            <option value="Sydney">
+                            <option value="Melbourne">
+                            <option value="London">
+                            <option value="Paris">
+                            <option value="Tokyo">
+                            <!-- City, Country examples -->
+                            <option value="Sydney, Australia">
+                            <option value="Melbourne, Australia">
+                            <option value="Brisbane, Australia">
+                            <option value="Perth, Australia">
+                            <option value="Adelaide, Australia">
+                            <option value="Canberra, Australia">
+                            <option value="London, UK">
+                            <option value="Manchester, UK">
+                            <option value="Birmingham, UK">
+                            <option value="Edinburgh, UK">
+                            <option value="Toronto, Canada">
+                            <option value="Vancouver, Canada">
+                            <option value="Montreal, Canada">
+                            <option value="Calgary, Canada">
+                            <option value="Paris, France">
+                            <option value="Berlin, Germany">
+                            <option value="Madrid, Spain">
+                            <option value="Rome, Italy">
+                            <option value="Amsterdam, Netherlands">
+                            <option value="Tokyo, Japan">
+                            <option value="Seoul, South Korea">
+                            <option value="Beijing, China">
+                            <option value="Shanghai, China">
+                            <option value="Bangkok, Thailand">
+                            <option value="Mumbai, India">
+                            <option value="Delhi, India">
+                            <option value="Dubai, UAE">
+                            <option value="Cairo, Egypt">
+                            <option value="Johannesburg, South Africa">
+                            <option value="São Paulo, Brazil">
+                            <option value="Rio de Janeiro, Brazil">
+                            <option value="Buenos Aires, Argentina">
+                            <option value="Mexico City, Mexico">
+                            <!-- City, State, Country examples -->
+                            <option value="New York, NY, USA">
+                            <option value="Los Angeles, CA, USA">
+                            <option value="Chicago, IL, USA">
+                            <option value="Houston, TX, USA">
+                            <option value="Phoenix, AZ, USA">
+                            <option value="Philadelphia, PA, USA">
+                            <option value="San Antonio, TX, USA">
+                            <option value="San Diego, CA, USA">
+                            <option value="Dallas, TX, USA">
+                            <option value="San Jose, CA, USA">
+                            <!-- Special cases -->
+                            <option value="Hong Kong">
+                            <option value="Singapore">
+                        </datalist>
+                        <small style="display: block; color: #666; margin-top: 8px;">
+                            Formats: "City", "City, Country", or "City, State, Country" (e.g. "Sydney", "Sydney, Australia", "New York, NY, USA")
+                        </small>
+                    </div>
+                    <div class="setting-item">
                         <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Delay (seconds)</label>
                         <input type="number" id="delay-seconds" min="1" max="3600" value="30" 
                                onchange="updateSetting('delay_seconds', this.value)">
@@ -740,12 +863,6 @@
                         <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Display Off Time</label>
                         <input type="time" id="display-off-time" 
                                onchange="updateSetting('display_off_time', this.value)">
-                    </div>
-                    <div class="setting-item">
-                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Location (City)</label>
-                        <input type="text" id="location-city" placeholder="Sydney, Australia" 
-                               onchange="updateSetting('location_city_suburb', this.value)"
-                               style="width: 100%;">
                     </div>
                     <div class="setting-item">
                         <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Weather Update (seconds)</label>
@@ -779,6 +896,35 @@
                     </div>
                     <div id="directoryBrowser">
                         <p>Loading directories...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+
+        <div id="tab-system" class="tab-content">
+            <div class="status-bar">
+                <h2 style="margin-bottom: 15px; color: #667eea;">💻 System Resources</h2>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-label">💾 Free Memory</div>
+                        <div class="status-value" id="status-memory">-- MB</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">⚡ CPU Usage</div>
+                        <div class="status-value" id="status-cpu">--%</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">🌡️ CPU Temperature</div>
+                        <div class="status-value" id="status-cpu-temp">--°C</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">💿 Free Disk Space</div>
+                        <div class="status-value" id="status-disk-free">-- GB</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">📊 Disk Used</div>
+                        <div class="status-value" id="status-disk-used">--%</div>
                     </div>
                 </div>
             </div>
@@ -926,6 +1072,24 @@
             }
         }
 
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            
+            // Activate selected button
+            event.target.classList.add('active');
+        }
+
         async function updateStatus() {
             try {
                 const response = await fetch('/api/status');
@@ -938,6 +1102,32 @@
                 document.getElementById('status-index').textContent = `${data.current_index} / ${data.total_images}`;
                 document.getElementById('status-paused').textContent = data.paused ? 'Paused' : 'Playing';
                 document.getElementById('current-image').textContent = data.current_image || 'No image loaded';
+                
+                // Update system stats if available
+                if (data.system) {
+                    const sys = data.system;
+                    const memoryEl = document.getElementById('status-memory');
+                    const cpuEl = document.getElementById('status-cpu');
+                    const tempEl = document.getElementById('status-cpu-temp');
+                    const diskFreeEl = document.getElementById('status-disk-free');
+                    const diskUsedEl = document.getElementById('status-disk-used');
+                    
+                    if (memoryEl && sys.memory_free_mb !== undefined) {
+                        memoryEl.textContent = `${sys.memory_free_mb} MB`;
+                    }
+                    if (cpuEl && sys.cpu_percent !== undefined) {
+                        cpuEl.textContent = `${sys.cpu_percent}%`;
+                    }
+                    if (tempEl && sys.cpu_temp !== undefined) {
+                        tempEl.textContent = `${sys.cpu_temp}°C`;
+                    }
+                    if (diskFreeEl && sys.disk_free_gb !== undefined) {
+                        diskFreeEl.textContent = `${sys.disk_free_gb} GB`;
+                    }
+                    if (diskUsedEl && sys.disk_used_percent !== undefined) {
+                        diskUsedEl.textContent = `${sys.disk_used_percent}%`;
+                    }
+                }
                 
                 // Update image preview only when image changes
                 const previewImg = document.getElementById('image-preview');

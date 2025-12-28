@@ -3,4 +3,5 @@ requests
 geopy
 flask
 flask-cors
+psutil
 # python-telegram-bot (only needed for Phase 2 - receiving commands from Telegram)
