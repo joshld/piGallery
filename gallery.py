@@ -1613,6 +1613,12 @@ def api_set_caption():
         
         success = set_image_caption(img_path, caption)
         if success:
+            # Clear cached caption so it reloads on next draw
+            if slideshow_instance._cached_caption_image == slideshow_instance.current_img:
+                slideshow_instance._cached_caption = None
+                slideshow_instance._cached_caption_image = None
+            # Force redraw to show updated caption immediately
+            slideshow_instance.force_redraw = True
             return jsonify({'status': 'ok', 'message': 'Caption saved successfully'})
         else:
             return jsonify({'error': 'Failed to save caption. Make sure piexif is installed: pip install piexif'}), 500
