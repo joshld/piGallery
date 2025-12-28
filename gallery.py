@@ -9,6 +9,8 @@ import subprocess
 from geopy.geocoders import Nominatim
 import sys
 import threading
+import logging
+from logging.handlers import RotatingFileHandler
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -80,6 +82,100 @@ print(f"[Startup] Loaded config from {CONFIG_PATH}, using {len(GALLERY_CONFIG)} 
 print("[gallery] settings in use:")
 for k, v in GALLERY_CONFIG.items():
     print(f"  {k} = {v}")
+
+# ---------------- Logging Setup ----------------
+LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_FILE = os.path.join(LOG_DIR, "gallery.log")
+
+# Setup rotating file handler (10MB max, keep 1 backups)
+file_handler = RotatingFileHandler(
+    LOG_FILE,
+    maxBytes=10*1024*1024,  # 10MB
+    backupCount=1,
+    encoding='utf-8'
+)
+file_handler.setLevel(logging.INFO)
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+file_handler.setFormatter(formatter)
+
+# Store original streams BEFORE setting up logger
+_original_stdout = sys.stdout
+_original_stderr = sys.stderr
+
+# Setup logger
+logger = logging.getLogger('piGallery')
+logger.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+
+# Note: We don't add a console handler because stdout/stderr redirection
+# will handle console output, and we write directly to file_handler to avoid duplication
+
+# Redirect stdout/stderr to logger to capture all print() statements
+# Filter out Flask/Werkzeug HTTP request logs to avoid duplication
+class StreamToLogger:
+    """Redirect stdout/stderr to logger while preserving original behavior"""
+    def __init__(self, stream, log_level=logging.INFO):
+        self.stream = stream  # Original stream (stdout/stderr)
+        self.log_level = log_level
+        self.linebuf = ''
+    
+    def write(self, buf):
+        if not buf:
+            return
+        
+        # Convert bytes to string if necessary
+        if isinstance(buf, bytes):
+            buf = buf.decode('utf-8', errors='replace')
+        
+        # Handle incomplete lines from previous write
+        if self.linebuf:
+            buf = self.linebuf + buf
+            self.linebuf = ''
+        
+        # Split buffer into lines
+        lines = buf.split('\n')
+        
+        # If buffer doesn't end with newline, last line is incomplete - save it
+        if not buf.endswith('\n') and lines:
+            self.linebuf = lines[-1]
+            lines = lines[:-1]
+        
+        # Write each complete line separately (skip empty lines to avoid extra blank lines)
+        for line in lines:
+            if line.strip():  # Only write non-empty lines
+                self.stream.write(line + '\n')
+                self.stream.flush()
+                
+                # Log to file (write directly to file handler to avoid console duplication)
+                try:
+                    record = logging.LogRecord(
+                        name=logger.name,
+                        level=self.log_level,
+                        pathname='',
+                        lineno=0,
+                        msg=line,
+                        args=(),
+                        exc_info=None
+                    )
+                    file_handler.emit(record)
+                except Exception:
+                    # If logging fails, don't break the stream
+                    pass
+    
+    def flush(self):
+        self.stream.flush()
+
+# Redirect stdout and stderr to logger
+sys.stdout = StreamToLogger(_original_stdout, logging.INFO)
+sys.stderr = StreamToLogger(_original_stderr, logging.ERROR)
+
+logger.info("=" * 60)
+logger.info("piGallery starting up")
+logger.info(f"Log file: {LOG_FILE}")
 
 
 def get_config_value(key, default=None):
@@ -945,6 +1041,43 @@ class Slideshow:
                 clock.tick(60)
 
 
+# ---------------- Logging Functions ----------------
+
+def get_logs(lines=200):
+    """Get logs from journalctl (systemd) or log file (cross-platform)"""
+    logs = []
+    
+    # Try journalctl first (Linux with systemd)
+    if sys.platform == 'linux':
+        # Check if running as systemd service
+        try:
+            # Try to get service name from environment or use default
+            service_name = os.environ.get('SERVICE_NAME', 'piGallery.service')
+            result = subprocess.run(
+                ['journalctl', '-u', service_name, '-n', str(lines), '--no-pager'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0 and result.stdout:
+                return result.stdout.strip().split('\n')
+        except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.SubprocessError):
+            pass  # Fall through to file reading
+    
+    # Fallback: Read from log file (works everywhere)
+    if os.path.exists(LOG_FILE):
+        try:
+            with open(LOG_FILE, 'r', encoding='utf-8') as f:
+                all_lines = f.readlines()
+                # Return last N lines
+                return [line.rstrip('\n') for line in all_lines[-lines:]]
+        except Exception as e:
+            logger.warning(f"Error reading log file: {e}")
+            return [f"Error reading log file: {e}"]
+    
+    return ["No logs available"]
+
+
 # ---------------- Web API Endpoints ----------------
 
 @app.route('/')
@@ -996,6 +1129,24 @@ def api_status():
         response['system'] = system_stats
     
     return jsonify(response)
+
+@app.route('/api/logs')
+def api_logs():
+    """Get application logs"""
+    lines = request.args.get('lines', 200, type=int)
+    # Limit to reasonable range
+    lines = max(50, min(1000, lines))
+    
+    try:
+        log_lines = get_logs(lines)
+        return jsonify({
+            'status': 'ok',
+            'lines': log_lines,
+            'count': len(log_lines)
+        })
+    except Exception as e:
+        logger.error(f"Error getting logs: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/directories', methods=['GET'])
 def api_directories():
@@ -1420,7 +1571,7 @@ def api_settings():
             # Clear cached image so it reloads with new aspect ratios
             if hasattr(slideshow_instance, '_cached_image_name'):
                 slideshow_instance._cached_image_name = None
-
+        
         # Optionally save to config.ini
         save_to_config = data.get('save_to_config', False)
         if save_to_config:
@@ -1454,6 +1605,11 @@ def api_settings():
 def start_web_server(host='0.0.0.0', port=5000):
     """Start Flask web server in background thread"""
     print(f"[Web] Starting web server on http://{host}:{port}")
+    
+    # Optionally make Flask quieter by disabling Werkzeug request logging
+    # Uncomment the next line to suppress HTTP request logs in console/logs
+    # logging.getLogger('werkzeug').setLevel(logging.WARNING)
+    
     app.run(host=host, port=port, debug=False, threaded=True)
 
 

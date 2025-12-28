@@ -928,6 +928,24 @@
                     </div>
                 </div>
             </div>
+
+            <div class="status-bar">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0; color: #667eea;">📋 Application Logs</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <select id="log-lines" onchange="loadLogs()" style="padding: 5px 10px; border: 2px solid #ddd; border-radius: 5px;">
+                            <option value="50">Last 50 lines</option>
+                            <option value="100" selected>Last 100 lines</option>
+                            <option value="200">Last 200 lines</option>
+                            <option value="500">Last 500 lines</option>
+                        </select>
+                        <button onclick="loadLogs()" class="btn-primary" style="padding: 5px 15px;">🔄 Refresh</button>
+                    </div>
+                </div>
+                <div id="log-viewer" style="background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 0.9em; max-height: 500px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">
+                    Loading logs...
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1088,6 +1106,39 @@
             
             // Activate selected button
             event.target.classList.add('active');
+            
+            // Load logs when System tab is opened
+            if (tabName === 'system') {
+                loadLogs();
+            }
+        }
+
+        async function loadLogs() {
+            const logViewer = document.getElementById('log-viewer');
+            const linesSelect = document.getElementById('log-lines');
+            const lines = linesSelect ? parseInt(linesSelect.value) : 100;
+            
+            try {
+                if (logViewer) {
+                    logViewer.textContent = 'Loading logs...';
+                    const response = await fetch(`/api/logs?lines=${lines}`);
+                    const data = await response.json();
+                    
+                    if (data.status === 'ok' && data.lines) {
+                        // Join log lines and display
+                        logViewer.textContent = data.lines.join('\n');
+                        // Auto-scroll to bottom
+                        logViewer.scrollTop = logViewer.scrollHeight;
+                    } else {
+                        logViewer.textContent = 'No logs available';
+                    }
+                }
+            } catch (error) {
+                if (logViewer) {
+                    logViewer.textContent = `Error loading logs: ${error.message}`;
+                }
+                console.error('Failed to load logs:', error);
+            }
         }
 
         async function updateStatus() {
