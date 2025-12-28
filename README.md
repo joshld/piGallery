@@ -243,7 +243,42 @@ Edit `config.ini`:
 - Pause during parties for manual control
 - Auto mode follows your schedule automatically
 
-### 9. Notes
+### 9. Feature Tracking & Contributing
+
+piGallery uses **GitHub Issues** for tracking features, bugs, and improvements. All TODO items have been converted to interactive GitHub Issues with checklists that you can check off as you complete tasks.
+
+#### View Planned Features
+- **Browse all issues:** https://github.com/joshld/piGallery/issues
+- **View by priority:** Look for ⭐ emoji in issue titles
+- **Track progress:** Each issue shows completion percentage
+
+#### Key Feature Issues
+- **#14** - ⭐ Telegram Integration (commands, remote control)
+- **#7** - Image Captions from Metadata
+- **#8** - Shutdown Button in Web UI
+- **#15** - Color Schemes (Dark Mode)
+- **#9** - Image Transitions
+- **#10** - Video Support
+- **#11** - Error Detection & Reporting
+- **#12** - Delete Uploaded Images
+- **#16** - Performance Monitoring
+
+#### Using GitHub Issues
+```bash
+# List all features/issues
+gh issue list
+
+# View specific feature details
+gh issue view 14
+
+# Check off tasks as you complete them (on GitHub web UI)
+# Reference issues in commits
+git commit -m "Add Telegram status updates for #14"
+```
+
+For more details, see **[GITHUB_TODO_GUIDE.md](GITHUB_TODO_GUIDE.md)** for a complete guide on using GitHub Issues for task tracking.
+
+### 10. Notes
 - The script is designed for fullscreen display and will hide the mouse cursor.
 - Weather and time information is displayed on the screen.
 - Some features (like display power control) are specific to Raspberry Pi and may not work on other platforms.
