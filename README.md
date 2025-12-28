@@ -83,7 +83,73 @@ The first time you run the script, it will create a `config.ini` file with defau
 - `location_city_suburb` - Location for weather data
 - Display toggles (show_time, show_date, show_temperature, etc.)
 
-### 8. Code Quality: Linting and Type Checking
+### 8. Telegram Notifications (Optional)
+
+piGallery can send notifications to a Telegram channel or chat. This is useful for remote monitoring and alerts.
+
+#### Setup Steps:
+
+1. **Create a Telegram Bot:**
+   - Open Telegram and search for [@BotFather](https://t.me/BotFather)
+   - Send `/newbot` and follow the instructions
+   - Save the bot token you receive (format: `123456789:ABCdefGHIjklMNOpqrsTUVwxyz`)
+
+2. **Get Your Chat ID:**
+   
+   **For a Private Channel:**
+   - Create a private channel in Telegram
+   - Add your bot as an administrator (Channel Settings → Administrators → Add Administrator)
+   - Give the bot permission to post messages
+   - Forward a message from the channel to [@userinfobot](https://t.me/userinfobot) to get the chat ID
+   - Or send a message to the channel, then visit: `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+   - Look for `"chat":{"id":-1001234567890}` (negative number for channels/groups)
+
+   **For a Personal Chat:**
+   - Start a chat with your bot
+   - Send any message to the bot
+   - Visit: `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+   - Look for `"chat":{"id":123456789}` (positive number for personal chats)
+
+   **For a Group:**
+   - Add your bot to the group
+   - Make it an administrator (recommended)
+   - Get the chat ID the same way (will be negative)
+
+3. **Configure in config.ini:**
+   ```ini
+   [telegram]
+   bot_token = YOUR_BOT_TOKEN_HERE
+   chat_id = YOUR_CHAT_ID_HERE
+   notify_startup = true
+   notify_shutdown = true
+   notify_errors = true
+   notify_uploads = true
+   notify_image_changes = false
+   notify_settings_changes = false
+   notify_system_alerts = true
+   image_notify_frequency = 10
+   ```
+
+4. **Notification Types:**
+   - **Startup/Shutdown** - When the gallery starts or stops
+   - **Errors** - Immediate alerts for critical errors
+   - **Uploads** - When new images are uploaded via web interface
+   - **Image Changes** - When slideshow advances (configurable frequency)
+   - **Settings Changes** - When settings are modified via web interface
+   - **System Alerts** - Low memory, high CPU, high temperature warnings
+
+5. **Test:**
+   - Start the gallery: `python gallery.py`
+   - You should receive a test message: "🤖 piGallery Telegram notifications enabled!"
+   - If you don't receive it, check:
+     - Bot token is correct
+     - Chat ID is correct
+     - Bot is added as admin to channel/group (if applicable)
+     - Bot has permission to send messages
+
+**Note:** Leave `bot_token` or `chat_id` empty to disable Telegram notifications.
+
+### 9. Code Quality: Linting and Type Checking
 
 You can use `flake8` for code style/linting and `mypy` for type checking.
 

@@ -41,6 +41,18 @@ DEFAULT_CONFIG = {
         "show_temperature": "true",
         "show_weather_code": "true",
         "show_filename": "true"
+    },
+    "telegram": {
+        "bot_token": "",
+        "chat_id": "",
+        "notify_startup": "true",
+        "notify_shutdown": "true",
+        "notify_errors": "true",
+        "notify_image_changes": "false",
+        "notify_uploads": "true",
+        "notify_settings_changes": "false",
+        "notify_system_alerts": "true",
+        "image_notify_frequency": "10"
     }
 }
 
@@ -53,6 +65,7 @@ else:
     config.read(CONFIG_PATH)
 
 GALLERY_CONFIG = config["gallery"] if "gallery" in config else DEFAULT_CONFIG["gallery"]
+TELEGRAM_CONFIG = config["telegram"] if "telegram" in config else DEFAULT_CONFIG["telegram"]
 
 print(f"[Startup] Loaded config from {CONFIG_PATH}, using {len(GALLERY_CONFIG)} settings.")
 
@@ -168,6 +181,131 @@ def get_weather(lat=51.5072, lon=-0.1276):
         return None, None, None
 
 
+# ---------------- Telegram Notifications ----------------
+
+
+class TelegramNotifier:
+    """Handles sending notifications to Telegram"""
+    
+    def __init__(self, config_dict):
+        self.config = config_dict
+        self.bot_token = config_dict.get('bot_token', '').strip()
+        self.chat_id = config_dict.get('chat_id', '').strip()
+        self.enabled = bool(self.bot_token and self.chat_id)
+        self.image_change_count = 0
+        
+        if self.enabled:
+            try:
+                # Test connection
+                self._send_message("🤖 piGallery Telegram notifications enabled!")
+                print("[Telegram] Notifications enabled and tested successfully")
+            except Exception as e:
+                print(f"[Telegram] Warning: Failed to send test message: {e}")
+                self.enabled = False
+        else:
+            print("[Telegram] Notifications disabled (bot_token or chat_id not set)")
+    
+    def _send_message(self, message, parse_mode='HTML'):
+        """Internal method to send a message to Telegram"""
+        if not self.enabled:
+            return False
+        
+        try:
+            url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+            data = {
+                'chat_id': self.chat_id,
+                'text': message,
+                'parse_mode': parse_mode
+            }
+            response = requests.post(url, data=data, timeout=5)
+            response.raise_for_status()
+            return True
+        except Exception as e:
+            print(f"[Telegram] Error sending message: {e}")
+            return False
+    
+    def notify_startup(self):
+        """Send startup notification"""
+        if not self.enabled or not self.config.get('notify_startup', 'true').lower() == 'true':
+            return
+        message = "🚀 <b>piGallery Started</b>\n" \
+                 f"📅 {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        self._send_message(message)
+    
+    def notify_shutdown(self):
+        """Send shutdown notification"""
+        if not self.enabled or not self.config.get('notify_shutdown', 'true').lower() == 'true':
+            return
+        message = "🛑 <b>piGallery Shutting Down</b>\n" \
+                 f"📅 {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        self._send_message(message)
+    
+    def notify_error(self, error_message, context=""):
+        """Send error notification (immediate alerts)"""
+        if not self.enabled or not self.config.get('notify_errors', 'true').lower() == 'true':
+            return
+        message = "⚠️ <b>Error Alert</b>\n" \
+                 f"❌ {error_message}"
+        if context:
+            message += f"\n📍 {context}"
+        message += f"\n📅 {datetime.datetime.now().strftime('%H:%M:%S')}"
+        self._send_message(message)
+    
+    def notify_image_change(self, image_name, image_index, total_images):
+        """Send image change notification (with frequency control)"""
+        if not self.enabled or not self.config.get('notify_image_changes', 'false').lower() == 'true':
+            return
+        
+        frequency = int(self.config.get('image_notify_frequency', '10'))
+        self.image_change_count += 1
+        
+        if frequency > 0 and self.image_change_count % frequency != 0:
+            return
+        
+        message = "📸 <b>Image Changed</b>\n" \
+                 f"🖼️ {image_name}\n" \
+                 f"📊 {image_index} / {total_images}"
+        self._send_message(message)
+    
+    def notify_upload(self, filename):
+        """Send upload notification"""
+        if not self.enabled or not self.config.get('notify_uploads', 'true').lower() == 'true':
+            return
+        message = "📤 <b>New Image Uploaded</b>\n" \
+                 f"📁 {filename}\n" \
+                 f"📅 {datetime.datetime.now().strftime('%H:%M:%S')}"
+        self._send_message(message)
+    
+    def notify_settings_change(self, setting_name, old_value, new_value):
+        """Send settings change notification"""
+        if not self.enabled or not self.config.get('notify_settings_changes', 'false').lower() == 'true':
+            return
+        message = "⚙️ <b>Settings Changed</b>\n" \
+                 f"🔧 {setting_name}\n" \
+                 f"📝 {old_value} → {new_value}"
+        self._send_message(message)
+    
+    def notify_system_alert(self, alert_type, message, value=None):
+        """Send system alert (low memory, high CPU, high temp)"""
+        if not self.enabled or not self.config.get('notify_system_alerts', 'true').lower() == 'true':
+            return
+        
+        emoji_map = {
+            'memory': '💾',
+            'cpu': '⚡',
+            'temperature': '🌡️',
+            'disk': '💿'
+        }
+        emoji = emoji_map.get(alert_type, '⚠️')
+        
+        alert_message = f"{emoji} <b>System Alert: {alert_type.upper()}</b>\n" \
+                       f"⚠️ {message}"
+        if value is not None:
+            alert_message += f"\n📊 Current: {value}"
+        alert_message += f"\n📅 {datetime.datetime.now().strftime('%H:%M:%S')}"
+        self._send_message(alert_message)
+
+
 def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667):
     img_w, img_h = img.get_size()
     if img_w >= img_h:
@@ -193,15 +331,17 @@ CORS(app)
 
 # Global reference to slideshow instance (set in main)
 slideshow_instance = None
+telegram_notifier = None
 
 
 # ---------------- Slideshow Class ----------------
 class Slideshow:
-    def __init__(self, folder, screen, display_time_seconds, config_dict):
+    def __init__(self, folder, screen, display_time_seconds, config_dict, telegram_notifier=None):
         self.screen = screen
         self.screen_w, self.screen_h = screen.get_size()
         self.display_time_seconds = display_time_seconds
         self.config = config_dict
+        self.telegram = telegram_notifier
 
         self.images = []
         self.folder = folder
@@ -278,7 +418,10 @@ class Slideshow:
             attempts += 1
         
         if attempts >= max_attempts:
-            print(f"[Error] Too many missing files, stopping image search")
+            error_msg = f"Too many missing files, stopping image search"
+            print(f"[Error] {error_msg}")
+            if self.telegram:
+                self.telegram.notify_error(error_msg, f"Directory: {self.folder}")
             self.current_img = None
 
         self.screen.fill((0, 0, 0))
@@ -328,7 +471,10 @@ class Slideshow:
                 self.screen.blit(img_scaled, (x_off, y_off))
                 print(f"[Slideshow] Drawing {self.current_img} scaled to {new_w}x{self.screen_h}")
             except pygame.error as e:
-                print(f"[Error] Failed to load image {self.current_img}: {e}")
+                error_msg = f"Failed to load image {self.current_img}: {e}"
+                print(f"[Error] {error_msg}")
+                if self.telegram:
+                    self.telegram.notify_error(error_msg, f"Path: {img_path}")
                 self.current_img = None
 
         now = datetime.datetime.now()
@@ -460,6 +606,9 @@ class Slideshow:
                 # Nothing at all, do nothing
                 self.current_img = None
         print(f"[Slideshow] Next image {self.current_index+1}/{self.total_images}: {self.current_img}")
+        # Notify Telegram of image change
+        if self.telegram and self.current_img:
+            self.telegram.notify_image_change(self.current_img, self.current_index + 1, self.total_images)
 
     def prev_image(self):
         if self.current_index > 0:
@@ -467,6 +616,9 @@ class Slideshow:
             self.forward_stack.append(self.history[self.current_index])
             self.current_img = self.history[self.current_index]
             print(f"[Slideshow] Previous image {self.current_index+1}/{self.total_images}: {self.current_img}")
+            # Notify Telegram of image change
+            if self.telegram and self.current_img:
+                self.telegram.notify_image_change(self.current_img, self.current_index + 1, self.total_images)
 
     def is_display_on(self):
         # Check for manual override first
@@ -865,10 +1017,17 @@ def api_upload():
         file.save(filepath)
         print(f"[Web] Uploaded new image: {filename} to {upload_dir}")
     except Exception as e:
-        return jsonify({'error': f'Failed to save file: {e}'}), 500
+        error_msg = f'Failed to save file: {e}'
+        if telegram_notifier:
+            telegram_notifier.notify_error(error_msg, f"Upload: {filename}")
+        return jsonify({'error': error_msg}), 500
     
     # Refresh images to include the new upload (refresh_images scans recursively)
     slideshow_instance.refresh_images()
+    
+    # Notify Telegram of upload
+    if telegram_notifier:
+        telegram_notifier.notify_upload(filename)
     
     return jsonify({'status': 'ok', 'filename': filename, 'upload_dir': upload_dir})
 
@@ -900,44 +1059,102 @@ def api_settings():
     elif request.method == 'POST':
         data = request.json
         
+        # Track changes for Telegram notifications
         # Update config values
         if 'show_time' in data:
-            slideshow_instance.config['show_time'] = str(data['show_time']).lower()
+            old_val = slideshow_instance.config.get('show_time', 'true')
+            new_val = str(data['show_time']).lower()
+            slideshow_instance.config['show_time'] = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('show_time', old_val, new_val)
         if 'show_date' in data:
-            slideshow_instance.config['show_date'] = str(data['show_date']).lower()
+            old_val = slideshow_instance.config.get('show_date', 'true')
+            new_val = str(data['show_date']).lower()
+            slideshow_instance.config['show_date'] = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('show_date', old_val, new_val)
         if 'show_temperature' in data:
-            slideshow_instance.config['show_temperature'] = str(data['show_temperature']).lower()
+            old_val = slideshow_instance.config.get('show_temperature', 'true')
+            new_val = str(data['show_temperature']).lower()
+            slideshow_instance.config['show_temperature'] = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('show_temperature', old_val, new_val)
         if 'show_weather_code' in data:
-            slideshow_instance.config['show_weather_code'] = str(data['show_weather_code']).lower()
+            old_val = slideshow_instance.config.get('show_weather_code', 'true')
+            new_val = str(data['show_weather_code']).lower()
+            slideshow_instance.config['show_weather_code'] = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('show_weather_code', old_val, new_val)
         if 'show_filename' in data:
-            slideshow_instance.config['show_filename'] = str(data['show_filename']).lower()
+            old_val = slideshow_instance.config.get('show_filename', 'true')
+            new_val = str(data['show_filename']).lower()
+            slideshow_instance.config['show_filename'] = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('show_filename', old_val, new_val)
         if 'delay_seconds' in data:
-            slideshow_instance.display_time_seconds = int(data['delay_seconds'])
+            old_val = slideshow_instance.display_time_seconds
+            new_val = int(data['delay_seconds'])
+            slideshow_instance.display_time_seconds = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('delay_seconds', str(old_val), str(new_val))
         if 'display_off_time' in data:
-            slideshow_instance.config['display_off_time'] = data['display_off_time']
+            old_val = slideshow_instance.config.get('display_off_time', '23:00')
+            new_val = data['display_off_time']
+            slideshow_instance.config['display_off_time'] = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('display_off_time', old_val, new_val)
         if 'display_on_time' in data:
-            slideshow_instance.config['display_on_time'] = data['display_on_time']
+            old_val = slideshow_instance.config.get('display_on_time', '05:00')
+            new_val = data['display_on_time']
+            slideshow_instance.config['display_on_time'] = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('display_on_time', old_val, new_val)
         if 'location_city_suburb' in data:
-            slideshow_instance.config['location_city_suburb'] = data['location_city_suburb']
+            old_val = slideshow_instance.config.get('location_city_suburb', 'Sydney, Australia')
+            new_val = data['location_city_suburb']
+            slideshow_instance.config['location_city_suburb'] = new_val
             # Re-geocode the location
-            slideshow_instance.city_suburb = data['location_city_suburb']
-            lat, lon = get_coords_from_place(data['location_city_suburb'])
+            slideshow_instance.city_suburb = new_val
+            lat, lon = get_coords_from_place(new_val)
             if lat and lon:
                 slideshow_instance.lat = lat
                 slideshow_instance.long = lon
-                print(f"[Web] Updated location to {data['location_city_suburb']}: lat={lat}, lon={lon}")
+                print(f"[Web] Updated location to {new_val}: lat={lat}, lon={lon}")
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('location_city_suburb', old_val, new_val)
         if 'aspect_ratio_landscape' in data:
-            slideshow_instance.config['aspect_ratio_landscape'] = str(data['aspect_ratio_landscape'])
+            old_val = slideshow_instance.config.get('aspect_ratio_landscape', '1.5')
+            new_val = str(data['aspect_ratio_landscape'])
+            slideshow_instance.config['aspect_ratio_landscape'] = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('aspect_ratio_landscape', old_val, new_val)
         if 'aspect_ratio_portrait' in data:
-            slideshow_instance.config['aspect_ratio_portrait'] = str(data['aspect_ratio_portrait'])
+            old_val = slideshow_instance.config.get('aspect_ratio_portrait', '0.667')
+            new_val = str(data['aspect_ratio_portrait'])
+            slideshow_instance.config['aspect_ratio_portrait'] = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('aspect_ratio_portrait', old_val, new_val)
         if 'ui_text_alpha' in data:
-            slideshow_instance.config['ui_text_alpha'] = str(int(data['ui_text_alpha']))
+            old_val = slideshow_instance.config.get('ui_text_alpha', '192')
+            new_val = str(int(data['ui_text_alpha']))
+            slideshow_instance.config['ui_text_alpha'] = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('ui_text_alpha', old_val, new_val)
         if 'weather_update_seconds' in data:
-            slideshow_instance.config['weather_update_seconds'] = str(int(data['weather_update_seconds']))
+            old_val = slideshow_instance.config.get('weather_update_seconds', '900')
+            new_val = str(int(data['weather_update_seconds']))
+            slideshow_instance.config['weather_update_seconds'] = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('weather_update_seconds', old_val, new_val)
         if 'upload_directory' in data:
-            slideshow_instance.config['upload_directory'] = data['upload_directory'].strip()
+            old_val = slideshow_instance.config.get('upload_directory', '')
+            new_val = data['upload_directory'].strip()
+            slideshow_instance.config['upload_directory'] = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('upload_directory', old_val or '(empty)', new_val or '(empty)')
         if 'images_directory' in data:
             # Update images directory (requires restart to take full effect)
+            old_val = slideshow_instance.folder
             new_dir = data['images_directory'].strip()
             if os.path.exists(new_dir) and os.path.isdir(new_dir):
                 slideshow_instance.folder = new_dir
@@ -950,6 +1167,8 @@ def api_settings():
                 if slideshow_instance.images:
                     slideshow_instance.next_image()
                 print(f"[Web] Images directory changed to: {new_dir}")
+                if telegram_notifier and old_val != new_dir:
+                    telegram_notifier.notify_settings_change('images_directory', old_val, new_dir)
             else:
                 return jsonify({'error': 'Invalid directory path'}), 400
         
@@ -1095,12 +1314,20 @@ def main():
         'image_history_size': get_config_value('image_history_size', '5')
     }
 
+    # Initialize Telegram notifier
+    global telegram_notifier
+    telegram_notifier = TelegramNotifier(TELEGRAM_CONFIG)
+    
     # Pass config values to Slideshow
-    slideshow = Slideshow(images_directory, screen, display_time_seconds, slideshow_config)
+    slideshow = Slideshow(images_directory, screen, display_time_seconds, slideshow_config, telegram_notifier)
     
     # Set global reference for web API
     global slideshow_instance
     slideshow_instance = slideshow
+    
+    # Send startup notification
+    if telegram_notifier:
+        telegram_notifier.notify_startup()
     
     # Start web server in background thread
     web_thread = threading.Thread(target=start_web_server, kwargs={'host': '0.0.0.0', 'port': 5000}, daemon=True)
@@ -1108,7 +1335,14 @@ def main():
     print("[Startup] Web interface available at http://0.0.0.0:5000")
     
     # Run slideshow (this blocks)
-    slideshow.run()
+    try:
+        slideshow.run()
+    except KeyboardInterrupt:
+        print("\n[Shutdown] Interrupted by user")
+    finally:
+        # Send shutdown notification
+        if telegram_notifier:
+            telegram_notifier.notify_shutdown()
 
 
 if __name__ == "__main__":
