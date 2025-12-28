@@ -407,6 +407,49 @@ def get_cpu_usage():
     return None
 
 
+def get_disk_usage(path='/'):
+    """Get disk usage - lightweight on Linux, psutil on Windows/Mac"""
+    # Try lightweight df command on Linux first
+    try:
+        result = subprocess.run(['df', '-B', '1', path], 
+                              capture_output=True, text=True, timeout=2)
+        if result.returncode == 0:
+            lines = result.stdout.strip().split('\n')
+            if len(lines) >= 2:
+                # Parse the header and data line
+                # Format: "Filesystem      1B-blocks       Used Available Use% Mounted on"
+                #         "/dev/mmcblk0p2 7122513920 5904424960 835575808  88% /"
+                parts = lines[1].split()
+                if len(parts) >= 4:
+                    total = int(parts[1])
+                    used = int(parts[2])
+                    available = int(parts[3])
+                    percent_used = (used / total) * 100 if total > 0 else 0
+                    return {
+                        'total': total,
+                        'used': used,
+                        'available': available,
+                        'percent_used': percent_used
+                    }
+    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError, IndexError):
+        pass
+    
+    # Fallback to psutil (works on Windows, Mac, and Linux)
+    if PSUTIL_AVAILABLE:
+        try:
+            usage = psutil.disk_usage(path)
+            return {
+                'total': usage.total,
+                'used': usage.used,
+                'available': usage.free,
+                'percent_used': usage.percent
+            }
+        except Exception:
+            pass
+    
+    return None
+
+
 def monitor_system_resources(telegram_notifier, check_interval=120):
     """Monitor system resources using lightweight native OS commands"""
     # Alert thresholds
@@ -894,11 +937,11 @@ class Slideshow:
                         elif event.key == pygame.K_LEFT:
                             with self.control_lock:
                                 self.prev_image()
-                            if display_should_be_on:
-                                self.draw_image()
-                                pygame.display.flip()
-                            start_time = 0
-                            break
+                                if display_should_be_on:
+                                    self.draw_image()
+                                    pygame.display.flip()
+                                start_time = 0
+                                break
                 clock.tick(60)
 
 
@@ -914,7 +957,29 @@ def api_status():
     if slideshow_instance is None:
         return jsonify({'error': 'Slideshow not initialized'}), 503
     
-    return jsonify({
+    # Get system stats
+    system_stats = {}
+    try:
+        memory = get_memory_info()
+        if memory is not None:
+            system_stats['memory_free_mb'] = round(memory, 1)
+        
+        cpu = get_cpu_usage()
+        if cpu is not None:
+            system_stats['cpu_percent'] = round(cpu, 1)
+        
+        temp = get_cpu_temperature()
+        if temp is not None:
+            system_stats['cpu_temp'] = round(temp, 1)
+        
+        disk = get_disk_usage()
+        if disk is not None:
+            system_stats['disk_free_gb'] = round(disk['available'] / (1024 * 1024 * 1024), 2)
+            system_stats['disk_used_percent'] = round(disk['percent_used'], 1)
+    except Exception as e:
+        print(f"[API] Error getting system stats: {e}")
+    
+    response = {
         'current_image': slideshow_instance.current_img,
         'current_index': slideshow_instance.current_index + 1,
         'total_images': slideshow_instance.total_images,
@@ -925,7 +990,12 @@ def api_status():
         'paused': slideshow_instance.paused,
         'display_on': slideshow_instance.is_display_on(),
         'manual_override': slideshow_instance.manual_display_override
-    })
+    }
+    
+    if system_stats:
+        response['system'] = system_stats
+    
+    return jsonify(response)
 
 @app.route('/api/directories', methods=['GET'])
 def api_directories():
@@ -1487,7 +1557,7 @@ def main():
     # Initialize Telegram notifier
     global telegram_notifier
     telegram_notifier = TelegramNotifier(TELEGRAM_CONFIG)
-    
+
     # Pass config values to Slideshow
     slideshow = Slideshow(images_directory, screen, display_time_seconds, slideshow_config, telegram_notifier)
     
