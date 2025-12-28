@@ -116,46 +116,53 @@
 - [ ] User feedback history view
 - [ ] Anonymous submission option
 
-### 10. Telegram Integration (Full Featured)
-**Phase 1 - Status Updates TO Telegram:**
-- [ ] Setup Telegram bot via BotFather
-- [ ] Send status updates to group/channel
-- [ ] Startup/shutdown notifications
-- [ ] Error notifications (immediate alerts)
-- [ ] Image change notifications (configurable frequency)
-- [ ] Upload notifications
-- [ ] Settings change notifications
-- [ ] System alerts (low memory, high CPU, high temp)
-- [ ] Daily summary reports
-- [ ] Configure notification types in settings
+### 11. Performance Monitoring & System Health
+**Real-time Metrics:**
+- [ ] CPU usage (current, average, per-core if multi-core)
+- [ ] Memory usage (total, used, free, available, swap)
+- [ ] Memory leak detection (track growth over time)
+- [ ] Temperature monitoring (CPU temp, GPU temp if available)
+- [ ] Disk/filesystem usage (used, free, percentage)
+- [ ] Network usage (bandwidth, requests per minute)
+- [ ] Process uptime and restart count
 
-**Phase 2 - Commands FROM Telegram:**
-- [ ] Receive and process Telegram commands
-- [ ] `/next` - Skip to next image
-- [ ] `/prev` - Go to previous image
-- [ ] `/pause` - Toggle pause/play
-- [ ] `/status` - Get current status
-- [ ] `/weather` - Force weather update
-- [ ] `/shutdown` - Safe shutdown with confirmation
-- [ ] `/restart` - Restart gallery
-- [ ] `/photo` - Send current image to Telegram
-- [ ] `/help` - List all available commands
+**Historical Tracking:**
+- [ ] Store metrics history (last 24 hours, 7 days)
+- [ ] Generate performance graphs/charts
+- [ ] Peak usage tracking
+- [ ] Identify performance trends
+- [ ] Export metrics data (CSV/JSON)
 
-**Phase 3 - Advanced Features:**
-- [ ] `/upload` - Upload photo from Telegram to gallery
-- [ ] `/settings <key> <value>` - Change settings
-- [ ] `/sort <type>` - Change image sorting
-- [ ] `/delay <seconds>` - Change display delay
-- [ ] User authentication (whitelist user IDs)
-- [ ] Rate limiting for commands
-- [ ] Command history/audit log
-- [ ] Scheduled status updates (hourly/daily)
+**Web UI Dashboard:**
+- [ ] System status card with live metrics
+- [ ] Visual indicators (gauges, progress bars)
+- [ ] Color-coded warnings (green/yellow/red)
+- [ ] Performance graphs (CPU, memory over time)
+- [ ] Disk space breakdown by directory
+- [ ] Alert thresholds configuration
 
-**Configuration:**
-- [ ] Store bot token and chat ID in config.ini
-- [ ] Configure notification preferences
-- [ ] Security settings (allowed users, rate limits)
-- [ ] Add python-telegram-bot to requirements.txt
+**Alerts & Warnings:**
+- [ ] High CPU usage alert (>80% sustained)
+- [ ] Low memory warning (<100 MB free)
+- [ ] Disk space warning (<1 GB free)
+- [ ] High temperature alert (>80°C)
+- [ ] Memory leak detection (continuous growth)
+- [ ] Swap usage warning
+- [ ] Send alerts via Telegram (if enabled)
+- [ ] Log performance issues to error log
+
+**Optimization Tools:**
+- [ ] Cache cleanup button
+- [ ] Memory optimization suggestions
+- [ ] Identify resource-heavy operations
+- [ ] Restart services if memory leaked
+- [ ] Auto-restart on critical thresholds
+
+**Raspberry Pi Specific:**
+- [ ] GPU memory split monitoring
+- [ ] Throttling detection (under-voltage, thermal)
+- [ ] SD card health monitoring
+- [ ] vcgencmd integration for Pi metrics
 
 ---
 
