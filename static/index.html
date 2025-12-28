@@ -681,6 +681,19 @@
                 </div>
             </div>
 
+            <div class="caption-editor-container" style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px; border: 1px solid #e0e0e0;">
+                <h3 style="margin-bottom: 15px; color: #667eea; font-size: 1.1em;">✏️ Image Caption</h3>
+                <div style="margin-bottom: 10px;">
+                    <textarea id="caption-text" placeholder="Enter caption for this image (saved to image metadata)..." 
+                              style="width: 100%; min-height: 100px; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 0.95em; font-family: inherit; resize: vertical; box-sizing: border-box;"></textarea>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button class="btn-success" onclick="saveCaption()" id="save-caption-btn">💾 Save Caption</button>
+                    <button class="btn-secondary" onclick="loadCaption()" id="load-caption-btn">🔄 Reload</button>
+                    <span id="caption-status" style="color: #666; font-size: 0.9em; margin-left: 10px;"></span>
+                </div>
+            </div>
+
             <div id="imageModal" class="image-modal" onclick="closeFullImage(event)">
                 <span class="image-modal-close">&times;</span>
                 <div class="image-modal-content">
@@ -776,6 +789,12 @@
                         <div class="setting-item-row">
                             <span>Show Filename</span>
                             <div class="toggle-switch" id="toggle-filename" onclick="toggleSetting('show_filename', this)"></div>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-item-row">
+                            <span>Show Caption</span>
+                            <div class="toggle-switch" id="toggle-caption" onclick="toggleSetting('show_caption', this)"></div>
                         </div>
                     </div>
                 </div>
@@ -1186,9 +1205,14 @@
                     previewImg.src = `/api/image/preview?t=${Date.now()}`;
                     previewImg.style.display = 'block';
                     lastImageName = data.current_image;
+                    // Load caption when image changes
+                    loadCaption();
                 } else if (!data.current_image) {
                     previewImg.style.display = 'none';
                     lastImageName = '';
+                    // Clear caption when no image
+                    document.getElementById('caption-text').value = '';
+                    document.getElementById('caption-status').textContent = '';
                 }
                 
                 isPaused = data.paused;
@@ -1209,6 +1233,7 @@
                 updateToggle('toggle-temp', settings.show_temperature === 'true');
                 updateToggle('toggle-weather', settings.show_weather_code === 'true');
                 updateToggle('toggle-filename', settings.show_filename === 'true');
+                updateToggle('toggle-caption', settings.show_caption === 'true');
 
                 // Update input fields
                 if (document.getElementById('delay-seconds')) {
@@ -1321,6 +1346,78 @@
                 }
             } catch (error) {
                 showAlert('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function loadCaption() {
+            try {
+                const response = await fetch('/api/image/caption');
+                if (response.ok) {
+                    const data = await response.json();
+                    const captionText = document.getElementById('caption-text');
+                    const statusEl = document.getElementById('caption-status');
+                    
+                    if (data.caption) {
+                        captionText.value = data.caption;
+                        statusEl.textContent = 'Caption loaded from image metadata';
+                        statusEl.style.color = '#28a745';
+                    } else {
+                        captionText.value = '';
+                        statusEl.textContent = 'No caption found in image metadata';
+                        statusEl.style.color = '#666';
+                    }
+                } else {
+                    const error = await response.json();
+                    document.getElementById('caption-status').textContent = 'Error: ' + (error.error || 'Failed to load caption');
+                    document.getElementById('caption-status').style.color = '#dc3545';
+                }
+            } catch (error) {
+                document.getElementById('caption-status').textContent = 'Error: ' + error.message;
+                document.getElementById('caption-status').style.color = '#dc3545';
+            }
+        }
+
+        async function saveCaption() {
+            try {
+                const captionText = document.getElementById('caption-text');
+                const statusEl = document.getElementById('caption-status');
+                const saveBtn = document.getElementById('save-caption-btn');
+                
+                const caption = captionText.value.trim();
+                
+                // Disable button during save
+                saveBtn.disabled = true;
+                saveBtn.textContent = '💾 Saving...';
+                statusEl.textContent = 'Saving caption...';
+                statusEl.style.color = '#666';
+                
+                const response = await fetch('/api/image/caption', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ caption: caption })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    statusEl.textContent = data.message || 'Caption saved successfully!';
+                    statusEl.style.color = '#28a745';
+                    showAlert('Caption saved to image metadata', 'success');
+                } else {
+                    const error = await response.json();
+                    statusEl.textContent = 'Error: ' + (error.error || 'Failed to save caption');
+                    statusEl.style.color = '#dc3545';
+                    showAlert('Failed to save caption: ' + (error.error || 'Unknown error'), 'error');
+                }
+                
+                // Re-enable button
+                saveBtn.disabled = false;
+                saveBtn.textContent = '💾 Save Caption';
+            } catch (error) {
+                document.getElementById('caption-status').textContent = 'Error: ' + error.message;
+                document.getElementById('caption-status').style.color = '#dc3545';
+                document.getElementById('save-caption-btn').disabled = false;
+                document.getElementById('save-caption-btn').textContent = '💾 Save Caption';
+                showAlert('Error saving caption: ' + error.message, 'error');
             }
         }
 
