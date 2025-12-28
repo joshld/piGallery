@@ -8,6 +8,10 @@ import requests
 import subprocess
 from geopy.geocoders import Nominatim
 import sys
+import threading
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
+from werkzeug.utils import secure_filename
 
 if sys.version_info < (3, 7):
     print("Python 3.7 or newer is required.")
@@ -21,6 +25,7 @@ DEFAULT_CONFIG = {
     "gallery": {
         "location_city_suburb": "Sydney, Australia",
         "images_directory": "/path/to/your/images/",
+        "upload_directory": "",
         "display_off_time": "23:00",
         "display_on_time": "05:00",
         "delay_seconds": "10",
@@ -182,6 +187,14 @@ def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667):
     return img_scaled, x_offset, y_offset, new_w
 
 
+# ---------------- Web Server Setup ----------------
+app = Flask(__name__, static_folder='static')
+CORS(app)
+
+# Global reference to slideshow instance (set in main)
+slideshow_instance = None
+
+
 # ---------------- Slideshow Class ----------------
 class Slideshow:
     def __init__(self, folder, screen, display_time_seconds, config_dict):
@@ -198,6 +211,12 @@ class Slideshow:
         self.current_index = -1
         self.current_img = None
         self.total_images = 0
+        
+        # Web control state
+        self.paused = False
+        self.manual_display_override = None  # None = auto, True = force on, False = force off
+        self.control_lock = threading.Lock()
+        self.force_redraw = False
 
         self.fonts = {
             "filename": pygame.font.SysFont("Arial", 14),
@@ -279,10 +298,28 @@ class Slideshow:
             status_surf = status_font.render(status_msg, True, (255, 255, 255))
             status_rect = status_surf.get_rect(center=(self.screen_w // 2, self.screen_h // 2))
             self.screen.blit(status_surf, status_rect)
-            print(f"[Slideshow] {status_msg}")
+            # Only print once, not every frame
+            if not hasattr(self, '_last_status_msg') or self._last_status_msg != status_msg:
+                print(f"[Slideshow] {status_msg}")
+                self._last_status_msg = status_msg
         
         if self.current_img:
-            img_path = os.path.join(self.folder, self.current_img)
+            # Check if this is an uploaded image (starts with "uploaded/")
+            if self.current_img.startswith("uploaded/"):
+                # Get upload directory
+                upload_dir = self.config.get('upload_directory', '').strip()
+                if upload_dir:
+                    upload_dir = os.path.expanduser(upload_dir)
+                    # Remove "uploaded/" prefix to get actual path
+                    actual_path = self.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
+                    img_path = os.path.join(upload_dir, actual_path)
+                else:
+                    # Fallback: treat as subdirectory of main folder
+                    img_path = os.path.join(self.folder, self.current_img)
+            else:
+                # Regular image in main directory
+                img_path = os.path.join(self.folder, self.current_img)
+
             try:
                 img = pygame.image.load(img_path)
                 ar_landscape = float(self.config.get('aspect_ratio_landscape', '1.5'))
@@ -348,6 +385,7 @@ class Slideshow:
         # Recursively scan for images (supports subfolders)
         new_images = []
         try:
+            # Scan main images directory
             for root, _, files in os.walk(self.folder):
                 for f in files:
                     if f.lower().endswith((".jpg", ".jpeg", ".png")):
@@ -355,6 +393,37 @@ class Slideshow:
                         rel_path = os.path.relpath(os.path.join(root, f), self.folder)
                         if rel_path not in self.history and rel_path != self.current_img:
                             new_images.append(rel_path)
+            
+            # Also scan upload directory if it's separate from images directory
+            upload_dir = self.config.get('upload_directory', '').strip()
+            if upload_dir:
+                upload_dir = os.path.expanduser(upload_dir)
+                if os.path.exists(upload_dir) and os.path.isdir(upload_dir):
+                    # Check if upload_dir is within self.folder (already scanned by os.walk)
+                    try:
+                        # Normalize paths for comparison
+                        main_folder_abs = os.path.abspath(self.folder)
+                        upload_dir_abs = os.path.abspath(upload_dir)
+                        
+                        # Check if upload_dir is a subdirectory of main folder
+                        common_path = os.path.commonpath([main_folder_abs, upload_dir_abs])
+                        is_subdirectory = os.path.abspath(common_path) == main_folder_abs
+                    except (ValueError, OSError):
+                        # Paths are on different drives (Windows) or can't be compared
+                        is_subdirectory = False
+                    
+                    if not is_subdirectory:
+                        # Upload directory is separate, scan it too
+                        print(f"[Slideshow] Also scanning upload directory: {upload_dir}")
+                        for root, _, files in os.walk(upload_dir):
+                            for f in files:
+                                if f.lower().endswith((".jpg", ".jpeg", ".png")):
+                                    # Store as relative path from upload_dir, with "uploaded/" prefix
+                                    rel_path = os.path.relpath(os.path.join(root, f), upload_dir)
+                                    # Use a prefix to distinguish uploaded images
+                                    upload_rel_path = os.path.join("uploaded", rel_path).replace("\\", "/")
+                                    if upload_rel_path not in self.history and upload_rel_path != self.current_img:
+                                        new_images.append(upload_rel_path)
         except PermissionError as e:
             print(f"[Error] Permission denied accessing {self.folder}: {e}")
             return
@@ -400,6 +469,10 @@ class Slideshow:
             print(f"[Slideshow] Previous image {self.current_index+1}/{self.total_images}: {self.current_img}")
 
     def is_display_on(self):
+        # Check for manual override first
+        if self.manual_display_override is not None:
+            return self.manual_display_override
+            
         now = datetime.datetime.now().time()
         display_off_time = self.config.get('display_off_time', '23:00')
         display_on_time = self.config.get('display_on_time', '05:00')
@@ -431,6 +504,9 @@ class Slideshow:
             elif not on and current_state == 1:
                 os.system("vcgencmd display_power 0")
             # else: already in desired state
+        except FileNotFoundError:
+            # Not on Raspberry Pi - silently skip
+            pass
         except Exception as e:
             print(f"Failed to set display power: {e}")
 
@@ -445,13 +521,24 @@ class Slideshow:
         
         clock = pygame.time.Clock()
         display_was_on = True
+        
         while True:
             display_should_be_on = self.is_display_on()
             if display_should_be_on:
                 self.set_display_power(True)
-                self.next_image()
-                self.draw_image()
-                pygame.display.flip()
+                
+                # Check if we need to force a redraw (settings changed)
+                if self.force_redraw:
+                    self.draw_image()
+                    pygame.display.flip()
+                    self.force_redraw = False
+
+                # Only advance if not paused
+                if not self.paused:
+                    self.next_image()
+                    self.draw_image()
+                    pygame.display.flip()
+                
                 display_was_on = True
             else:
                 if display_was_on:
@@ -460,10 +547,16 @@ class Slideshow:
                 self.draw_blank_screen()
                 pygame.display.flip()
                 self.set_display_power(False)
-                # Removed automatic shutdown - just blank the display
 
+            # Wait for display_time_seconds, handling events (original structure)
             start_time = time.time()
             while time.time() - start_time < self.display_time_seconds:
+                # Check for forced redraw during wait (for settings changes)
+                if self.force_redraw and display_should_be_on:
+                    self.draw_image()
+                    pygame.display.flip()
+                    self.force_redraw = False
+
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         pygame.quit()
@@ -477,10 +570,432 @@ class Slideshow:
                             start_time = 0
                             break
                         elif event.key == pygame.K_LEFT:
-                            self.prev_image()
+                            with self.control_lock:
+                                self.prev_image()
+                            if display_should_be_on:
+                                self.draw_image()
+                                pygame.display.flip()
                             start_time = 0
                             break
                 clock.tick(60)
+
+
+# ---------------- Web API Endpoints ----------------
+
+@app.route('/')
+def index():
+    return send_from_directory('static', 'index.html')
+
+@app.route('/api/status')
+def api_status():
+    """Get current slideshow status"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    return jsonify({
+        'current_image': slideshow_instance.current_img,
+        'current_index': slideshow_instance.current_index + 1,
+        'total_images': slideshow_instance.total_images,
+        'temperature': slideshow_instance.current_temp,
+        'weather': slideshow_instance.current_weather,
+        'time': datetime.datetime.now().strftime("%I:%M %p"),
+        'date': datetime.datetime.now().strftime("%d %b %Y"),
+        'paused': slideshow_instance.paused,
+        'display_on': slideshow_instance.is_display_on(),
+        'manual_override': slideshow_instance.manual_display_override
+    })
+
+@app.route('/api/directories', methods=['GET'])
+def api_directories():
+    """List directories for folder selection"""
+    path = request.args.get('path', '')
+    
+    if not path:
+        # Return root directories
+        if sys.platform == 'win32':
+            # Windows: list drive letters
+            import string
+            drives = [f"{d}:\\" for d in string.ascii_uppercase if os.path.exists(f"{d}:\\")]
+            return jsonify({'directories': drives, 'current_path': ''})
+        else:
+            # Unix/Linux: start from home directory
+            home = os.path.expanduser('~')
+            return jsonify({'directories': [home, '/'], 'current_path': ''})
+    
+    # Expand user path (~)
+    path = os.path.expanduser(path)
+    
+    if not os.path.exists(path):
+        return jsonify({'error': 'Path does not exist'}), 404
+    
+    if not os.path.isdir(path):
+        return jsonify({'error': 'Path is not a directory'}), 400
+    
+    try:
+        # List directories only
+        dirs = []
+        for item in os.listdir(path):
+            item_path = os.path.join(path, item)
+            if os.path.isdir(item_path):
+                dirs.append(item)
+        
+        dirs.sort()
+        return jsonify({
+            'directories': dirs,
+            'current_path': path,
+            'parent_path': os.path.dirname(path) if path != os.path.dirname(path) else None
+        })
+    except PermissionError:
+        return jsonify({'error': 'Permission denied'}), 403
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def get_image_path():
+    """Helper function to get the current image path"""
+    if slideshow_instance is None or not slideshow_instance.current_img:
+        return None
+    
+    # Check if this is an uploaded image
+    if slideshow_instance.current_img.startswith("uploaded/"):
+        upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
+        if upload_dir:
+            upload_dir = os.path.expanduser(upload_dir)
+            actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
+            img_path = os.path.join(upload_dir, actual_path)
+        else:
+            img_path = os.path.join(slideshow_instance.folder, slideshow_instance.current_img)
+    else:
+        img_path = os.path.join(slideshow_instance.folder, slideshow_instance.current_img)
+    
+    return img_path if os.path.exists(img_path) else None
+
+@app.route('/api/image/preview')
+def api_image_preview():
+    """Get current image as thumbnail preview"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    if not slideshow_instance.current_img:
+        return jsonify({'error': 'No image loaded'}), 404
+    
+    try:
+        from PIL import Image
+        from flask import send_file
+        import io
+        
+        img_path = get_image_path()
+        if not img_path:
+            return jsonify({'error': 'Image file not found'}), 404
+        
+        # Create thumbnail (max 400x400, maintains aspect ratio)
+        img = Image.open(img_path)
+        img.thumbnail((400, 400), Image.Resampling.LANCZOS)
+        
+        # Convert to bytes
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format='JPEG', quality=85)
+        img_bytes.seek(0)
+        
+        return send_file(img_bytes, mimetype='image/jpeg')
+    except ImportError:
+        # Fallback: serve original image if PIL not available
+        img_path = get_image_path()
+        if img_path:
+            if slideshow_instance.current_img.startswith("uploaded/"):
+                upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
+                if upload_dir:
+                    upload_dir = os.path.expanduser(upload_dir)
+                    actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
+                    return send_from_directory(upload_dir, actual_path)
+            else:
+                return send_from_directory(slideshow_instance.folder, slideshow_instance.current_img)
+        return jsonify({'error': 'Image not found'}), 404
+    except Exception as e:
+        print(f"[Web] Error generating preview: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/image/full')
+def api_image_full():
+    """Get current image at full resolution"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    if not slideshow_instance.current_img:
+        return jsonify({'error': 'No image loaded'}), 404
+    
+    try:
+        img_path = get_image_path()
+        if not img_path:
+            return jsonify({'error': 'Image file not found'}), 404
+        
+        if slideshow_instance.current_img.startswith("uploaded/"):
+            upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
+            if upload_dir:
+                upload_dir = os.path.expanduser(upload_dir)
+                actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
+                return send_from_directory(upload_dir, actual_path)
+        else:
+            return send_from_directory(slideshow_instance.folder, slideshow_instance.current_img)
+    except Exception as e:
+        print(f"[Web] Error serving full image: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/next', methods=['POST'])
+def api_next():
+    """Go to next image"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    with slideshow_instance.control_lock:
+        slideshow_instance.next_image()
+        slideshow_instance.force_redraw = True  # Force immediate redraw
+    
+    return jsonify({'status': 'ok', 'current_image': slideshow_instance.current_img})
+
+@app.route('/api/prev', methods=['POST'])
+def api_prev():
+    """Go to previous image"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    with slideshow_instance.control_lock:
+        slideshow_instance.prev_image()
+        slideshow_instance.force_redraw = True  # Force immediate redraw
+    
+    return jsonify({'status': 'ok', 'current_image': slideshow_instance.current_img})
+
+@app.route('/api/pause', methods=['POST'])
+def api_pause():
+    """Toggle pause state"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    slideshow_instance.paused = not slideshow_instance.paused
+    status = 'paused' if slideshow_instance.paused else 'playing'
+    print(f"[Web] Slideshow {status}")
+    
+    return jsonify({'status': 'ok', 'paused': slideshow_instance.paused})
+
+@app.route('/api/display', methods=['POST'])
+def api_display():
+    """Control display on/off"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    data = request.json
+    action = data.get('action')  # 'on', 'off', or 'auto'
+    
+    if action == 'on':
+        slideshow_instance.manual_display_override = True
+    elif action == 'off':
+        slideshow_instance.manual_display_override = False
+    elif action == 'auto':
+        slideshow_instance.manual_display_override = None
+    else:
+        return jsonify({'error': 'Invalid action'}), 400
+    
+    print(f"[Web] Display set to: {action}")
+    return jsonify({'status': 'ok', 'action': action})
+
+@app.route('/api/upload', methods=['POST'])
+def api_upload():
+    """Upload new image to separate upload directory"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    if not file.filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+        return jsonify({'error': 'Invalid file type. Only JPG and PNG allowed'}), 400
+    
+    filename = secure_filename(file.filename)
+    
+    # Determine upload directory
+    upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
+    if not upload_dir:
+        # Default: create 'uploaded' subdirectory in images directory
+        upload_dir = os.path.join(slideshow_instance.folder, 'uploaded')
+    else:
+        # Use configured upload directory
+        upload_dir = os.path.expanduser(upload_dir)  # Support ~ for home directory
+    
+    # Create upload directory if it doesn't exist
+    try:
+        os.makedirs(upload_dir, exist_ok=True)
+        # Verify directory was actually created
+        if not os.path.exists(upload_dir):
+            return jsonify({'error': f'Failed to create upload directory: {upload_dir}'}), 500
+        if not os.path.isdir(upload_dir):
+            return jsonify({'error': f'Upload path exists but is not a directory: {upload_dir}'}), 500
+        print(f"[Web] Upload directory: {upload_dir}")
+    except PermissionError as e:
+        return jsonify({'error': f'Permission denied creating upload directory: {e}'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Failed to create upload directory: {e}'}), 500
+    
+    # Verify directory is writable
+    try:
+        test_file = os.path.join(upload_dir, '.write_test')
+        with open(test_file, 'w') as f:
+            f.write('test')
+        os.remove(test_file)
+    except Exception as e:
+        return jsonify({'error': f'Upload directory is not writable: {e}'}), 500
+    
+    # Save file to upload directory
+    filepath = os.path.join(upload_dir, filename)
+
+    # Save file to upload directory
+    filepath = os.path.join(upload_dir, filename)
+    
+    # Handle filename conflicts (add number if exists)
+    base_name, ext = os.path.splitext(filename)
+    counter = 1
+    while os.path.exists(filepath):
+        filename = f"{base_name}_{counter}{ext}"
+        filepath = os.path.join(upload_dir, filename)
+        counter += 1
+    
+    try:
+        file.save(filepath)
+        print(f"[Web] Uploaded new image: {filename} to {upload_dir}")
+    except Exception as e:
+        return jsonify({'error': f'Failed to save file: {e}'}), 500
+    
+    # Refresh images to include the new upload (refresh_images scans recursively)
+    slideshow_instance.refresh_images()
+    
+    return jsonify({'status': 'ok', 'filename': filename, 'upload_dir': upload_dir})
+
+@app.route('/api/settings', methods=['GET', 'POST'])
+def api_settings():
+    """Get or update settings"""
+    if slideshow_instance is None:
+        return jsonify({'error': 'Slideshow not initialized'}), 503
+    
+    if request.method == 'GET':
+        return jsonify({
+            'show_time': slideshow_instance.config.get('show_time', 'true'),
+            'show_date': slideshow_instance.config.get('show_date', 'true'),
+            'show_temperature': slideshow_instance.config.get('show_temperature', 'true'),
+            'show_weather_code': slideshow_instance.config.get('show_weather_code', 'true'),
+            'show_filename': slideshow_instance.config.get('show_filename', 'true'),
+            'delay_seconds': slideshow_instance.display_time_seconds,
+            'display_off_time': slideshow_instance.config.get('display_off_time', '23:00'),
+            'display_on_time': slideshow_instance.config.get('display_on_time', '05:00'),
+            'location_city_suburb': slideshow_instance.config.get('location_city_suburb', 'Sydney, Australia'),
+            'aspect_ratio_landscape': slideshow_instance.config.get('aspect_ratio_landscape', '1.5'),
+            'aspect_ratio_portrait': slideshow_instance.config.get('aspect_ratio_portrait', '0.667'),
+            'ui_text_alpha': slideshow_instance.config.get('ui_text_alpha', '192'),
+            'weather_update_seconds': slideshow_instance.config.get('weather_update_seconds', '900'),
+            'upload_directory': slideshow_instance.config.get('upload_directory', ''),
+            'images_directory': slideshow_instance.folder
+        })
+    
+    elif request.method == 'POST':
+        data = request.json
+        
+        # Update config values
+        if 'show_time' in data:
+            slideshow_instance.config['show_time'] = str(data['show_time']).lower()
+        if 'show_date' in data:
+            slideshow_instance.config['show_date'] = str(data['show_date']).lower()
+        if 'show_temperature' in data:
+            slideshow_instance.config['show_temperature'] = str(data['show_temperature']).lower()
+        if 'show_weather_code' in data:
+            slideshow_instance.config['show_weather_code'] = str(data['show_weather_code']).lower()
+        if 'show_filename' in data:
+            slideshow_instance.config['show_filename'] = str(data['show_filename']).lower()
+        if 'delay_seconds' in data:
+            slideshow_instance.display_time_seconds = int(data['delay_seconds'])
+        if 'display_off_time' in data:
+            slideshow_instance.config['display_off_time'] = data['display_off_time']
+        if 'display_on_time' in data:
+            slideshow_instance.config['display_on_time'] = data['display_on_time']
+        if 'location_city_suburb' in data:
+            slideshow_instance.config['location_city_suburb'] = data['location_city_suburb']
+            # Re-geocode the location
+            slideshow_instance.city_suburb = data['location_city_suburb']
+            lat, lon = get_coords_from_place(data['location_city_suburb'])
+            if lat and lon:
+                slideshow_instance.lat = lat
+                slideshow_instance.long = lon
+                print(f"[Web] Updated location to {data['location_city_suburb']}: lat={lat}, lon={lon}")
+        if 'aspect_ratio_landscape' in data:
+            slideshow_instance.config['aspect_ratio_landscape'] = str(data['aspect_ratio_landscape'])
+        if 'aspect_ratio_portrait' in data:
+            slideshow_instance.config['aspect_ratio_portrait'] = str(data['aspect_ratio_portrait'])
+        if 'ui_text_alpha' in data:
+            slideshow_instance.config['ui_text_alpha'] = str(int(data['ui_text_alpha']))
+        if 'weather_update_seconds' in data:
+            slideshow_instance.config['weather_update_seconds'] = str(int(data['weather_update_seconds']))
+        if 'upload_directory' in data:
+            slideshow_instance.config['upload_directory'] = data['upload_directory'].strip()
+        if 'images_directory' in data:
+            # Update images directory (requires restart to take full effect)
+            new_dir = data['images_directory'].strip()
+            if os.path.exists(new_dir) and os.path.isdir(new_dir):
+                slideshow_instance.folder = new_dir
+                slideshow_instance.config['images_directory'] = new_dir
+                # Refresh images from new directory
+                slideshow_instance.images = []
+                slideshow_instance.history = []
+                slideshow_instance.current_index = -1
+                slideshow_instance.refresh_images()
+                if slideshow_instance.images:
+                    slideshow_instance.next_image()
+                print(f"[Web] Images directory changed to: {new_dir}")
+            else:
+                return jsonify({'error': 'Invalid directory path'}), 400
+        
+        # Force a redraw to apply settings immediately
+        slideshow_instance.force_redraw = True
+
+        # If aspect ratios changed, need to reload current image
+        if 'aspect_ratio_landscape' in data or 'aspect_ratio_portrait' in data:
+            # Clear cached image so it reloads with new aspect ratios
+            if hasattr(slideshow_instance, '_cached_image_name'):
+                slideshow_instance._cached_image_name = None
+
+        # Optionally save to config.ini
+        save_to_config = data.get('save_to_config', False)
+        if save_to_config:
+            config = configparser.ConfigParser()
+            if os.path.exists(CONFIG_PATH):
+                config.read(CONFIG_PATH)
+            
+            if 'gallery' not in config:
+                config['gallery'] = {}
+            
+            # Update config file
+            for key in ['show_time', 'show_date', 'show_temperature', 'show_weather_code', 
+                       'show_filename', 'display_off_time', 'display_on_time',
+                       'location_city_suburb', 'aspect_ratio_landscape', 'aspect_ratio_portrait',
+                       'ui_text_alpha', 'weather_update_seconds', 'upload_directory', 'images_directory']:
+                if key in data:
+                    config['gallery'][key] = str(data[key])
+            
+            if 'delay_seconds' in data:
+                config['gallery']['delay_seconds'] = str(data['delay_seconds'])
+            
+            with open(CONFIG_PATH, 'w') as f:
+                config.write(f)
+            
+            print("[Web] Settings saved to config.ini")
+        
+        print(f"[Web] Settings updated: {data}")
+        return jsonify({'status': 'ok'})
+
+
+def start_web_server(host='0.0.0.0', port=5000):
+    """Start Flask web server in background thread"""
+    print(f"[Web] Starting web server on http://{host}:{port}")
+    app.run(host=host, port=port, debug=False, threaded=True)
 
 
 # ---------------- Main ----------------
@@ -582,6 +1097,17 @@ def main():
 
     # Pass config values to Slideshow
     slideshow = Slideshow(images_directory, screen, display_time_seconds, slideshow_config)
+    
+    # Set global reference for web API
+    global slideshow_instance
+    slideshow_instance = slideshow
+    
+    # Start web server in background thread
+    web_thread = threading.Thread(target=start_web_server, kwargs={'host': '0.0.0.0', 'port': 5000}, daemon=True)
+    web_thread.start()
+    print("[Startup] Web interface available at http://0.0.0.0:5000")
+    
+    # Run slideshow (this blocks)
     slideshow.run()
 
 
