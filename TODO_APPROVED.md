@@ -40,12 +40,16 @@
 - [ ] Export error logs
 - [ ] Clear error log option
 
-### 7. Delete Uploaded Images
-- [ ] Identify uploaded vs original images
-- [ ] Delete button (uploaded images only)
-- [ ] Protection for original gallery images
-- [ ] Confirmation before delete
-- [ ] Optional trash/recycle bin
+### 7. Delete Uploaded Images (via Modal Manager)
+- [ ] "Manage Uploaded Images" button near upload area
+- [ ] Modal popup showing grid of uploaded image thumbnails
+- [ ] Checkboxes for selecting images to delete
+- [ ] "Delete Selected" button (bulk delete)
+- [ ] Individual delete button per image
+- [ ] Protection for original gallery images (only uploaded folder)
+- [ ] Confirmation dialog before delete
+- [ ] Pagination if >20 images
+- [ ] Refresh image list after deletion
 
 ---
 
