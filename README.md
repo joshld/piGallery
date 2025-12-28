@@ -119,6 +119,64 @@ If you want to integrate with other systems, the following API endpoints are ava
 - `GET /api/settings` - Get current settings
 - `POST /api/settings` - Update settings (body: settings JSON)
 
+## Quick Reference
+
+### Access URLs
+- **On Pi:** `http://localhost:5000`
+- **Same network:** `http://raspberrypi.local:5000`
+- **Direct IP:** `http://192.168.1.xxx:5000` (find with `hostname -I`)
+
+### Web Interface Features
+- **Playback:** Previous, Next, Pause/Resume
+- **Display Control:** Turn On, Turn Off, Auto Mode
+- **Upload:** Drag & drop or click to upload (JPG, JPEG, PNG)
+- **Settings:** Toggle time, date, temperature, weather, filename display
+- **Save:** Persist changes to config.ini
+
+### Keyboard Shortcuts (on Pi)
+- `ESC` - Quit application
+- `RIGHT →` - Next image
+- `LEFT ←` - Previous image
+
+### Configuration Options
+Edit `config.ini`:
+- `images_directory` - Photo folder path
+- `delay_seconds` - Time per image
+- `display_off_time` - When to turn display off (e.g., 23:00)
+- `display_on_time` - When to turn display on (e.g., 05:00)
+- `location_city_suburb` - Weather location
+
+### Troubleshooting
+**Can't access web interface?**
+- Run verification: `./test_setup.sh`
+- Allow firewall: `sudo ufw allow 5000`
+- Find Pi IP: `hostname -I`
+
+**Web loads but doesn't work?**
+- Check browser console (F12) for errors
+- Check Python console for errors
+- Verify slideshow is running
+
+**Upload not working?**
+- Check directory permissions
+- Verify file format (JPG/PNG only)
+- Check file size (large files may timeout)
+
+### Performance
+- **Memory:** ~129 MB total (+10 MB for web server)
+- **CPU:** ~8% idle
+- **Compatible:** Raspberry Pi 3 B+ (1GB RAM) and higher
+
+### Browser Compatibility
+✓ Chrome/Chromium | ✓ Firefox | ✓ Safari | ✓ Edge | ✓ Mobile browsers
+
+### Pro Tips
+- Bookmark the URL on your phone home screen for quick access
+- Use drag-and-drop for fast photo uploads
+- Toggle settings to reduce screen clutter
+- Pause during parties for manual control
+- Auto mode follows your schedule automatically
+
 ### 9. Notes
 - The script is designed for fullscreen display and will hide the mouse cursor.
 - Weather and time information is displayed on the screen.
