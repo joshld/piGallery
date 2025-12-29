@@ -49,6 +49,7 @@
             --btn-info: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
             --btn-save: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
             --btn-save-saved: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --btn-text: #ffffff;
             
             /* Tab Colors */
             --tab-bg: rgba(255, 255, 255, 0.2);
@@ -388,32 +389,32 @@
 
         .btn-primary {
             background: var(--btn-primary);
-            color: white;
+            color: var(--btn-text);
         }
 
         .btn-success {
             background: var(--btn-success);
-            color: white;
+            color: var(--btn-text);
         }
 
         .btn-danger {
             background: var(--btn-danger);
-            color: white;
+            color: var(--btn-text);
         }
 
         .btn-warning {
             background: var(--btn-warning);
-            color: white;
+            color: var(--btn-text);
         }
 
         .btn-secondary {
             background: var(--btn-secondary);
-            color: white;
+            color: var(--btn-text);
         }
 
         .btn-info {
             background: var(--btn-info);
-            color: white;
+            color: var(--btn-text);
         }
 
         .btn-full {
@@ -850,7 +851,7 @@
             font-size: 1.2em;
             font-weight: 600;
             background: var(--btn-save);
-            color: white;
+            color: var(--btn-text);
             border: none;
             border-radius: 50px;
             cursor: pointer;
@@ -2296,7 +2297,7 @@
                 
                 const removeBtn = document.createElement('button');
                 removeBtn.textContent = '×';
-                removeBtn.style.cssText = 'background: var(--alert-error-border); color: white; border: none; border-radius: 2px; padding: 0; margin: 0; cursor: pointer; font-size: 12px; font-weight: bold; flex-shrink: 0; width: 16px !important; height: 16px !important; min-width: 16px !important; max-width: 16px !important; line-height: 1; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;';
+                removeBtn.style.cssText = 'background: var(--alert-error-border); color: var(--btn-text); border: none; border-radius: 2px; padding: 0; margin: 0; cursor: pointer; font-size: 12px; font-weight: bold; flex-shrink: 0; width: 16px !important; height: 16px !important; min-width: 16px !important; max-width: 16px !important; line-height: 1; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;';
                 removeBtn.title = 'Remove file';
                 removeBtn.onclick = () => {
                     selectedFiles.splice(index, 1);
