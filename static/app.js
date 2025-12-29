@@ -1091,5 +1091,3 @@ async function cancelPowerAction() {
     } catch (error) {
         showAlert('Error cancelling power action: ' + error.message, 'error');
     }
-}
-    </script>
