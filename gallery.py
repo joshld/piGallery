@@ -42,6 +42,7 @@ DEFAULT_CONFIG = {
         "fullscreen": "false",
         "aspect_ratio_landscape": "auto",
         "aspect_ratio_portrait": "auto",
+        "display_aspect_correction": "1.0",
         "ui_text_alpha": "192",
         "image_history_size": "5",
         "weather_update_seconds": "900",
@@ -842,8 +843,24 @@ class Slideshow:
                 except ValueError:
                     ar_portrait = 0.667  # Fallback if conversion fails
                 img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h, ar_landscape, ar_portrait)
+                
+                # Apply display aspect correction for displays with hardware stretching
+                # This compensates for displays where resolution doesn't match physical aspect ratio
+                try:
+                    correction = float(self.config.get('display_aspect_correction', '1.0'))
+                except (ValueError, TypeError):
+                    correction = 1.0
+                
+                if correction != 1.0:
+                    new_h = img_scaled.get_height()
+                    corrected_w = int(new_w * correction)
+                    img_scaled = pygame.transform.scale(img_scaled, (corrected_w, new_h))
+                    new_w = corrected_w
+                    # Recalculate x_offset after width correction
+                    x_off = (self.screen_w - new_w) // 2
+                
                 self.screen.blit(img_scaled, (x_off, y_off))
-                print(f"[Slideshow] Drawing {self.current_img} scaled to {new_w}x{self.screen_h}")
+                print(f"[Slideshow] Drawing {self.current_img} scaled to {new_w}x{img_scaled.get_height()}")
             except pygame.error as e:
                 error_msg = f"Failed to load image {self.current_img}: {e}"
                 print(f"[Error] {error_msg}")
@@ -2137,6 +2154,7 @@ def api_settings():
             'location_city_suburb': slideshow_instance.config.get('location_city_suburb', 'Sydney, Australia'),
             'aspect_ratio_landscape': slideshow_instance.config.get('aspect_ratio_landscape', '1.5'),
             'aspect_ratio_portrait': slideshow_instance.config.get('aspect_ratio_portrait', '0.667'),
+            'display_aspect_correction': slideshow_instance.config.get('display_aspect_correction', '1.0'),
             'ui_text_alpha': slideshow_instance.config.get('ui_text_alpha', '192'),
             'weather_update_seconds': slideshow_instance.config.get('weather_update_seconds', '900'),
             'upload_directory': slideshow_instance.config.get('upload_directory', ''),
@@ -2231,6 +2249,14 @@ def api_settings():
             slideshow_instance.config['aspect_ratio_portrait'] = new_val
             if telegram_notifier and old_val != new_val:
                 telegram_notifier.notify_settings_change('aspect_ratio_portrait', old_val, new_val)
+        if 'display_aspect_correction' in data:
+            old_val = slideshow_instance.config.get('display_aspect_correction', '1.0')
+            new_val = str(data['display_aspect_correction'])
+            slideshow_instance.config['display_aspect_correction'] = new_val
+            # Force redraw when correction changes
+            slideshow_instance.force_redraw = True
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('display_aspect_correction', old_val, new_val)
         if 'ui_text_alpha' in data:
             old_val = slideshow_instance.config.get('ui_text_alpha', '192')
             new_val = str(int(data['ui_text_alpha']))
@@ -2289,9 +2315,9 @@ def api_settings():
         # Force a redraw to apply settings immediately
         slideshow_instance.force_redraw = True
 
-        # If aspect ratios changed, need to reload current image
-        if 'aspect_ratio_landscape' in data or 'aspect_ratio_portrait' in data:
-            # Clear cached image so it reloads with new aspect ratios
+        # If aspect ratios or display correction changed, need to reload current image
+        if 'aspect_ratio_landscape' in data or 'aspect_ratio_portrait' in data or 'display_aspect_correction' in data:
+            # Clear cached image so it reloads with new scaling
             if hasattr(slideshow_instance, '_cached_image_name'):
                 slideshow_instance._cached_image_name = None
         
@@ -2432,6 +2458,7 @@ def main():
         'weather_update_seconds': get_config_value('weather_update_seconds', '900'),
         'aspect_ratio_landscape': get_config_value('aspect_ratio_landscape', 'auto'),
         'aspect_ratio_portrait': get_config_value('aspect_ratio_portrait', 'auto'),
+        'display_aspect_correction': get_config_value('display_aspect_correction', '1.0'),
         'image_history_size': get_config_value('image_history_size', '5'),
         'shutdown_on_display_off': get_config_value('shutdown_on_display_off', 'true'),
         'shutdown_countdown_seconds': get_config_value('shutdown_countdown_seconds', '10')
