@@ -1462,18 +1462,29 @@
         
         // Theme management
         function changeTheme(theme) {
-            document.documentElement.setAttribute('data-theme', theme);
-            localStorage.setItem('piGallery-theme', theme);
+            if (theme === 'default' || !theme) {
+                // Remove data-theme attribute to use :root styles
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.setItem('piGallery-theme', 'default');
+            } else {
+                document.documentElement.setAttribute('data-theme', theme);
+                localStorage.setItem('piGallery-theme', theme);
+            }
             // Update selector if it exists
             const selector = document.getElementById('theme-selector');
             if (selector) {
-                selector.value = theme;
+                selector.value = theme || 'default';
             }
         }
         
         function loadTheme() {
-            const savedTheme = localStorage.getItem('piGallery-theme') || 'default';
-            changeTheme(savedTheme);
+            const savedTheme = localStorage.getItem('piGallery-theme');
+            if (savedTheme) {
+                changeTheme(savedTheme);
+            } else {
+                // No saved theme, use default (no data-theme attribute = uses :root styles)
+                document.documentElement.removeAttribute('data-theme');
+            }
         }
         let isPaused = false;
 
