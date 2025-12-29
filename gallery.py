@@ -833,7 +833,19 @@ class Slideshow:
             time_surf = self.fonts["time"].render(now.strftime("%I:%M"), True, self.text_color)
             text_alpha = int(self.config.get('ui_text_alpha', '192'))
             time_surf.set_alpha(text_alpha)
-            self.screen.blit(time_surf, (10, 10))
+            
+            # Draw background
+            padding = 8
+            x_pos, y_pos = 10, 10
+            bg_rect = pygame.Rect(x_pos - padding, y_pos - padding // 2, 
+                                 time_surf.get_width() + (padding * 2), 
+                                 time_surf.get_height() + padding)
+            bg_surface = pygame.Surface((bg_rect.width, bg_rect.height))
+            bg_surface.set_alpha(100)
+            bg_surface.fill((0, 0, 0))
+            self.screen.blit(bg_surface, (bg_rect.x, bg_rect.y))
+            
+            self.screen.blit(time_surf, (x_pos, y_pos))
 
         # date
         show_date = self.config.get('show_date', 'true').lower() == 'true'
@@ -841,7 +853,19 @@ class Slideshow:
             date_surf = self.fonts["date"].render(now.strftime("%d %b %y"), True, self.text_color)
             text_alpha = int(self.config.get('ui_text_alpha', '192'))
             date_surf.set_alpha(text_alpha)
-            self.screen.blit(date_surf, (10, 90))
+            
+            # Draw background
+            padding = 8
+            x_pos, y_pos = 10, 90
+            bg_rect = pygame.Rect(x_pos - padding, y_pos - padding // 2, 
+                                 date_surf.get_width() + (padding * 2), 
+                                 date_surf.get_height() + padding)
+            bg_surface = pygame.Surface((bg_rect.width, bg_rect.height))
+            bg_surface.set_alpha(100)
+            bg_surface.fill((0, 0, 0))
+            self.screen.blit(bg_surface, (bg_rect.x, bg_rect.y))
+            
+            self.screen.blit(date_surf, (x_pos, y_pos))
 
         # weather
         show_temperature = self.config.get('show_temperature', 'true').lower() == 'true'
@@ -852,12 +876,38 @@ class Slideshow:
             temp_surf = self.fonts["temp"].render(self.current_temp, True, self.text_color)
             text_alpha = int(self.config.get('ui_text_alpha', '192'))
             temp_surf.set_alpha(text_alpha)
-            self.screen.blit(temp_surf, (self.screen_w - temp_surf.get_width() - 10, 10))
+            
+            # Draw background
+            padding = 8
+            x_pos = self.screen_w - temp_surf.get_width() - 10
+            y_pos = 10
+            bg_rect = pygame.Rect(x_pos - padding, y_pos - padding // 2, 
+                                 temp_surf.get_width() + (padding * 2), 
+                                 temp_surf.get_height() + padding)
+            bg_surface = pygame.Surface((bg_rect.width, bg_rect.height))
+            bg_surface.set_alpha(100)
+            bg_surface.fill((0, 0, 0))
+            self.screen.blit(bg_surface, (bg_rect.x, bg_rect.y))
+            
+            self.screen.blit(temp_surf, (x_pos, y_pos))
         if show_weather_code and self.current_weather:
             weather_surf = self.fonts["weather"].render(self.current_weather, True, self.text_color)
             text_alpha = int(self.config.get('ui_text_alpha', '192'))
             weather_surf.set_alpha(text_alpha)
-            self.screen.blit(weather_surf, (self.screen_w - weather_surf.get_width() - 10, 90))
+            
+            # Draw background
+            padding = 8
+            x_pos = self.screen_w - weather_surf.get_width() - 10
+            y_pos = 90
+            bg_rect = pygame.Rect(x_pos - padding, y_pos - padding // 2, 
+                                 weather_surf.get_width() + (padding * 2), 
+                                 weather_surf.get_height() + padding)
+            bg_surface = pygame.Surface((bg_rect.width, bg_rect.height))
+            bg_surface.set_alpha(100)
+            bg_surface.fill((0, 0, 0))
+            self.screen.blit(bg_surface, (bg_rect.x, bg_rect.y))
+            
+            self.screen.blit(weather_surf, (x_pos, y_pos))
         
         # caption overlay
         show_caption = self.config.get('show_caption', 'true').lower() == 'true'
@@ -903,9 +953,11 @@ class Slideshow:
                     lines = lines[:3]
                     lines[2] = lines[2][:57] + "..."
                 
-                # Render each line
-                line_height = 55
-                start_y = self.screen_h - (len(lines) * line_height) - 20  # Bottom of screen with padding
+                # Render each line  
+                line_height = 45  # Reduced from 55 for tighter line spacing
+                # Position caption extremely close to bottom edge
+                # Very minimal padding (5px) - caption sits just above filename
+                start_y = self.screen_h - (len(lines) * line_height) - 5
                 
                 for i, line in enumerate(lines):
                     caption_surf = self.fonts["caption"].render(line, True, self.text_color)
@@ -914,6 +966,22 @@ class Slideshow:
                     # Center horizontally
                     x_pos = (self.screen_w - caption_surf.get_width()) // 2
                     y_pos = start_y + (i * line_height)
+                    
+                    # Draw semi-transparent dark background behind text for better readability
+                    padding = 10  # Padding around text
+                    bg_rect = pygame.Rect(
+                        x_pos - padding,
+                        y_pos - padding // 2,
+                        caption_surf.get_width() + (padding * 2),
+                        caption_surf.get_height() + padding
+                    )
+                    # Create semi-transparent surface for background
+                    bg_surface = pygame.Surface((bg_rect.width, bg_rect.height))
+                    bg_surface.set_alpha(100)  # More transparent (0=transparent, 255=opaque)
+                    bg_surface.fill((0, 0, 0))  # Black background
+                    self.screen.blit(bg_surface, (bg_rect.x, bg_rect.y))
+                    
+                    # Draw text on top of background
                     self.screen.blit(caption_surf, (x_pos, y_pos))
 
     def refresh_images(self):
