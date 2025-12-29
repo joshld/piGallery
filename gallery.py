@@ -641,6 +641,7 @@ def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667):
     """
     Scale image to fit screen while maintaining aspect ratio.
     Uses physical display aspect ratio to prevent stretching.
+    Works for any image resolution.
     """
     img_w, img_h = img.get_size()
     img_aspect = img_w / img_h
@@ -651,15 +652,19 @@ def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667):
     else:
         physical_aspect = ar_portrait
     
-    # Calculate physical display width (not screen resolution width)
+    # Calculate physical display width
     physical_width = screen_h * physical_aspect
     
-    # Calculate scale factors for both dimensions
-    scale_by_width = physical_width / img_w
-    scale_by_height = screen_h / img_h
-    
-    # Use the smaller scale to ensure image fits within physical bounds
-    scale = min(scale_by_width, scale_by_height)
+    # Compare image aspect ratio to physical aspect ratio
+    # This determines which dimension will be the limiting factor
+    if img_aspect > physical_aspect:
+        # Image is wider than physical display (relative to their heights)
+        # Scale based on physical width to prevent horizontal stretching
+        scale = physical_width / img_w
+    else:
+        # Image is narrower than or matches physical display (relative to their widths)
+        # Scale based on height to fill vertical space
+        scale = screen_h / img_h
     
     # Calculate new dimensions
     new_w = int(img_w * scale)
