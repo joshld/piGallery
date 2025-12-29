@@ -1273,3 +1273,152 @@ class Slideshow:
 # Routes are now in web.py - import and initialize it
 import web
 
+
+# ---------------- Main ----------------
+def main():
+    parser = argparse.ArgumentParser(description="Fullscreen slideshow")
+    parser.add_argument("--delay", type=int, help="Display time per image in seconds (integer)")
+    parser.add_argument(
+        "--window-size",
+        type=str,
+        help="Window size as WIDTHxHEIGHT, e.g. 1280x720. Default is 1024x768."
+    )
+    parser.add_argument(
+        "--fullscreen",
+        action="store_true",
+        help="Display in fullscreen mode (overrides --window-size if both are set)"
+    )
+    parser.add_argument(
+        "--location-city-suburb",
+        type=str,
+        help="Location for weather lookups (default from config.ini)"
+    )
+    parser.add_argument(
+        "--images-directory",
+        type=str,
+        help="Directory containing images (default from config.ini)"
+    )
+    parser.add_argument(
+        "--display-off-time",
+        type=str,
+        help="Time to turn display off (default from config.ini)"
+    )
+    parser.add_argument(
+        "--display-on-time",
+        type=str,
+        help="Time to turn display on (default from config.ini)"
+    )
+    args = parser.parse_args()
+
+    # Load config values, overridden by command-line args if provided
+    location_city_suburb = args.location_city_suburb or get_config_value("location_city_suburb")
+    images_directory = args.images_directory or get_config_value("images_directory")
+    display_off_time = args.display_off_time or get_config_value("display_off_time")
+    display_on_time = args.display_on_time or get_config_value("display_on_time")
+
+    # Delay
+    if args.delay is not None:
+        display_time_seconds = args.delay
+    else:
+        try:
+            display_time_seconds = get_int_config("delay_seconds", 10)
+        except Exception:
+            display_time_seconds = 10
+
+    # Window size and fullscreen
+    fullscreen = args.fullscreen
+    window_size_str = args.window_size or get_config_value("window_size", "1024x768")
+    fullscreen_config = get_bool_config("fullscreen", True)
+    if not fullscreen:
+        if window_size_str.lower() == "fullscreen":
+            fullscreen = True
+        elif fullscreen_config:
+            fullscreen = True
+
+    if not fullscreen:
+        try:
+            width, height = map(int, window_size_str.lower().split("x"))
+            window_size = (width, height)
+        except Exception:
+            print("Invalid window size format. Use WIDTHxHEIGHT, e.g. 1280x720. Falling back to 1024x768.")
+            window_size = (1024, 768)
+
+    print(f"[Startup] Overriding config: images_directory={images_directory}, "
+          f"delay={display_time_seconds}s, fullscreen={fullscreen}")
+
+    # Pygame setup
+    pygame.init()
+    if fullscreen:
+        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    else:
+        screen = pygame.display.set_mode(window_size)
+    pygame.mouse.set_visible(False)
+
+    # Create config dictionary for Slideshow
+    slideshow_config = {
+        'location_city_suburb': location_city_suburb,
+        'display_off_time': display_off_time,
+        'display_on_time': display_on_time,
+        'show_time': get_config_value('show_time', 'true'),
+        'show_date': get_config_value('show_date', 'true'),
+        'show_temperature': get_config_value('show_temperature', 'true'),
+        'show_weather_code': get_config_value('show_weather_code', 'true'),
+        'show_filename': get_config_value('show_filename', 'true'),
+        'show_caption': get_config_value('show_caption', 'true'),
+        'ui_text_alpha': get_config_value('ui_text_alpha', '192'),
+        'weather_update_seconds': get_config_value('weather_update_seconds', '900'),
+        'display_correction_horizontal': get_config_value('display_correction_horizontal', '1.0'),
+        'display_correction_vertical': get_config_value('display_correction_vertical', '1.0'),
+        'image_history_size': get_config_value('image_history_size', '5'),
+        'shutdown_on_display_off': get_config_value('shutdown_on_display_off', 'true'),
+        'shutdown_countdown_seconds': get_config_value('shutdown_countdown_seconds', '10')
+    }
+
+    # Initialize Telegram notifier
+    global telegram_notifier
+    telegram_notifier = TelegramNotifier(TELEGRAM_CONFIG)
+
+    # Pass config values to Slideshow
+    slideshow = Slideshow(images_directory, screen, display_time_seconds, slideshow_config, telegram_notifier)
+    
+    # Set global reference for web API
+    global slideshow_instance
+    slideshow_instance = slideshow
+    
+    # Send startup notification
+    if telegram_notifier:
+        telegram_notifier.notify_startup()
+    
+    # Initialize web routes
+    web.init_web(app, slideshow_instance, telegram_notifier, CONFIG_PATH, LOG_FILE, logger)
+    
+    # Start web server in background thread
+    web_thread = threading.Thread(target=web.start_web_server, kwargs={'host': '0.0.0.0', 'port': 5000}, daemon=True)
+    web_thread.start()
+    print("[Startup] Web interface available at http://0.0.0.0:5000")
+    
+    # Start system monitoring in background thread (lightweight, works without psutil)
+    if telegram_notifier:
+        monitor_thread = threading.Thread(
+            target=monitor_system_resources, 
+            args=(telegram_notifier,),
+            kwargs={'check_interval': 120},  # Check every 2 minutes (lighter)
+            daemon=True
+        )
+        monitor_thread.start()
+        print("[Startup] System monitoring started (lightweight mode)")
+    
+    # Run slideshow (this blocks)
+    try:
+        slideshow.run()
+    except KeyboardInterrupt:
+        print("\n[Shutdown] Interrupted by user")
+    finally:
+        # Send shutdown notification
+        if telegram_notifier:
+            telegram_notifier.notify_shutdown()
+
+
+if __name__ == "__main__":
+    main()
+
