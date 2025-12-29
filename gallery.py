@@ -644,30 +644,21 @@ def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667):
     """
     img_w, img_h = img.get_size()
     img_aspect = img_w / img_h
-    screen_aspect = screen_w / screen_h  # 1920/1080 = 1.778
-    
-    # Compare image aspect ratio to screen aspect ratio
-    # This determines which dimension will be the limiting factor
+    screen_aspect = screen_w / screen_h
+
     if img_aspect > screen_aspect:
-        # Image is wider than screen (relative to their heights)
-        # Scale based on width to fill screen width
+        # Wider than screen → fit width
         scale = screen_w / img_w
     else:
-        # Image is taller than screen (relative to their widths)
-        # Scale based on height to fill screen height
+        # Taller/narrower → fit height
         scale = screen_h / img_h
-    
-    # Calculate new dimensions
+
     new_w = int(img_w * scale)
     new_h = int(img_h * scale)
-    
-    # Scale the image
     img_scaled = pygame.transform.scale(img, (new_w, new_h))
-    
-    # Center the image on screen
+
     x_offset = (screen_w - new_w) // 2
     y_offset = (screen_h - new_h) // 2
-    
     return img_scaled, x_offset, y_offset, new_w
 
 
