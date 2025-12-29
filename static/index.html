@@ -1823,7 +1823,7 @@
             const themeSelector = document.getElementById('theme-selector');
             if (themeSelector) {
                 const savedTheme = localStorage.getItem('piGallery-theme') || 'default';
-                themeSelector.value = savedTheme;
+                themeSelector.value = savedTheme || 'default';
             }
             try {
                 const response = await fetch('/api/settings');
