@@ -1919,11 +1919,17 @@ def api_shutdown():
                         rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
                         screen.blit(text, rect)
                         pygame.display.flip()
-                        time.sleep(2)
+                        time.sleep(1)  # Brief message, then immediately restore
                     
-                    # Force redraw to show image again
+                    # Force redraw to show image again immediately
                     if slideshow_instance:
                         slideshow_instance.force_redraw = True
+                        # Trigger immediate redraw by drawing now
+                        try:
+                            slideshow_instance.draw_image()
+                            pygame.display.flip()
+                        except:
+                            pass  # If draw fails, force_redraw will handle it on next loop
                     
                     power_action_in_progress = False
                     power_action_cancel_event = None
@@ -2002,11 +2008,17 @@ def api_restart():
                         rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
                         screen.blit(text, rect)
                         pygame.display.flip()
-                        time.sleep(2)
+                        time.sleep(1)  # Brief message, then immediately restore
                     
-                    # Force redraw to show image again
+                    # Force redraw to show image again immediately
                     if slideshow_instance:
                         slideshow_instance.force_redraw = True
+                        # Trigger immediate redraw by drawing now
+                        try:
+                            slideshow_instance.draw_image()
+                            pygame.display.flip()
+                        except:
+                            pass  # If draw fails, force_redraw will handle it on next loop
                     
                     power_action_in_progress = False
                     power_action_cancel_event = None
@@ -2037,13 +2049,18 @@ def api_restart():
 
 @app.route('/api/system/cancel', methods=['POST'])
 def api_cancel_power_action():
-    """Cancel ongoing shutdown or restart"""    
+    """Cancel ongoing shutdown or restart"""
+    global power_action_in_progress, power_action_cancel_event
+    
     if not power_action_in_progress:
         return jsonify({'error': 'No power action in progress'}), 400
     
     if power_action_cancel_event:
         power_action_cancel_event.set()
         print("[Web] Power action cancelled by user")
+        # Note: Don't clear power_action_cancel_event here - let the thread detect and clear it
+        # We can reset the flag now so user can start another action if needed
+        power_action_in_progress = False
         return jsonify({'status': 'ok', 'message': 'Power action cancelled'})
     else:
         return jsonify({'error': 'Cannot cancel at this time'}), 400
