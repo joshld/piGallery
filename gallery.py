@@ -638,21 +638,40 @@ def monitor_system_resources(telegram_notifier, check_interval=120):
 
 
 def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667):
+    """
+    Scale image to fit screen while maintaining aspect ratio.
+    Uses physical display aspect ratio to prevent stretching.
+    """
     img_w, img_h = img.get_size()
-    if img_w >= img_h:
-        scale_factor = screen_h / img_h
-        scaled_width = img_w * scale_factor
-        target_width = scaled_width * (screen_w / screen_h / ar_portrait)
-        new_w = int(min(target_width, screen_w))
-        img_scaled = pygame.transform.scale(img, (new_w, screen_h))
+    img_aspect = img_w / img_h
+    
+    # Determine which physical aspect ratio to use based on image orientation
+    if img_aspect >= 1.0:
+        physical_aspect = ar_landscape
     else:
-        scale_factor = screen_h / img_h
-        scaled_width = img_w * scale_factor
-        target_width = scaled_width * (screen_w / screen_h / ar_landscape)
-        new_w = int(min(target_width, screen_w))
-        img_scaled = pygame.transform.scale(img, (new_w, screen_h))
+        physical_aspect = ar_portrait
+    
+    # Calculate physical display width (not screen resolution width)
+    physical_width = screen_h * physical_aspect
+    
+    # Calculate scale factors for both dimensions
+    scale_by_width = physical_width / img_w
+    scale_by_height = screen_h / img_h
+    
+    # Use the smaller scale to ensure image fits within physical bounds
+    scale = min(scale_by_width, scale_by_height)
+    
+    # Calculate new dimensions
+    new_w = int(img_w * scale)
+    new_h = int(img_h * scale)
+    
+    # Scale the image
+    img_scaled = pygame.transform.scale(img, (new_w, new_h))
+    
+    # Center the image on screen
     x_offset = (screen_w - new_w) // 2
-    y_offset = 0
+    y_offset = (screen_h - new_h) // 2
+    
     return img_scaled, x_offset, y_offset, new_w
 
 
