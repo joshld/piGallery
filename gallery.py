@@ -638,21 +638,35 @@ def monitor_system_resources(telegram_notifier, check_interval=120):
 
 
 def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667):
+    """
+    Scale image to fit screen while maintaining aspect ratio.
+    Centers the image on the screen.
+    """
     img_w, img_h = img.get_size()
-    if img_w >= img_h:
-        scale_factor = screen_h / img_h
-        scaled_width = img_w * scale_factor
-        target_width = scaled_width * (screen_w / screen_h / ar_portrait)
-        new_w = int(min(target_width, screen_w))
-        img_scaled = pygame.transform.scale(img, (new_w, screen_h))
+    img_aspect = img_w / img_h
+    screen_aspect = screen_w / screen_h
+    
+    # Calculate scale factor to fit image within screen bounds
+    if img_aspect > screen_aspect:
+        # Image is wider than screen (relative to their heights)
+        # Scale based on width
+        scale = screen_w / img_w
     else:
-        scale_factor = screen_h / img_h
-        scaled_width = img_w * scale_factor
-        target_width = scaled_width * (screen_w / screen_h / ar_landscape)
-        new_w = int(min(target_width, screen_w))
-        img_scaled = pygame.transform.scale(img, (new_w, screen_h))
+        # Image is taller than screen (relative to their widths)
+        # Scale based on height
+        scale = screen_h / img_h
+    
+    # Calculate new dimensions
+    new_w = int(img_w * scale)
+    new_h = int(img_h * scale)
+    
+    # Scale the image
+    img_scaled = pygame.transform.scale(img, (new_w, new_h))
+    
+    # Center the image on screen
     x_offset = (screen_w - new_w) // 2
-    y_offset = 0
+    y_offset = (screen_h - new_h) // 2
+    
     return img_scaled, x_offset, y_offset, new_w
 
 
@@ -836,8 +850,9 @@ class Slideshow:
                 except ValueError:
                     ar_portrait = 0.667  # Fallback if conversion fails
                 img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h, ar_landscape, ar_portrait)
+                new_h = img_scaled.get_height()  # Get actual scaled height
                 self.screen.blit(img_scaled, (x_off, y_off))
-                print(f"[Slideshow] Drawing {self.current_img} scaled to {new_w}x{self.screen_h}")
+                print(f"[Slideshow] Drawing {self.current_img} scaled to {new_w}x{new_h} at offset ({x_off}, {y_off})")
             except pygame.error as e:
                 error_msg = f"Failed to load image {self.current_img}: {e}"
                 print(f"[Error] {error_msg}")
