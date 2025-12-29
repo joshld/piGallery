@@ -1,5 +1,5 @@
 /* Light Theme */
-[data-theme="light"] {
+html[data-theme="light"] {
     --bg-primary: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     --bg-card: #ffffff;
     --bg-input: #ffffff;
@@ -51,7 +51,7 @@
 }
 
 /* Dark Theme */
-[data-theme="dark"] {
+html[data-theme="dark"] {
     --bg-primary: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
     --bg-card: #2d3748;
     --bg-input: #2d3748;
@@ -123,7 +123,7 @@
 }
 
 /* Nord Theme */
-[data-theme="nord"] {
+html[data-theme="nord"] {
     --bg-primary: linear-gradient(135deg, #3b4252 0%, #2e3440 100%);
     --bg-card: #3b4252;
     --bg-input: #434c5e;
@@ -204,7 +204,7 @@
 }
 
 /* Dracula Theme */
-[data-theme="dracula"] {
+html[data-theme="dracula"] {
     --bg-primary: linear-gradient(135deg, #282a36 0%, #1e1f29 100%);
     --bg-card: #282a36;
     --bg-input: #44475a;
@@ -285,7 +285,7 @@
 }
 
 /* Solarized Dark Theme */
-[data-theme="solarized-dark"] {
+html[data-theme="solarized-dark"] {
     --bg-primary: linear-gradient(135deg, #002b36 0%, #001f27 100%);
     --bg-card: #073642;
     --bg-input: #073642;
@@ -366,7 +366,7 @@
 }
 
 /* Solarized Light Theme */
-[data-theme="solarized-light"] {
+html[data-theme="solarized-light"] {
     --bg-primary: linear-gradient(135deg, #fdf6e3 0%, #eee8d5 100%);
     --bg-card: #fdf6e3;
     --bg-input: #fdf6e3;
@@ -447,7 +447,7 @@
 }
 
 /* Gruvbox Theme */
-[data-theme="gruvbox"] {
+html[data-theme="gruvbox"] {
     --bg-primary: linear-gradient(135deg, #282828 0%, #1d2021 100%);
     --bg-card: #3c3836;
     --bg-input: #3c3836;
@@ -528,7 +528,7 @@
 }
 
 /* One Dark Theme */
-[data-theme="one-dark"] {
+html[data-theme="one-dark"] {
     --bg-primary: linear-gradient(135deg, #282c34 0%, #1e2127 100%);
     --bg-card: #353b45;
     --bg-input: #353b45;
@@ -609,7 +609,7 @@
 }
 
 /* Material Dark Theme */
-[data-theme="material-dark"] {
+html[data-theme="material-dark"] {
     --bg-primary: linear-gradient(135deg, #212121 0%, #1a1a1a 100%);
     --bg-card: #303030;
     --bg-input: #424242;
@@ -690,7 +690,7 @@
 }
 
 /* Material Light Theme */
-[data-theme="material-light"] {
+html[data-theme="material-light"] {
     --bg-primary: linear-gradient(135deg, #fafafa 0%, #e0e0e0 100%);
     --bg-card: #ffffff;
     --bg-input: #ffffff;
@@ -771,7 +771,7 @@
 }
 
 /* High Contrast Theme */
-[data-theme="high-contrast"] {
+html[data-theme="high-contrast"] {
     --bg-primary: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
     --bg-card: #000000;
     --bg-input: #000000;
@@ -852,7 +852,7 @@
 }
 
 /* Forest/Green Theme */
-[data-theme="forest"] {
+html[data-theme="forest"] {
     --bg-primary: linear-gradient(135deg, #1b4332 0%, #081c15 100%);
     --bg-card: #2d5016;
     --bg-input: #2d5016;
@@ -933,7 +933,7 @@
 }
 
 /* Ocean/Blue Theme */
-[data-theme="ocean"] {
+html[data-theme="ocean"] {
     --bg-primary: linear-gradient(135deg, #0d47a1 0%, #01579b 100%);
     --bg-card: #1565c0;
     --bg-input: #1565c0;
@@ -1014,7 +1014,7 @@
 }
 
 /* Monochrome Theme */
-[data-theme="monochrome"] {
+html[data-theme="monochrome"] {
     --bg-primary: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
     --bg-card: #3d3d3d;
     --bg-input: #3d3d3d;
@@ -1095,7 +1095,7 @@
 }
 
 /* Monokai Theme */
-[data-theme="monokai"] {
+html[data-theme="monokai"] {
     --bg-primary: linear-gradient(135deg, #272822 0%, #1e1f1a 100%);
     --bg-card: #272822;
     --bg-input: #3e3d32;
@@ -1176,7 +1176,7 @@
 }
 
 /* Flatland Theme */
-[data-theme="flatland"] {
+html[data-theme="flatland"] {
     --bg-primary: linear-gradient(135deg, #2c2c2c 0%, #1f1f1f 100%);
     --bg-card: #2c2c2c;
     --bg-input: #2c2c2c;
@@ -1257,7 +1257,7 @@
 }
 
 /* Catppuccin Mocha Theme */
-[data-theme="catppuccin-mocha"] {
+html[data-theme="catppuccin-mocha"] {
     --bg-primary: linear-gradient(135deg, #1e1e2e 0%, #11111b 100%);
     --bg-card: #313244;
     --bg-input: #45475a;
@@ -1338,7 +1338,7 @@
 }
 
 /* Catppuccin Macchiato Theme */
-[data-theme="catppuccin-macchiato"] {
+html[data-theme="catppuccin-macchiato"] {
     --bg-primary: linear-gradient(135deg, #24273a 0%, #181926 100%);
     --bg-card: #363a4f;
     --bg-input: #494d64;
@@ -1419,7 +1419,7 @@
 }
 
 /* Catppuccin Frappé Theme */
-[data-theme="catppuccin-frappe"] {
+html[data-theme="catppuccin-frappe"] {
     --bg-primary: linear-gradient(135deg, #303446 0%, #232634 100%);
     --bg-card: #414559;
     --bg-input: #51576d;
@@ -1500,7 +1500,7 @@
 }
 
 /* Catppuccin Latte Theme */
-[data-theme="catppuccin-latte"] {
+html[data-theme="catppuccin-latte"] {
     --bg-primary: linear-gradient(135deg, #eff1f5 0%, #dce0e8 100%);
     --bg-card: #ffffff;
     --bg-input: #ffffff;
