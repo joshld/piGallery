@@ -640,7 +640,7 @@ def monitor_system_resources(telegram_notifier, check_interval=120):
 def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667):
     """
     Scale image to fit screen while maintaining aspect ratio.
-    Uses physical display aspect ratio to prevent stretching.
+    Uses physical display aspect ratio to prevent excessive stretching.
     Works for any image resolution.
     """
     img_w, img_h = img.get_size()
@@ -655,16 +655,20 @@ def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667):
     # Calculate physical display width
     physical_width = screen_h * physical_aspect
     
-    # Compare image aspect ratio to physical aspect ratio
-    # This determines which dimension will be the limiting factor
-    if img_aspect > physical_aspect:
-        # Image is wider than physical display (relative to their heights)
-        # Scale based on physical width to prevent horizontal stretching
+    # Calculate scale factors
+    scale_by_screen_width = screen_w / img_w  # Fill screen resolution width
+    scale_by_height = screen_h / img_h
+    
+    # For images that aren't excessively wide, scale to fill screen width
+    # This allows images to fill the display (hardware will stretch appropriately)
+    # Only constrain very wide images to prevent extreme stretching
+    if img_aspect > physical_aspect * 1.3:  # More than 30% wider than physical
+        # Very wide image - constrain to physical width to prevent extreme stretching
         scale = physical_width / img_w
     else:
-        # Image is narrower than or matches physical display (relative to their widths)
-        # Scale based on height to fill vertical space
-        scale = screen_h / img_h
+        # Normal or slightly wide image - scale to fill screen width
+        # Use min to ensure it doesn't exceed height
+        scale = min(scale_by_screen_width, scale_by_height)
     
     # Calculate new dimensions
     new_w = int(img_w * scale)
