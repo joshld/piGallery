@@ -1313,6 +1313,11 @@ def get_logs(lines=200):
 def index():
     return send_from_directory('static', 'index.html')
 
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    """Serve static files"""
+    return send_from_directory('static', filename)
+
 @app.route('/api/status')
 def api_status():
     """Get current slideshow status"""
