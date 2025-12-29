@@ -40,8 +40,8 @@ DEFAULT_CONFIG = {
         "delay_seconds": "10",
         "window_size": "1024x768",
         "fullscreen": "false",
-        "aspect_ratio_landscape": "1.5",
-        "aspect_ratio_portrait": "0.667",
+        "aspect_ratio_landscape": "auto",
+        "aspect_ratio_portrait": "auto",
         "ui_text_alpha": "192",
         "image_history_size": "5",
         "weather_update_seconds": "900",
@@ -674,6 +674,25 @@ class Slideshow:
         self.screen_w, self.screen_h = screen.get_size()
         self.display_time_seconds = display_time_seconds
         self.config = config_dict
+        
+        self.screen_w, self.screen_h = screen.get_size()
+        print(f"[Display] Detected resolution: {self.screen_w}x{self.screen_h}")
+
+        # Calculate optimal aspect ratios based on screen dimensions if not specified
+        screen_aspect = self.screen_w / self.screen_h
+        # Auto-calculate aspect ratios if set to "auto" or if using defaults
+        ar_landscape_config = config_dict.get('aspect_ratio_landscape', 'auto')
+        ar_portrait_config = config_dict.get('aspect_ratio_portrait', 'auto')
+        
+        if ar_landscape_config == 'auto':
+            # For landscape images, use screen aspect ratio as baseline
+            self.config['aspect_ratio_landscape'] = str(screen_aspect)
+            print(f"[Config] Auto-calculated landscape aspect ratio: {screen_aspect:.3f}")
+        
+        if ar_portrait_config == 'auto':
+            # For portrait images, use inverse of screen aspect ratio
+            self.config['aspect_ratio_portrait'] = str(1 / screen_aspect)
+            print(f"[Config] Auto-calculated portrait aspect ratio: {1/screen_aspect:.3f}")
         self.telegram = telegram_notifier
 
         self.images = []
@@ -807,8 +826,15 @@ class Slideshow:
 
             try:
                 img = pygame.image.load(img_path)
-                ar_landscape = float(self.config.get('aspect_ratio_landscape', '1.5'))
-                ar_portrait = float(self.config.get('aspect_ratio_portrait', '0.667'))
+                # Get aspect ratios (should already be calculated if set to "auto")
+                try:
+                    ar_landscape = float(self.config.get('aspect_ratio_landscape', '1.5'))
+                except ValueError:
+                    ar_landscape = 1.5  # Fallback if conversion fails
+                try:
+                    ar_portrait = float(self.config.get('aspect_ratio_portrait', '0.667'))
+                except ValueError:
+                    ar_portrait = 0.667  # Fallback if conversion fails
                 img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h, ar_landscape, ar_portrait)
                 self.screen.blit(img_scaled, (x_off, y_off))
                 print(f"[Slideshow] Drawing {self.current_img} scaled to {new_w}x{self.screen_h}")
@@ -2400,8 +2426,8 @@ def main():
         'show_caption': get_config_value('show_caption', 'true'),
         'ui_text_alpha': get_config_value('ui_text_alpha', '192'),
         'weather_update_seconds': get_config_value('weather_update_seconds', '900'),
-        'aspect_ratio_landscape': get_config_value('aspect_ratio_landscape', '1.5'),
-        'aspect_ratio_portrait': get_config_value('aspect_ratio_portrait', '0.667'),
+        'aspect_ratio_landscape': get_config_value('aspect_ratio_landscape', 'auto'),
+        'aspect_ratio_portrait': get_config_value('aspect_ratio_portrait', 'auto'),
         'image_history_size': get_config_value('image_history_size', '5'),
         'shutdown_on_display_off': get_config_value('shutdown_on_display_off', 'true'),
         'shutdown_countdown_seconds': get_config_value('shutdown_countdown_seconds', '10')
