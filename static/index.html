@@ -879,8 +879,8 @@
                 <div class="status-item">
                     <div class="status-label">⏱️ Next Image In</div>
                     <div class="status-value" id="status-countdown">--s</div>
-                </div>
             </div>
+        </div>
             <div class="image-preview-container">
                 <h3 style="margin-bottom: 15px; color: #667eea; font-size: 1.1em;">📸 Current Image</h3>
                 <div class="current-image-info" id="current-image" style="margin-bottom: 15px; color: #666; font-size: 0.95em;">No image loaded</div>
@@ -1012,32 +1012,32 @@
                 <div class="settings-group">
                     <div class="setting-item">
                         <div class="setting-item-row">
-                            <span>Show Time</span>
-                            <div class="toggle-switch" id="toggle-time" onclick="toggleSetting('show_time', this)"></div>
+                        <span>Show Time</span>
+                        <div class="toggle-switch" id="toggle-time" onclick="toggleSetting('show_time', this)"></div>
                         </div>
                     </div>
                     <div class="setting-item">
                         <div class="setting-item-row">
-                            <span>Show Date</span>
-                            <div class="toggle-switch" id="toggle-date" onclick="toggleSetting('show_date', this)"></div>
+                        <span>Show Date</span>
+                        <div class="toggle-switch" id="toggle-date" onclick="toggleSetting('show_date', this)"></div>
                         </div>
                     </div>
                     <div class="setting-item">
                         <div class="setting-item-row">
-                            <span>Show Temperature</span>
-                            <div class="toggle-switch" id="toggle-temp" onclick="toggleSetting('show_temperature', this)"></div>
+                        <span>Show Temperature</span>
+                        <div class="toggle-switch" id="toggle-temp" onclick="toggleSetting('show_temperature', this)"></div>
                         </div>
                     </div>
                     <div class="setting-item">
                         <div class="setting-item-row">
-                            <span>Show Weather</span>
-                            <div class="toggle-switch" id="toggle-weather" onclick="toggleSetting('show_weather_code', this)"></div>
+                        <span>Show Weather</span>
+                        <div class="toggle-switch" id="toggle-weather" onclick="toggleSetting('show_weather_code', this)"></div>
                         </div>
                     </div>
                     <div class="setting-item">
                         <div class="setting-item-row">
-                            <span>Show Filename</span>
-                            <div class="toggle-switch" id="toggle-filename" onclick="toggleSetting('show_filename', this)"></div>
+                        <span>Show Filename</span>
+                        <div class="toggle-switch" id="toggle-filename" onclick="toggleSetting('show_filename', this)"></div>
                         </div>
                     </div>
                     <div class="setting-item">
@@ -1156,14 +1156,16 @@
                                onchange="updateSetting('ui_text_alpha', this.value)">
                     </div>
                     <div class="setting-item">
-                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Aspect Ratio (Landscape)</label>
-                        <input type="number" id="aspect-landscape" step="0.1" min="0.5" max="3.0" value="1.5" 
-                               onchange="updateSetting('aspect_ratio_landscape', this.value)">
+                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Display Correction (Horizontal)</label>
+                        <input type="number" id="display-correction-horizontal" step="0.01" min="0.5" max="2.0" value="1.0" 
+                               onchange="updateSetting('display_correction_horizontal', this.value)">
+                        <small style="color: #666; font-size: 0.85em;">Compensate for horizontal hardware stretching (default: 1.0)</small>
                     </div>
                     <div class="setting-item">
-                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Aspect Ratio (Portrait)</label>
-                        <input type="number" id="aspect-portrait" step="0.1" min="0.1" max="1.0" value="0.667" 
-                               onchange="updateSetting('aspect_ratio_portrait', this.value)">
+                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Display Correction (Vertical)</label>
+                        <input type="number" id="display-correction-vertical" step="0.01" min="0.5" max="2.0" value="1.0" 
+                               onchange="updateSetting('display_correction_vertical', this.value)">
+                        <small style="color: #666; font-size: 0.85em;">Compensate for vertical hardware stretching (default: 1.0)</small>
                     </div>
                 </div>
             </div>
@@ -1180,7 +1182,7 @@
                 </div>
             </div>
         </div>
-        </div>
+    </div>
 
         <div id="tab-system" class="tab-content">
             <div class="status-bar">
@@ -1640,11 +1642,11 @@
                 if (document.getElementById('ui-text-alpha')) {
                     document.getElementById('ui-text-alpha').value = settings.ui_text_alpha || 192;
                 }
-                if (document.getElementById('aspect-landscape')) {
-                    document.getElementById('aspect-landscape').value = settings.aspect_ratio_landscape || 1.5;
+                if (document.getElementById('display-correction-horizontal')) {
+                    document.getElementById('display-correction-horizontal').value = settings.display_correction_horizontal || 1.0;
                 }
-                if (document.getElementById('aspect-portrait')) {
-                    document.getElementById('aspect-portrait').value = settings.aspect_ratio_portrait || 0.667;
+                if (document.getElementById('display-correction-vertical')) {
+                    document.getElementById('display-correction-vertical').value = settings.display_correction_vertical || 1.0;
                 }
                 if (document.getElementById('weather-update')) {
                     document.getElementById('weather-update').value = settings.weather_update_seconds || 900;
@@ -1697,8 +1699,8 @@
                     location_city_suburb: document.getElementById('location-city')?.value || settings.location_city_suburb,
                     weather_update_seconds: parseInt(document.getElementById('weather-update')?.value || settings.weather_update_seconds),
                     ui_text_alpha: parseInt(document.getElementById('ui-text-alpha')?.value || settings.ui_text_alpha),
-                    aspect_ratio_landscape: parseFloat(document.getElementById('aspect-landscape')?.value || settings.aspect_ratio_landscape),
-                    aspect_ratio_portrait: parseFloat(document.getElementById('aspect-portrait')?.value || settings.aspect_ratio_portrait),
+                    display_correction_horizontal: parseFloat(document.getElementById('display-correction-horizontal')?.value || settings.display_correction_horizontal || 1.0),
+                    display_correction_vertical: parseFloat(document.getElementById('display-correction-vertical')?.value || settings.display_correction_vertical || 1.0),
                     images_directory: document.getElementById('images-directory')?.value || settings.images_directory,
                     upload_directory: document.getElementById('upload-directory')?.value || settings.upload_directory,
                     shutdown_countdown_seconds: parseInt(document.getElementById('shutdown-countdown')?.value || settings.shutdown_countdown_seconds || 10),
@@ -2026,7 +2028,7 @@
             const uploadStatus = document.getElementById('uploadStatus');
             const uploadBtn = document.getElementById('uploadBtn');
             uploadStatus.innerHTML = '';
-            
+
             // Disable upload button during upload
             uploadBtn.disabled = true;
             uploadBtn.textContent = '⏳ Uploading...';
