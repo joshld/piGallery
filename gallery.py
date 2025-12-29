@@ -70,11 +70,30 @@ DEFAULT_CONFIG = {
 
 config = configparser.ConfigParser()
 if not os.path.exists(CONFIG_PATH):
+    # Create new config with all defaults
     config.read_dict(DEFAULT_CONFIG)
     with open(CONFIG_PATH, "w") as f:
         config.write(f)
 else:
+    # Read existing config
     config.read(CONFIG_PATH)
+    
+    # Merge missing keys from defaults (preserve existing values)
+    updated = False
+    for section, keys in DEFAULT_CONFIG.items():
+        if section not in config:
+            config[section] = {}
+        for key, default_value in keys.items():
+            if key not in config[section]:
+                config[section][key] = default_value
+                updated = True
+                print(f"[Config] Adding missing key: [{section}] {key} = {default_value}")
+    
+    # Write back if any keys were added
+    if updated:
+        with open(CONFIG_PATH, "w") as f:
+            config.write(f)
+        print(f"[Config] Updated {CONFIG_PATH} with missing default settings")
 
 GALLERY_CONFIG = config["gallery"] if "gallery" in config else DEFAULT_CONFIG["gallery"]
 TELEGRAM_CONFIG = config["telegram"] if "telegram" in config else DEFAULT_CONFIG["telegram"]
