@@ -638,24 +638,43 @@ def monitor_system_resources(telegram_notifier, check_interval=120):
             time.sleep(check_interval)
 
 
-def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667):
+def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667, correction=1.0):
     """
     Scale image to fit screen while maintaining aspect ratio.
     Compares image aspect to screen aspect to determine scaling.
+    correction: Factor to account for display hardware stretching (baked into calculation).
     """
     img_w, img_h = img.get_size()
     img_aspect = img_w / img_h
-    screen_aspect = screen_w / screen_h
+    
+    # Calculate effective screen width accounting for hardware correction
+    # If hardware stretches by correction factor, we scale to effective_width,
+    # then hardware stretches it back to screen_w
+    effective_screen_w = screen_w / correction if correction != 1.0 else screen_w
+    screen_aspect = effective_screen_w / screen_h
 
     if img_aspect > screen_aspect:
-        # Wider than screen → fit width
-        scale = screen_w / img_w
+        # Wider than effective screen → fit effective width
+        scale = effective_screen_w / img_w
     else:
         # Taller/narrower → fit height
         scale = screen_h / img_h
 
-    new_w = int(img_w * scale)
-    new_h = int(img_h * scale)
+    # Calculate dimensions before correction
+    base_w = int(img_w * scale)
+    base_h = int(img_h * scale)
+    
+    # Apply correction to width (hardware will stretch it)
+    new_w = int(base_w * correction)
+    new_h = base_h
+    
+    # Ensure final width doesn't exceed screen bounds
+    if new_w > screen_w:
+        # Cap width and adjust height proportionally to maintain aspect
+        scale_factor = screen_w / new_w
+        new_w = screen_w
+        new_h = int(new_h * scale_factor)
+    
     img_scaled = pygame.transform.scale(img, (new_w, new_h))
 
     x_offset = (screen_w - new_w) // 2
@@ -842,7 +861,6 @@ class Slideshow:
                     ar_portrait = float(self.config.get('aspect_ratio_portrait', '0.667'))
                 except ValueError:
                     ar_portrait = 0.667  # Fallback if conversion fails
-                img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h, ar_landscape, ar_portrait)
                 
                 # Apply display aspect correction for displays with hardware stretching
                 # This compensates for displays where resolution doesn't match physical aspect ratio
@@ -850,14 +868,8 @@ class Slideshow:
                     correction = float(self.config.get('display_aspect_correction', '1.0'))
                 except (ValueError, TypeError):
                     correction = 1.0
-                
-                if correction != 1.0:
-                    new_h = img_scaled.get_height()
-                    corrected_w = int(new_w * correction)
-                    img_scaled = pygame.transform.scale(img_scaled, (corrected_w, new_h))
-                    new_w = corrected_w
-                    # Recalculate x_offset after width correction
-                    x_off = (self.screen_w - new_w) // 2
+
+                img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h, ar_landscape, ar_portrait, correction)
                 
                 self.screen.blit(img_scaled, (x_off, y_off))
                 print(f"[Slideshow] Drawing {self.current_img} scaled to {new_w}x{img_scaled.get_height()}")
