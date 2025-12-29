@@ -55,8 +55,8 @@
 - [x] Telegram notification before shutdown
 - [x] Default enabled for power savings
 - [x] Documented power-saving options (smart plugs, timers, etc.)
-- [ ] Add shutdown button to web UI (manual shutdown)
-- [ ] Confirmation dialog for manual shutdown
+- [x] Add shutdown button to web UI (manual shutdown)
+- [x] Confirmation dialog for manual shutdown
 
 ### 4. Color Schemes for Web UI
 - [ ] Light mode (current)
@@ -147,7 +147,7 @@
 **Alerts & Warnings:**
 - [x] High CPU usage alert (>80% sustained)
 - [x] Low memory warning (<100 MB free)
-- [ ] Disk space warning (<1 GB free)
+- [x] Disk space warning (<1 GB free)
 - [x] High temperature alert (>80°C)
 - [ ] Memory leak detection (continuous growth)
 - [ ] Swap usage warning
