@@ -279,7 +279,12 @@ def shutdown(timeout_seconds):
                 print(f"Shutting down in {remaining} seconds...")
             time.sleep(1)
         # Requires the script to run with sudo or the user must have shutdown privileges
-        subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
+        # Try Linux shutdown command, catch failure on Windows
+        try:
+            subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # On Windows or if command fails
+            print("[System] Shutdown command not available")
     except subprocess.CalledProcessError as e:
         print(f"Failed to shutdown: {e}")
 
@@ -1946,8 +1951,12 @@ def api_shutdown():
                     print(f"Shutting down in {remaining} seconds...")
                 time.sleep(1)
             
-            # Execute shutdown
-            subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
+            # Execute shutdown - try Linux command, catch failure on Windows
+            try:
+                subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                # On Windows or if command fails
+                print("[System] Shutdown command not available")
         except subprocess.CalledProcessError as e:
             print(f"Failed to shutdown: {e}")
             power_action_in_progress = False
@@ -2035,8 +2044,12 @@ def api_restart():
                     print(f"Restarting in {remaining} seconds...")
                 time.sleep(1)
             
-            # Restart command
-            subprocess.run(["sudo", "reboot"], check=True)
+            # Restart command - try Linux command, catch failure on Windows
+            try:
+                subprocess.run(["sudo", "reboot"], check=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                # On Windows or if command fails
+                print("[System] Restart command not available")
         except subprocess.CalledProcessError as e:
             print(f"Failed to restart: {e}")
             power_action_in_progress = False
