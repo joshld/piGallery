@@ -49,6 +49,7 @@
             --btn-info: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
             --btn-save: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
             --btn-save-saved: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --btn-text: #ffffff;
             
             /* Tab Colors */
             --tab-bg: rgba(255, 255, 255, 0.2);
@@ -388,32 +389,32 @@
 
         .btn-primary {
             background: var(--btn-primary);
-            color: white;
+            color: var(--btn-text);
         }
 
         .btn-success {
             background: var(--btn-success);
-            color: white;
+            color: var(--btn-text);
         }
 
         .btn-danger {
             background: var(--btn-danger);
-            color: white;
+            color: var(--btn-text);
         }
 
         .btn-warning {
             background: var(--btn-warning);
-            color: white;
+            color: var(--btn-text);
         }
 
         .btn-secondary {
             background: var(--btn-secondary);
-            color: white;
+            color: var(--btn-text);
         }
 
         .btn-info {
             background: var(--btn-info);
-            color: white;
+            color: var(--btn-text);
         }
 
         .btn-full {
@@ -850,7 +851,7 @@
             font-size: 1.2em;
             font-weight: 600;
             background: var(--btn-save);
-            color: white;
+            color: var(--btn-text);
             border: none;
             border-radius: 50px;
             cursor: pointer;
@@ -1196,7 +1197,7 @@
                 </div>
                 <button class="btn-primary btn-full" onclick="setDisplay('auto')">🔄 Auto Mode</button>
                 
-                <div style="margin-top: 25px; padding-top: 25px; border-top: 1px solid #eee;"></div>
+                <div style="margin-top: 25px; padding-top: 25px; border-top: 1px solid var(--border-divider);"></div>
                 <h2>⚡ System Power</h2>
                 <small class="text-small" style="display: block; margin-top: 10px; border-radius: 8px; padding: 10px;">
                     ⚠️ Requires sudo privileges. System will countdown before executing.
@@ -1239,7 +1240,7 @@
                 
                 <div id="uploadStatus" style="margin-top: 15px;"></div>
                 
-                <div style="margin-top: 25px; padding-top: 25px; border-top: 1px solid #eee;">
+                <div style="margin-top: 25px; padding-top: 25px; border-top: 1px solid var(--border-divider);">
                     <h3 style="font-size: 1.3em; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid var(--accent-primary);" class="text-accent">📁 Directories</h3>
                     <div class="settings-group">
                         <div class="setting-item">
@@ -1522,7 +1523,7 @@
                 <div style="margin-bottom: 20px;">
                     <label style="display: block; font-weight: 500; margin-bottom: 8px;">Countdown (seconds):</label>
                     <input type="number" id="shutdown-countdown-input" min="0" max="60" value="10" 
-                           style="width: 100%; padding: 8px; border: 2px solid #ddd; border-radius: 8px;">
+                           style="width: 100%; padding: 8px; border: 2px solid var(--input-border); border-radius: 8px; color: var(--input-text); background: var(--bg-input);">
                 </div>
                 <div style="display: flex; gap: 10px;">
                     <button class="btn-danger" style="flex: 1;" onclick="executeShutdown()">Shutdown</button>
@@ -1544,7 +1545,7 @@
                 <div style="margin-bottom: 20px;">
                     <label style="display: block; font-weight: 500; margin-bottom: 8px;">Countdown (seconds):</label>
                     <input type="number" id="restart-countdown-input" min="0" max="60" value="10" 
-                           style="width: 100%; padding: 8px; border: 2px solid #ddd; border-radius: 8px;">
+                           style="width: 100%; padding: 8px; border: 2px solid var(--input-border); border-radius: 8px; color: var(--input-text); background: var(--bg-input);">
                 </div>
                 <div style="display: flex; gap: 10px;">
                     <button class="btn-info" style="flex: 1;" onclick="executeRestart()">Restart</button>
@@ -1674,7 +1675,7 @@
                     
                     // Show current path
                     if (currentBrowsePath) {
-                        html += `<div style="margin-bottom: 15px; padding: 10px; background: #f0f0f0; border-radius: 5px;">`;
+                        html += `<div style="margin-bottom: 15px; padding: 10px; background: var(--bg-secondary); border-radius: 5px; color: var(--text-primary);">`;
                         html += `<strong>Current Path:</strong> ${currentBrowsePath}`;
                         html += `</div>`;
                     }
@@ -1724,7 +1725,7 @@
                     // Select current directory button
                     if (currentBrowsePath) {
                         const escapedPath = currentBrowsePath.replace(/'/g, "\\'").replace(/\\/g, '\\\\');
-                        html += `<div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #667eea;">`;
+                        html += `<div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid var(--accent-border);">`;
                         html += `<button class="btn-success btn-full" onclick="selectDirectory('${escapedPath}')">`;
                         html += `✓ Select This Directory`;
                         html += `</button>`;
@@ -1734,7 +1735,7 @@
                     browserDiv.innerHTML = html;
                 } else {
                     document.getElementById('directoryBrowser').innerHTML = 
-                        `<p style="color: red;">Error: ${data.error}</p>`;
+                        `<p style="color: var(--alert-error-text);">Error: ${data.error}</p>`;
                 }
             } catch (error) {
                 document.getElementById('directoryBrowser').innerHTML = 
@@ -2229,7 +2230,7 @@
                 fileInfoContainer.style.cssText = 'flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;';
                 
                 const fileInfo = document.createElement('span');
-                fileInfo.style.cssText = 'flex: 1; color: #333; font-size: 0.9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; cursor: pointer;';
+                fileInfo.style.cssText = 'flex: 1; color: var(--text-primary); font-size: 0.9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; cursor: pointer;';
                 const fileSize = (file.size / 1024 / 1024).toFixed(2);
                 fileInfo.textContent = `${displayName} (${fileSize} MB)`;
                 fileInfo.title = `Click to rename: ${displayName} (${fileSize} MB)`;
@@ -2241,7 +2242,7 @@
                     // Use current custom name or original base name
                     const currentBaseName = file.customName ? file.customName.substring(0, file.customName.lastIndexOf('.')) : baseName;
                     input.value = currentBaseName;
-                    input.style.cssText = 'flex: 1; padding: 2px 4px; border: 1px solid #667eea; border-radius: 3px; font-size: 0.9em; min-width: 0;';
+                    input.style.cssText = 'flex: 1; padding: 2px 4px; border: 1px solid var(--accent-border); border-radius: 3px; font-size: 0.9em; min-width: 0; color: var(--input-text); background: var(--bg-input);';
                     input.style.width = '100%';
                     
                     const saveRename = () => {
@@ -2296,7 +2297,7 @@
                 
                 const removeBtn = document.createElement('button');
                 removeBtn.textContent = '×';
-                removeBtn.style.cssText = 'background: #dc3545; color: white; border: none; border-radius: 2px; padding: 0; margin: 0; cursor: pointer; font-size: 12px; font-weight: bold; flex-shrink: 0; width: 16px !important; height: 16px !important; min-width: 16px !important; max-width: 16px !important; line-height: 1; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;';
+                removeBtn.style.cssText = 'background: var(--alert-error-border); color: var(--btn-text); border: none; border-radius: 2px; padding: 0; margin: 0; cursor: pointer; font-size: 12px; font-weight: bold; flex-shrink: 0; width: 16px !important; height: 16px !important; min-width: 16px !important; max-width: 16px !important; line-height: 1; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;';
                 removeBtn.title = 'Remove file';
                 removeBtn.onclick = () => {
                     selectedFiles.splice(index, 1);
@@ -2363,7 +2364,7 @@
                     if (response.ok) {
                         const data = await response.json();
                         const captionMsg = caption ? ' with caption' : '';
-                        uploadStatus.innerHTML += `<p style="color: green;">✅ ${file.name} uploaded successfully${captionMsg}!</p>`;
+                        uploadStatus.innerHTML += `<p style="color: var(--alert-success-text);">✅ ${file.name} uploaded successfully${captionMsg}!</p>`;
                         successCount++;
                     } else {
                         const data = await response.json();
