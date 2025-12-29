@@ -42,6 +42,8 @@ DEFAULT_CONFIG = {
         "fullscreen": "false",
         "aspect_ratio_landscape": "auto",
         "aspect_ratio_portrait": "auto",
+        "display_correction_horizontal": "1.0",
+        "display_correction_vertical": "1.0",
         "ui_text_alpha": "192",
         "image_history_size": "5",
         "weather_update_seconds": "900",
@@ -277,7 +279,12 @@ def shutdown(timeout_seconds):
                 print(f"Shutting down in {remaining} seconds...")
             time.sleep(1)
         # Requires the script to run with sudo or the user must have shutdown privileges
-        subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
+        # Try Linux shutdown command, catch failure on Windows
+        try:
+            subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # On Windows or if command fails
+            print("[System] Shutdown command not available")
     except subprocess.CalledProcessError as e:
         print(f"Failed to shutdown: {e}")
 
@@ -637,36 +644,45 @@ def monitor_system_resources(telegram_notifier, check_interval=120):
             time.sleep(check_interval)
 
 
-def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667):
+def scale_image(img, screen_w, screen_h, correction_h=1.0, correction_v=1.0):
     """
     Scale image to fit screen while maintaining aspect ratio.
-    Centers the image on the screen.
+    correction_h: Horizontal correction factor (default 1.0)
+    correction_v: Vertical correction factor (default 1.0)
     """
     img_w, img_h = img.get_size()
     img_aspect = img_w / img_h
-    screen_aspect = screen_w / screen_h
     
-    # Calculate scale factor to fit image within screen bounds
+    # Calculate effective screen dimensions accounting for hardware correction
+    effective_screen_w = screen_w / correction_h if correction_h != 1.0 else screen_w
+    effective_screen_h = screen_h / correction_v if correction_v != 1.0 else screen_h
+    screen_aspect = effective_screen_w / effective_screen_h
+
     if img_aspect > screen_aspect:
-        # Image is wider than screen (relative to their heights)
-        # Scale based on width
-        scale = screen_w / img_w
+        scale = effective_screen_w / img_w
     else:
-        # Image is taller than screen (relative to their widths)
-        # Scale based on height
-        scale = screen_h / img_h
+        scale = effective_screen_h / img_h
+
+    base_w = int(img_w * scale)
+    base_h = int(img_h * scale)
     
-    # Calculate new dimensions
-    new_w = int(img_w * scale)
-    new_h = int(img_h * scale)
+    # Apply corrections
+    new_w = int(base_w * correction_h)
+    new_h = int(base_h * correction_v)
     
-    # Scale the image
+    # Ensure final dimensions don't exceed screen bounds
+    if new_w > screen_w:
+        scale_factor = screen_w / new_w
+        new_w = screen_w
+        new_h = int(new_h * scale_factor)
+    if new_h > screen_h:
+        scale_factor = screen_h / new_h
+        new_h = screen_h
+        new_w = int(new_w * scale_factor)
+    
     img_scaled = pygame.transform.scale(img, (new_w, new_h))
-    
-    # Center the image on screen
     x_offset = (screen_w - new_w) // 2
     y_offset = (screen_h - new_h) // 2
-    
     return img_scaled, x_offset, y_offset, new_w
 
 
@@ -840,19 +856,22 @@ class Slideshow:
 
             try:
                 img = pygame.image.load(img_path)
-                # Get aspect ratios (should already be calculated if set to "auto")
+                # Get display correction factors for displays with hardware stretching
+                # This compensates for displays where resolution doesn't match physical aspect ratio
                 try:
-                    ar_landscape = float(self.config.get('aspect_ratio_landscape', '1.5'))
-                except ValueError:
-                    ar_landscape = 1.5  # Fallback if conversion fails
+                    correction_h = float(self.config.get('display_correction_horizontal', '1.0'))
+                except (ValueError, TypeError):
+                    correction_h = 1.0
+                
                 try:
-                    ar_portrait = float(self.config.get('aspect_ratio_portrait', '0.667'))
-                except ValueError:
-                    ar_portrait = 0.667  # Fallback if conversion fails
-                img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h, ar_landscape, ar_portrait)
-                new_h = img_scaled.get_height()  # Get actual scaled height
+                    correction_v = float(self.config.get('display_correction_vertical', '1.0'))
+                except (ValueError, TypeError):
+                    correction_v = 1.0
+
+                img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h, correction_h, correction_v)
+                
                 self.screen.blit(img_scaled, (x_off, y_off))
-                print(f"[Slideshow] Drawing {self.current_img} scaled to {new_w}x{new_h} at offset ({x_off}, {y_off})")
+                print(f"[Slideshow] Drawing {self.current_img} scaled to {new_w}x{img_scaled.get_height()}")
             except pygame.error as e:
                 error_msg = f"Failed to load image {self.current_img}: {e}"
                 print(f"[Error] {error_msg}")
@@ -1905,11 +1924,17 @@ def api_shutdown():
                         rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
                         screen.blit(text, rect)
                         pygame.display.flip()
-                        time.sleep(2)
+                        time.sleep(1)  # Brief message, then immediately restore
                     
-                    # Force redraw to show image again
+                    # Force redraw to show image again immediately
                     if slideshow_instance:
                         slideshow_instance.force_redraw = True
+                        # Trigger immediate redraw by drawing now
+                        try:
+                            slideshow_instance.draw_image()
+                            pygame.display.flip()
+                        except:
+                            pass  # If draw fails, force_redraw will handle it on next loop
                     
                     power_action_in_progress = False
                     power_action_cancel_event = None
@@ -1926,8 +1951,12 @@ def api_shutdown():
                     print(f"Shutting down in {remaining} seconds...")
                 time.sleep(1)
             
-            # Execute shutdown
-            subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
+            # Execute shutdown - try Linux command, catch failure on Windows
+            try:
+                subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                # On Windows or if command fails
+                print("[System] Shutdown command not available")
         except subprocess.CalledProcessError as e:
             print(f"Failed to shutdown: {e}")
             power_action_in_progress = False
@@ -1988,11 +2017,17 @@ def api_restart():
                         rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
                         screen.blit(text, rect)
                         pygame.display.flip()
-                        time.sleep(2)
+                        time.sleep(1)  # Brief message, then immediately restore
                     
-                    # Force redraw to show image again
+                    # Force redraw to show image again immediately
                     if slideshow_instance:
                         slideshow_instance.force_redraw = True
+                        # Trigger immediate redraw by drawing now
+                        try:
+                            slideshow_instance.draw_image()
+                            pygame.display.flip()
+                        except:
+                            pass  # If draw fails, force_redraw will handle it on next loop
                     
                     power_action_in_progress = False
                     power_action_cancel_event = None
@@ -2009,8 +2044,12 @@ def api_restart():
                     print(f"Restarting in {remaining} seconds...")
                 time.sleep(1)
             
-            # Restart command
-            subprocess.run(["sudo", "reboot"], check=True)
+            # Restart command - try Linux command, catch failure on Windows
+            try:
+                subprocess.run(["sudo", "reboot"], check=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                # On Windows or if command fails
+                print("[System] Restart command not available")
         except subprocess.CalledProcessError as e:
             print(f"Failed to restart: {e}")
             power_action_in_progress = False
@@ -2024,12 +2063,17 @@ def api_restart():
 @app.route('/api/system/cancel', methods=['POST'])
 def api_cancel_power_action():
     """Cancel ongoing shutdown or restart"""
+    global power_action_in_progress
+
     if not power_action_in_progress:
         return jsonify({'error': 'No power action in progress'}), 400
     
     if power_action_cancel_event:
         power_action_cancel_event.set()
         print("[Web] Power action cancelled by user")
+        # Note: Don't clear power_action_cancel_event here - let the thread detect and clear it
+        # We can reset the flag now so user can start another action if needed
+        power_action_in_progress = False
         return jsonify({'status': 'ok', 'message': 'Power action cancelled'})
     else:
         return jsonify({'error': 'Cannot cancel at this time'}), 400
@@ -2146,6 +2190,8 @@ def api_settings():
             'location_city_suburb': slideshow_instance.config.get('location_city_suburb', 'Sydney, Australia'),
             'aspect_ratio_landscape': slideshow_instance.config.get('aspect_ratio_landscape', '1.5'),
             'aspect_ratio_portrait': slideshow_instance.config.get('aspect_ratio_portrait', '0.667'),
+            'display_correction_horizontal': slideshow_instance.config.get('display_correction_horizontal', '1.0'),
+            'display_correction_vertical': slideshow_instance.config.get('display_correction_vertical', '1.0'),
             'ui_text_alpha': slideshow_instance.config.get('ui_text_alpha', '192'),
             'weather_update_seconds': slideshow_instance.config.get('weather_update_seconds', '900'),
             'upload_directory': slideshow_instance.config.get('upload_directory', ''),
@@ -2240,6 +2286,22 @@ def api_settings():
             slideshow_instance.config['aspect_ratio_portrait'] = new_val
             if telegram_notifier and old_val != new_val:
                 telegram_notifier.notify_settings_change('aspect_ratio_portrait', old_val, new_val)
+        if 'display_correction_horizontal' in data:
+            old_val = slideshow_instance.config.get('display_correction_horizontal', '1.0')
+            new_val = str(data['display_correction_horizontal'])
+            slideshow_instance.config['display_correction_horizontal'] = new_val
+            # Force redraw when correction changes
+            slideshow_instance.force_redraw = True
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('display_correction_horizontal', old_val, new_val)
+        if 'display_correction_vertical' in data:
+            old_val = slideshow_instance.config.get('display_correction_vertical', '1.0')
+            new_val = str(data['display_correction_vertical'])
+            slideshow_instance.config['display_correction_vertical'] = new_val
+            # Force redraw when correction changes
+            slideshow_instance.force_redraw = True
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('display_correction_vertical', old_val, new_val)
         if 'ui_text_alpha' in data:
             old_val = slideshow_instance.config.get('ui_text_alpha', '192')
             new_val = str(int(data['ui_text_alpha']))
@@ -2298,9 +2360,9 @@ def api_settings():
         # Force a redraw to apply settings immediately
         slideshow_instance.force_redraw = True
 
-        # If aspect ratios changed, need to reload current image
-        if 'aspect_ratio_landscape' in data or 'aspect_ratio_portrait' in data:
-            # Clear cached image so it reloads with new aspect ratios
+        # If display correction changed, need to reload current image
+        if 'display_correction_horizontal' in data or 'display_correction_vertical' in data:
+            # Clear cached image so it reloads with new scaling
             if hasattr(slideshow_instance, '_cached_image_name'):
                 slideshow_instance._cached_image_name = None
         
@@ -2441,6 +2503,8 @@ def main():
         'weather_update_seconds': get_config_value('weather_update_seconds', '900'),
         'aspect_ratio_landscape': get_config_value('aspect_ratio_landscape', 'auto'),
         'aspect_ratio_portrait': get_config_value('aspect_ratio_portrait', 'auto'),
+        'display_correction_horizontal': get_config_value('display_correction_horizontal', '1.0'),
+        'display_correction_vertical': get_config_value('display_correction_vertical', '1.0'),
         'image_history_size': get_config_value('image_history_size', '5'),
         'shutdown_on_display_off': get_config_value('shutdown_on_display_off', 'true'),
         'shutdown_countdown_seconds': get_config_value('shutdown_countdown_seconds', '10')
