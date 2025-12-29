@@ -663,6 +663,8 @@ CORS(app)
 # Global reference to slideshow instance (set in main)
 slideshow_instance = None
 telegram_notifier = None
+power_action_in_progress = False  # Prevent multiple shutdown/restart requests
+power_action_cancel_event = None  # Event to cancel ongoing power action
 
 
 # ---------------- Slideshow Class ----------------
@@ -1143,14 +1145,21 @@ class Slideshow:
         
         while True:
             display_should_be_on = self.is_display_on()
-            if display_should_be_on:
-                self.set_display_power(True)
-                
-                # Check if we need to force a redraw (settings changed)
-                if self.force_redraw:
+            
+            # Check if we need to force a redraw (settings changed) without advancing image
+            if self.force_redraw:
+                if display_should_be_on:
+                    self.set_display_power(True)
                     self.draw_image()
                     pygame.display.flip()
-                    self.force_redraw = False
+                else:
+                    self.draw_blank_screen()
+                    pygame.display.flip()
+                    self.set_display_power(False)
+                self.force_redraw = False
+                # Continue to wait loop without advancing image
+            elif display_should_be_on:
+                self.set_display_power(True)
 
                 # Only advance if not paused
                 if not self.paused:
@@ -1170,8 +1179,10 @@ class Slideshow:
                 self.set_display_power(False)
                 
                 # Optional automatic shutdown if configured
+                # ONLY trigger automatic shutdown if this is a scheduled display off, not manual override
                 shutdown_enabled = self.config.get('shutdown_on_display_off', 'false').lower() == 'true'
-                if shutdown_enabled:
+                is_scheduled_off = self.manual_display_override is None  # None means automatic, not manual
+                if shutdown_enabled and is_scheduled_off:
                     countdown_seconds = int(self.config.get('shutdown_countdown_seconds', '10'))
                     # Notify via Telegram before shutting down
                     if self.telegram:
@@ -1186,10 +1197,9 @@ class Slideshow:
             start_time = time.time()
             while time.time() - start_time < self.display_time_seconds:
                 # Check for forced redraw during wait (for settings changes)
-                if self.force_redraw and display_should_be_on:
-                    self.draw_image()
-                    pygame.display.flip()
-                    self.force_redraw = False
+                if self.force_redraw:
+                    # Break out of delay loop to immediately process display state change
+                    break
 
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
@@ -1798,8 +1808,192 @@ def api_display():
     else:
         return jsonify({'error': 'Invalid action'}), 400
     
+    # Force immediate redraw to apply display changes
+    slideshow_instance.force_redraw = True
+    
     print(f"[Web] Display set to: {action}")
     return jsonify({'status': 'ok', 'action': action})
+
+@app.route('/api/system/shutdown', methods=['POST'])
+def api_shutdown():
+    """Shutdown the system"""
+    global power_action_in_progress, power_action_cancel_event
+    
+    # Check if a power action is already in progress
+    if power_action_in_progress:
+        return jsonify({'error': 'A shutdown or restart is already in progress'}), 409
+    
+    data = request.json or {}
+    countdown = int(data.get('countdown', 10))
+    
+    print(f"[Web] Shutdown requested with {countdown}s countdown")
+    
+    # Set flag to prevent multiple requests
+    power_action_in_progress = True
+    
+    # Create cancel event
+    import threading
+    power_action_cancel_event = threading.Event()
+    
+    # Send notification if telegram is enabled
+    if telegram_notifier:
+        telegram_notifier.notify_system_alert(
+            'shutdown',
+            f'Manual shutdown initiated from web UI (countdown: {countdown}s)'
+        )
+    
+    # Start shutdown in a separate thread to allow response to be sent
+    def do_shutdown():
+        global power_action_in_progress, power_action_cancel_event
+        import time
+        time.sleep(0.5)  # Give time for response to be sent
+        
+        try:
+            if pygame.get_init():
+                screen = pygame.display.get_surface()
+            print(f"[System] Shutdown initiated, countdown={countdown}s")
+            
+            # Countdown with cancel check
+            for remaining in range(countdown, 0, -1):
+                if power_action_cancel_event and power_action_cancel_event.is_set():
+                    print("[System] Shutdown cancelled")
+                    if screen:
+                        screen.fill((0, 0, 0))
+                        font = pygame.font.SysFont(None, 48)
+                        text = font.render("Shutdown cancelled", True, (255, 255, 255))
+                        rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
+                        screen.blit(text, rect)
+                        pygame.display.flip()
+                        time.sleep(2)
+                    
+                    # Force redraw to show image again
+                    if slideshow_instance:
+                        slideshow_instance.force_redraw = True
+                    
+                    power_action_in_progress = False
+                    power_action_cancel_event = None
+                    return
+                
+                if screen:
+                    screen.fill((0, 0, 0))
+                    font = pygame.font.SysFont(None, 48)
+                    text = font.render(f"Shutting down in {remaining} seconds...", True, (255, 255, 255))
+                    rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
+                    screen.blit(text, rect)
+                    pygame.display.flip()
+                else:
+                    print(f"Shutting down in {remaining} seconds...")
+                time.sleep(1)
+            
+            # Execute shutdown
+            subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to shutdown: {e}")
+            power_action_in_progress = False
+            power_action_cancel_event = None
+    
+    thread = threading.Thread(target=do_shutdown, daemon=True)
+    thread.start()
+    
+    return jsonify({'status': 'ok', 'message': f'Shutdown initiated with {countdown}s countdown'})
+
+@app.route('/api/system/restart', methods=['POST'])
+def api_restart():
+    """Restart the system"""
+    global power_action_in_progress, power_action_cancel_event
+    
+    # Check if a power action is already in progress
+    if power_action_in_progress:
+        return jsonify({'error': 'A shutdown or restart is already in progress'}), 409
+    
+    data = request.json or {}
+    countdown = int(data.get('countdown', 10))
+    
+    print(f"[Web] Restart requested with {countdown}s countdown")
+    
+    # Set flag to prevent multiple requests
+    power_action_in_progress = True
+    
+    # Create cancel event
+    import threading
+    power_action_cancel_event = threading.Event()
+    
+    # Send notification if telegram is enabled
+    if telegram_notifier:
+        telegram_notifier.notify_system_alert(
+            'restart',
+            f'Manual restart initiated from web UI (countdown: {countdown}s)'
+        )
+    
+    # Start restart in a separate thread
+    def do_restart():
+        global power_action_in_progress, power_action_cancel_event
+        import time
+        time.sleep(0.5)  # Give time for response to be sent
+        
+        try:
+            if pygame.get_init():
+                screen = pygame.display.get_surface()
+            print(f"[System] Restart initiated, countdown={countdown}s")
+            
+            # Countdown with cancel check
+            for remaining in range(countdown, 0, -1):
+                if power_action_cancel_event and power_action_cancel_event.is_set():
+                    print("[System] Restart cancelled")
+                    if screen:
+                        screen.fill((0, 0, 0))
+                        font = pygame.font.SysFont(None, 48)
+                        text = font.render("Restart cancelled", True, (255, 255, 255))
+                        rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
+                        screen.blit(text, rect)
+                        pygame.display.flip()
+                        time.sleep(2)
+                    
+                    # Force redraw to show image again
+                    if slideshow_instance:
+                        slideshow_instance.force_redraw = True
+                    
+                    power_action_in_progress = False
+                    power_action_cancel_event = None
+                    return
+                
+                if screen:
+                    screen.fill((0, 0, 0))
+                    font = pygame.font.SysFont(None, 48)
+                    text = font.render(f"Restarting in {remaining} seconds...", True, (255, 255, 255))
+                    rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
+                    screen.blit(text, rect)
+                    pygame.display.flip()
+                else:
+                    print(f"Restarting in {remaining} seconds...")
+                time.sleep(1)
+            
+            # Restart command
+            subprocess.run(["sudo", "reboot"], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to restart: {e}")
+            power_action_in_progress = False
+            power_action_cancel_event = None
+    
+    thread = threading.Thread(target=do_restart, daemon=True)
+    thread.start()
+    
+    return jsonify({'status': 'ok', 'message': f'Restart initiated with {countdown}s countdown'})
+
+@app.route('/api/system/cancel', methods=['POST'])
+def api_cancel_power_action():
+    """Cancel ongoing shutdown or restart"""
+    global power_action_in_progress, power_action_cancel_event
+    
+    if not power_action_in_progress:
+        return jsonify({'error': 'No power action in progress'}), 400
+    
+    if power_action_cancel_event:
+        power_action_cancel_event.set()
+        print("[Web] Power action cancelled by user")
+        return jsonify({'status': 'ok', 'message': 'Power action cancelled'})
+    else:
+        return jsonify({'error': 'Cannot cancel at this time'}), 400
 
 @app.route('/api/upload', methods=['POST'])
 def api_upload():

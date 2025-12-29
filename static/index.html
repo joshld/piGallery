@@ -194,6 +194,11 @@
             color: white;
         }
 
+        .btn-info {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+        }
+
         .btn-full {
             width: 100%;
         }
@@ -919,9 +924,25 @@
                 <h2>💡 Display Control</h2>
                 <div class="button-group">
                     <button class="btn-success" onclick="setDisplay('on')">Turn On</button>
-                    <button class="btn-danger" onclick="setDisplay('off')">Turn Off</button>
+                    <button class="btn-secondary" onclick="setDisplay('off')">Turn Off</button>
                 </div>
                 <button class="btn-primary btn-full" onclick="setDisplay('auto')">🔄 Auto Mode</button>
+                
+                <div style="margin-top: 25px; padding-top: 25px; border-top: 1px solid #eee;"></div>
+                <h2>⚡ System Power</h2>
+                <small style="display: block; color: #666; margin-top: 10px; border-radius: 8px; padding: 10px; font-size: 0.85em;">
+                    ⚠️ Requires sudo privileges. System will countdown before executing.
+                </small>
+                <div class="button-group" id="power-buttons-container">
+                    <button class="btn-danger" onclick="confirmShutdown()">🔴 Shutdown</button>
+                    <button class="btn-info" onclick="confirmRestart()">🔄 Restart</button>
+                </div>
+                <div id="power-action-status" style="display: none; margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; color: #856404;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span id="power-action-message">⏳ Power action in progress...</span>
+                        <button class="btn-secondary" style="padding: 6px 15px; font-size: 0.9em;" onclick="cancelPowerAction()">❌ Cancel</button>
+                    </div>
+                </div>
             </div>
 
             <div class="control-card">
@@ -1205,6 +1226,51 @@
                     Loading logs...
                 </div>
             </div>
+
+        </div>
+    </div>
+
+    <!-- Shutdown Confirmation Modal -->
+    <div id="shutdownModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚠️ Confirm Shutdown</h2>
+                <span class="close" onclick="closeShutdownModal()">&times;</span>
+            </div>
+            <div style="padding: 20px;">
+                <p style="margin-bottom: 20px;">Are you sure you want to shutdown the system?</p>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-weight: 500; margin-bottom: 8px;">Countdown (seconds):</label>
+                    <input type="number" id="shutdown-countdown-input" min="0" max="60" value="10" 
+                           style="width: 100%; padding: 8px; border: 2px solid #ddd; border-radius: 8px;">
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-danger" style="flex: 1;" onclick="executeShutdown()">Shutdown</button>
+                    <button class="btn-secondary" style="flex: 1;" onclick="closeShutdownModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restart Confirmation Modal -->
+    <div id="restartModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔄 Confirm Restart</h2>
+                <span class="close" onclick="closeRestartModal()">&times;</span>
+            </div>
+            <div style="padding: 20px;">
+                <p style="margin-bottom: 20px;">Are you sure you want to restart the system?</p>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-weight: 500; margin-bottom: 8px;">Countdown (seconds):</label>
+                    <input type="number" id="restart-countdown-input" min="0" max="60" value="10" 
+                           style="width: 100%; padding: 8px; border: 2px solid #ddd; border-radius: 8px;">
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-info" style="flex: 1;" onclick="executeRestart()">Restart</button>
+                    <button class="btn-secondary" style="flex: 1;" onclick="closeRestartModal()">Cancel</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1221,6 +1287,11 @@
         let countdownInterval = null;
         let lastKnownTimeRemaining = 0;
         let lastUpdateTime = Date.now();
+        
+        // Power action countdown
+        let powerActionCountdownInterval = null;
+        let powerActionEndTime = null;
+        let powerActionCompleteTimeout = null;
 
         document.addEventListener('DOMContentLoaded', function() {
             updateStatus();
@@ -2059,8 +2130,201 @@
                 if (modal.style.display === 'block') {
                     modal.style.display = 'none';
                 }
+                // Close power management modals too
+                const shutdownModal = document.getElementById('shutdownModal');
+                const restartModal = document.getElementById('restartModal');
+                if (shutdownModal && shutdownModal.style.display === 'block') {
+                    closeShutdownModal();
+                }
+                if (restartModal && restartModal.style.display === 'block') {
+                    closeRestartModal();
+                }
             }
         });
+
+        // Shutdown modal functions
+        function confirmShutdown() {
+            document.getElementById('shutdownModal').style.display = 'block';
+        }
+
+        function closeShutdownModal() {
+            document.getElementById('shutdownModal').style.display = 'none';
+        }
+
+        async function executeShutdown() {
+            const countdown = parseInt(document.getElementById('shutdown-countdown-input').value) || 10;
+            
+            try {
+                const response = await fetch('/api/system/shutdown', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ countdown: countdown })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    closeShutdownModal();
+                    showAlert(`System shutting down in ${countdown} seconds...`, 'success');
+                    
+                    // Start countdown timer
+                    startPowerActionCountdown(countdown, 'Shutting down');
+                    
+                    // Hide cancel button after countdown
+                    powerActionCompleteTimeout = setTimeout(() => {
+                        stopPowerActionCountdown();
+                        hidePowerActionStatus();
+                        showAlert('System shutdown initiated. Connection will be lost.', 'error');
+                        powerActionCompleteTimeout = null;
+                    }, countdown * 1000);
+                } else if (response.status === 409) {
+                    // Power action already in progress
+                    const error = await response.json();
+                    closeShutdownModal();
+                    showAlert(error.error || 'A power action is already in progress', 'error');
+                } else {
+                    const error = await response.json();
+                    showAlert('Shutdown failed: ' + (error.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showAlert('Error initiating shutdown: ' + error.message, 'error');
+            }
+        }
+
+        // Restart modal functions
+        function confirmRestart() {
+            document.getElementById('restartModal').style.display = 'block';
+        }
+
+        function closeRestartModal() {
+            document.getElementById('restartModal').style.display = 'none';
+        }
+
+        async function executeRestart() {
+            const countdown = parseInt(document.getElementById('restart-countdown-input').value) || 10;
+            
+            try {
+                const response = await fetch('/api/system/restart', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ countdown: countdown })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    closeRestartModal();
+                    showAlert(`System restarting in ${countdown} seconds...`, 'success');
+                    
+                    // Start countdown timer
+                    startPowerActionCountdown(countdown, 'Restarting');
+                    
+                    // Hide cancel button and show reconnection message
+                    powerActionCompleteTimeout = setTimeout(() => {
+                        stopPowerActionCountdown();
+                        hidePowerActionStatus();
+                        showAlert('System restarting. Page will reload when system comes back online.', 'error');
+                        
+                        // Try to reconnect after estimated restart time (30 seconds boot time)
+                        const reconnectTime = 30 * 1000;
+                        setTimeout(() => {
+                            location.reload();
+                        }, reconnectTime);
+                        powerActionCompleteTimeout = null;
+                    }, countdown * 1000);
+                } else if (response.status === 409) {
+                    // Power action already in progress
+                    const error = await response.json();
+                    closeRestartModal();
+                    showAlert(error.error || 'A power action is already in progress', 'error');
+                } else {
+                    const error = await response.json();
+                    showAlert('Restart failed: ' + (error.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showAlert('Error initiating restart: ' + error.message, 'error');
+            }
+        }
+
+        // Close modals when clicking outside
+        window.addEventListener('click', function(event) {
+            const shutdownModal = document.getElementById('shutdownModal');
+            const restartModal = document.getElementById('restartModal');
+            if (event.target === shutdownModal) {
+                closeShutdownModal();
+            }
+            if (event.target === restartModal) {
+                closeRestartModal();
+            }
+        });
+
+        // Power action status functions
+        function showPowerActionStatus(message) {
+            const statusDiv = document.getElementById('power-action-status');
+            const messageSpan = document.getElementById('power-action-message');
+            messageSpan.textContent = message;
+            statusDiv.style.display = 'block';
+        }
+
+        function hidePowerActionStatus() {
+            const statusDiv = document.getElementById('power-action-status');
+            statusDiv.style.display = 'none';
+        }
+
+        function startPowerActionCountdown(seconds, actionName) {
+            // Set end time
+            powerActionEndTime = Date.now() + (seconds * 1000);
+            
+            // Initial display
+            updatePowerActionCountdown(actionName);
+            
+            // Update every second
+            powerActionCountdownInterval = setInterval(() => {
+                updatePowerActionCountdown(actionName);
+            }, 1000);
+        }
+
+        function updatePowerActionCountdown(actionName) {
+            if (!powerActionEndTime) return;
+            
+            const remaining = Math.max(0, Math.ceil((powerActionEndTime - Date.now()) / 1000));
+            
+            if (remaining > 0) {
+                showPowerActionStatus(`⏳ ${actionName} in ${remaining} second${remaining !== 1 ? 's' : ''}...`);
+            } else {
+                showPowerActionStatus(`⏳ ${actionName} now...`);
+            }
+        }
+
+        function stopPowerActionCountdown() {
+            if (powerActionCountdownInterval) {
+                clearInterval(powerActionCountdownInterval);
+                powerActionCountdownInterval = null;
+            }
+            if (powerActionCompleteTimeout) {
+                clearTimeout(powerActionCompleteTimeout);
+                powerActionCompleteTimeout = null;
+            }
+            powerActionEndTime = null;
+        }
+
+        async function cancelPowerAction() {
+            try {
+                const response = await fetch('/api/system/cancel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    stopPowerActionCountdown();
+                    hidePowerActionStatus();
+                    showAlert('Power action cancelled successfully', 'success');
+                } else {
+                    const error = await response.json();
+                    showAlert('Cancel failed: ' + (error.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showAlert('Error cancelling power action: ' + error.message, 'error');
+            }
+        }
     </script>
 </body>
 </html>
