@@ -40,8 +40,6 @@ DEFAULT_CONFIG = {
         "delay_seconds": "10",
         "window_size": "1024x768",
         "fullscreen": "false",
-        "aspect_ratio_landscape": "auto",
-        "aspect_ratio_portrait": "auto",
         "display_correction_horizontal": "1.0",
         "display_correction_vertical": "1.0",
         "ui_text_alpha": "192",
@@ -710,19 +708,7 @@ class Slideshow:
 
         # Calculate optimal aspect ratios based on screen dimensions if not specified
         screen_aspect = self.screen_w / self.screen_h
-        # Auto-calculate aspect ratios if set to "auto" or if using defaults
-        ar_landscape_config = config_dict.get('aspect_ratio_landscape', 'auto')
-        ar_portrait_config = config_dict.get('aspect_ratio_portrait', 'auto')
-        
-        if ar_landscape_config == 'auto':
-            # For landscape images, use screen aspect ratio as baseline
-            self.config['aspect_ratio_landscape'] = str(screen_aspect)
-            print(f"[Config] Auto-calculated landscape aspect ratio: {screen_aspect:.3f}")
-        
-        if ar_portrait_config == 'auto':
-            # For portrait images, use inverse of screen aspect ratio
-            self.config['aspect_ratio_portrait'] = str(1 / screen_aspect)
-            print(f"[Config] Auto-calculated portrait aspect ratio: {1/screen_aspect:.3f}")
+
         self.telegram = telegram_notifier
 
         self.images = []
@@ -2188,8 +2174,6 @@ def api_settings():
             'display_off_time': slideshow_instance.config.get('display_off_time', '23:00'),
             'display_on_time': slideshow_instance.config.get('display_on_time', '05:00'),
             'location_city_suburb': slideshow_instance.config.get('location_city_suburb', 'Sydney, Australia'),
-            'aspect_ratio_landscape': slideshow_instance.config.get('aspect_ratio_landscape', '1.5'),
-            'aspect_ratio_portrait': slideshow_instance.config.get('aspect_ratio_portrait', '0.667'),
             'display_correction_horizontal': slideshow_instance.config.get('display_correction_horizontal', '1.0'),
             'display_correction_vertical': slideshow_instance.config.get('display_correction_vertical', '1.0'),
             'ui_text_alpha': slideshow_instance.config.get('ui_text_alpha', '192'),
@@ -2274,18 +2258,6 @@ def api_settings():
                 print(f"[Web] Updated location to {new_val}: lat={lat}, lon={lon}")
             if telegram_notifier and old_val != new_val:
                 telegram_notifier.notify_settings_change('location_city_suburb', old_val, new_val)
-        if 'aspect_ratio_landscape' in data:
-            old_val = slideshow_instance.config.get('aspect_ratio_landscape', '1.5')
-            new_val = str(data['aspect_ratio_landscape'])
-            slideshow_instance.config['aspect_ratio_landscape'] = new_val
-            if telegram_notifier and old_val != new_val:
-                telegram_notifier.notify_settings_change('aspect_ratio_landscape', old_val, new_val)
-        if 'aspect_ratio_portrait' in data:
-            old_val = slideshow_instance.config.get('aspect_ratio_portrait', '0.667')
-            new_val = str(data['aspect_ratio_portrait'])
-            slideshow_instance.config['aspect_ratio_portrait'] = new_val
-            if telegram_notifier and old_val != new_val:
-                telegram_notifier.notify_settings_change('aspect_ratio_portrait', old_val, new_val)
         if 'display_correction_horizontal' in data:
             old_val = slideshow_instance.config.get('display_correction_horizontal', '1.0')
             new_val = str(data['display_correction_horizontal'])
@@ -2379,7 +2351,7 @@ def api_settings():
             # Update config file
             for key in ['show_time', 'show_date', 'show_temperature', 'show_weather_code', 
                        'show_filename', 'show_caption', 'display_off_time', 'display_on_time',
-                       'location_city_suburb', 'aspect_ratio_landscape', 'aspect_ratio_portrait',
+                       'location_city_suburb', 'display_correction_horizontal', 'display_correction_vertical',
                        'ui_text_alpha', 'weather_update_seconds', 'upload_directory', 'images_directory',
                        'shutdown_on_display_off', 'shutdown_countdown_seconds']:
                 if key in data:
@@ -2501,8 +2473,6 @@ def main():
         'show_caption': get_config_value('show_caption', 'true'),
         'ui_text_alpha': get_config_value('ui_text_alpha', '192'),
         'weather_update_seconds': get_config_value('weather_update_seconds', '900'),
-        'aspect_ratio_landscape': get_config_value('aspect_ratio_landscape', 'auto'),
-        'aspect_ratio_portrait': get_config_value('aspect_ratio_portrait', 'auto'),
         'display_correction_horizontal': get_config_value('display_correction_horizontal', '1.0'),
         'display_correction_vertical': get_config_value('display_correction_vertical', '1.0'),
         'image_history_size': get_config_value('image_history_size', '5'),
