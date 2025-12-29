@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Photo Frame Control</title>
-    <link rel="stylesheet" href="/static/themes.css">
     <style>
         /* CSS Variables - Default Theme (Current Colors) */
         :root {
@@ -100,7 +99,7 @@
             --border-setting: 1px solid #eee;
         }
         
-        /* All theme definitions are loaded from themes.css */
+        /* All theme definitions are loaded from themes.css - loaded after inline styles to ensure they override */
         
         * {
             margin: 0;
@@ -981,6 +980,7 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="/static/themes.css">
 </head>
 <body>
     <div class="container">
