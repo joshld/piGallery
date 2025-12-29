@@ -5,6 +5,223 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Photo Frame Control</title>
     <style>
+        /* CSS Variables - Default Theme (Current Colors) */
+        :root {
+            /* Background */
+            --bg-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --bg-card: #ffffff;
+            --bg-input: #ffffff;
+            --bg-hover: #f8f9ff;
+            --bg-dragover: #f0f0ff;
+            --bg-secondary: #f8f9fa;
+            --bg-tertiary: #e9ecef;
+            --bg-modal: rgba(0,0,0,0.5);
+            --bg-modal-content: #ffffff;
+            --bg-image-modal: rgba(0,0,0,0.9);
+            --bg-log-viewer: #1e1e1e;
+            --bg-directory-item: #f8f9fa;
+            --bg-directory-item-hover: #e9ecef;
+            --bg-toggle: #ccc;
+            --bg-toggle-active: #667eea;
+            
+            /* Text */
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --text-header: #ffffff;
+            --text-log: #d4d4d4;
+            --text-caption: #666666;
+            
+            /* Accent Colors */
+            --accent-primary: #667eea;
+            --accent-secondary: #764ba2;
+            --accent-border: #667eea;
+            --accent-border-hover: #764ba2;
+            
+            /* Status Colors */
+            --status-value: #667eea;
+            
+            /* Button Gradients */
+            --btn-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --btn-success: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            --btn-danger: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+            --btn-warning: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --btn-secondary: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            --btn-info: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            --btn-save: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            --btn-save-saved: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            
+            /* Tab Colors */
+            --tab-bg: rgba(255, 255, 255, 0.2);
+            --tab-bg-hover: rgba(255, 255, 255, 0.3);
+            --tab-bg-active: #ffffff;
+            --tab-text: #ffffff;
+            --tab-text-active: #667eea;
+            --tab-border: rgba(255, 255, 255, 0.3);
+            
+            /* Alert Colors */
+            --alert-success-bg: #d4edda;
+            --alert-success-text: #155724;
+            --alert-success-border: #28a745;
+            --alert-error-bg: #f8d7da;
+            --alert-error-text: #721c24;
+            --alert-error-border: #dc3545;
+            --alert-warning-bg: #fff3cd;
+            --alert-warning-text: #856404;
+            --alert-warning-border: #ffc107;
+            
+            /* Input Colors */
+            --input-border: #dddddd;
+            --input-border-focus: #667eea;
+            --input-text: #333333;
+            
+            /* Modal Colors */
+            --modal-close: #aaaaaa;
+            --modal-close-hover: #000000;
+            --modal-header-border: #667eea;
+            --image-modal-close: #ffffff;
+            --image-modal-close-hover: #667eea;
+            
+            /* Shadows */
+            --shadow-card: 0 10px 30px rgba(0,0,0,0.2);
+            --shadow-button: 0 4px 15px rgba(0,0,0,0.1);
+            --shadow-button-hover: 0 6px 20px rgba(0,0,0,0.2);
+            --shadow-save-button: 0 8px 25px rgba(17, 153, 142, 0.4);
+            --shadow-save-button-hover: 0 12px 35px rgba(17, 153, 142, 0.5);
+            --shadow-modal: 0 10px 30px rgba(0,0,0,0.3);
+            --shadow-image: 0 4px 15px rgba(0,0,0,0.2);
+            --shadow-image-hover: 0 6px 20px rgba(0,0,0,0.3);
+            --shadow-image-modal: 0 8px 32px rgba(0,0,0,0.5);
+            --shadow-alert: 0 8px 25px rgba(0,0,0,0.3);
+            
+            /* Borders */
+            --border-divider: #eeeeee;
+            --border-setting: 1px solid #eee;
+        }
+        
+        /* Light Theme */
+        [data-theme="light"] {
+            --bg-primary: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            --bg-card: #ffffff;
+            --bg-input: #ffffff;
+            --bg-hover: #f0f4ff;
+            --bg-dragover: #e8ecff;
+            --bg-secondary: #f8f9fa;
+            --bg-tertiary: #e9ecef;
+            --bg-modal: rgba(0,0,0,0.3);
+            --bg-modal-content: #ffffff;
+            --bg-image-modal: rgba(0,0,0,0.85);
+            --bg-log-viewer: #f5f5f5;
+            --bg-directory-item: #f8f9fa;
+            --bg-directory-item-hover: #e9ecef;
+            --bg-toggle: #ccc;
+            --bg-toggle-active: #667eea;
+            
+            --text-primary: #1a1a1a;
+            --text-secondary: #555555;
+            --text-header: #2c3e50;
+            --text-log: #2c3e50;
+            --text-caption: #555555;
+            
+            --accent-primary: #667eea;
+            --accent-secondary: #764ba2;
+            --accent-border: #667eea;
+            --accent-border-hover: #764ba2;
+            
+            --status-value: #667eea;
+            
+            --tab-bg: rgba(44, 62, 80, 0.1);
+            --tab-bg-hover: rgba(44, 62, 80, 0.2);
+            --tab-bg-active: #ffffff;
+            --tab-text: #2c3e50;
+            --tab-text-active: #667eea;
+            --tab-border: rgba(44, 62, 80, 0.2);
+            
+            --input-border: #cccccc;
+            --input-border-focus: #667eea;
+            --input-text: #1a1a1a;
+            
+            --modal-close: #888888;
+            --modal-close-hover: #000000;
+            --image-modal-close: #ffffff;
+            --image-modal-close-hover: #667eea;
+            
+            --shadow-card: 0 10px 30px rgba(0,0,0,0.15);
+            --shadow-button: 0 4px 15px rgba(0,0,0,0.08);
+            --shadow-button-hover: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        
+        /* Dark Theme */
+        [data-theme="dark"] {
+            --bg-primary: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            --bg-card: #2d3748;
+            --bg-input: #2d3748;
+            --bg-hover: #3a4556;
+            --bg-dragover: #4a5568;
+            --bg-secondary: #1a202c;
+            --bg-tertiary: #2d3748;
+            --bg-modal: rgba(0,0,0,0.7);
+            --bg-modal-content: #2d3748;
+            --bg-image-modal: rgba(0,0,0,0.95);
+            --bg-log-viewer: #1a1a1a;
+            --bg-directory-item: #2d3748;
+            --bg-directory-item-hover: #3a4556;
+            --bg-toggle: #4a5568;
+            --bg-toggle-active: #667eea;
+            
+            --text-primary: #e2e8f0;
+            --text-secondary: #a0aec0;
+            --text-header: #e2e8f0;
+            --text-log: #d4d4d4;
+            --text-caption: #a0aec0;
+            
+            --accent-primary: #667eea;
+            --accent-secondary: #764ba2;
+            --accent-border: #667eea;
+            --accent-border-hover: #8b9fff;
+            
+            --status-value: #8b9fff;
+            
+            --alert-success-bg: #1e4620;
+            --alert-success-text: #a5d6a7;
+            --alert-success-border: #4caf50;
+            --alert-error-bg: #5c1e1e;
+            --alert-error-text: #ef9a9a;
+            --alert-error-border: #f44336;
+            --alert-warning-bg: #5c4a1e;
+            --alert-warning-text: #fff59d;
+            --alert-warning-border: #ffc107;
+            
+            --tab-bg: rgba(255, 255, 255, 0.1);
+            --tab-bg-hover: rgba(255, 255, 255, 0.2);
+            --tab-bg-active: #2d3748;
+            --tab-text: #e2e8f0;
+            --tab-text-active: #8b9fff;
+            --tab-border: rgba(255, 255, 255, 0.2);
+            
+            --input-border: #4a5568;
+            --input-border-focus: #667eea;
+            --input-text: #e2e8f0;
+            
+            --modal-close: #a0aec0;
+            --modal-close-hover: #e2e8f0;
+            --image-modal-close: #ffffff;
+            --image-modal-close-hover: #8b9fff;
+            
+            --shadow-card: 0 10px 30px rgba(0,0,0,0.4);
+            --shadow-button: 0 4px 15px rgba(0,0,0,0.3);
+            --shadow-button-hover: 0 6px 20px rgba(0,0,0,0.4);
+            --shadow-save-button: 0 8px 25px rgba(17, 153, 142, 0.5);
+            --shadow-save-button-hover: 0 12px 35px rgba(17, 153, 142, 0.6);
+            --shadow-modal: 0 10px 30px rgba(0,0,0,0.5);
+            --shadow-image: 0 4px 15px rgba(0,0,0,0.4);
+            --shadow-image-hover: 0 6px 20px rgba(0,0,0,0.5);
+            --shadow-image-modal: 0 8px 32px rgba(0,0,0,0.7);
+            --shadow-alert: 0 8px 25px rgba(0,0,0,0.5);
+            
+            --border-divider: #4a5568;
+            --border-setting: 1px solid #4a5568;
+        }
+        
         * {
             margin: 0;
             padding: 0;
@@ -13,10 +230,10 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--bg-primary);
             min-height: 100vh;
             padding: 20px;
-            color: #333;
+            color: var(--text-primary);
         }
 
         .container {
@@ -26,7 +243,7 @@
 
         header {
             text-align: center;
-            color: white;
+            color: var(--text-header);
             margin-bottom: 30px;
         }
 
@@ -39,13 +256,13 @@
             display: flex;
             gap: 10px;
             margin-bottom: 20px;
-            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+            border-bottom: 2px solid var(--tab-border);
         }
 
         .tab-button {
-            background: rgba(255, 255, 255, 0.2);
+            background: var(--tab-bg);
             border: none;
-            color: white;
+            color: var(--tab-text);
             padding: 12px 24px;
             font-size: 1.1em;
             font-weight: 500;
@@ -56,13 +273,13 @@
         }
 
         .tab-button:hover {
-            background: rgba(255, 255, 255, 0.3);
+            background: var(--tab-bg-hover);
         }
 
         .tab-button.active {
-            background: white;
-            color: #667eea;
-            border-bottom: 2px solid white;
+            background: var(--tab-bg-active);
+            color: var(--tab-text-active);
+            border-bottom: 2px solid var(--tab-bg-active);
         }
 
         .tab-content {
@@ -74,11 +291,11 @@
         }
 
         .status-bar {
-            background: white;
+            background: var(--bg-card);
             border-radius: 15px;
             padding: 20px;
             margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: var(--shadow-card);
         }
 
         .status-grid {
@@ -94,14 +311,14 @@
 
         .status-label {
             font-size: 0.9em;
-            color: #666;
+            color: var(--text-secondary);
             margin-bottom: 5px;
         }
 
         .status-value {
             font-size: 1.5em;
             font-weight: bold;
-            color: #667eea;
+            color: var(--status-value);
         }
 
         .controls {
@@ -122,10 +339,10 @@
         }
 
         .control-card {
-            background: white;
+            background: var(--bg-card);
             border-radius: 15px;
             padding: 25px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: var(--shadow-card);
             overflow: hidden; /* Prevent content from overflowing */
             box-sizing: border-box;
             width: 100%;
@@ -135,8 +352,8 @@
         .control-card h2 {
             font-size: 1.3em;
             margin-bottom: 20px;
-            color: #667eea;
-            border-bottom: 2px solid #667eea;
+            color: var(--accent-primary);
+            border-bottom: 2px solid var(--accent-primary);
             padding-bottom: 10px;
         }
 
@@ -157,12 +374,12 @@
             cursor: pointer;
             transition: all 0.3s ease;
             font-weight: 600;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-button);
         }
 
         button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+            box-shadow: var(--shadow-button-hover);
         }
 
         button:active {
@@ -170,32 +387,32 @@
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--btn-primary);
             color: white;
         }
 
         .btn-success {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            background: var(--btn-success);
             color: white;
         }
 
         .btn-danger {
-            background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+            background: var(--btn-danger);
             color: white;
         }
 
         .btn-warning {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: var(--btn-warning);
             color: white;
         }
 
         .btn-secondary {
-            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            background: var(--btn-secondary);
             color: white;
         }
 
         .btn-info {
-            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            background: var(--btn-info);
             color: white;
         }
 
@@ -204,7 +421,7 @@
         }
 
         .upload-area {
-            border: 2px dashed #667eea;
+            border: 2px dashed var(--accent-border);
             border-radius: 10px;
             padding: 30px;
             text-align: center;
@@ -214,13 +431,13 @@
         }
 
         .upload-area:hover {
-            background: #f8f9ff;
-            border-color: #764ba2;
+            background: var(--bg-hover);
+            border-color: var(--accent-border-hover);
         }
 
         .upload-area.dragover {
-            background: #f0f0ff;
-            border-color: #764ba2;
+            background: var(--bg-dragover);
+            border-color: var(--accent-border-hover);
             transform: scale(1.02);
         }
 
@@ -241,7 +458,7 @@
             flex-direction: column;
             gap: 8px;
             padding: 12px 0;
-            border-bottom: 1px solid #eee;
+            border-bottom: var(--border-setting);
             width: 100%;
             max-width: 100%;
             box-sizing: border-box;
@@ -265,7 +482,7 @@
 
         .setting-item-row > span {
             font-weight: 500;
-            color: #333;
+            color: var(--text-primary);
             flex: 1 1 auto;
             min-width: 0;
             flex-shrink: 1;
@@ -297,7 +514,7 @@
             position: relative;
             width: 60px;
             height: 30px;
-            background: #ccc;
+            background: var(--bg-toggle);
             border-radius: 15px;
             cursor: pointer;
             transition: background 0.3s;
@@ -306,7 +523,7 @@
         }
 
         .toggle-switch.active {
-            background: #667eea;
+            background: var(--bg-toggle-active);
         }
 
         .toggle-switch::after {
@@ -327,28 +544,28 @@
 
         input[type="text"] {
             padding: 8px 12px;
-            border: 2px solid #ddd;
+            border: 2px solid var(--input-border);
             border-radius: 8px;
             font-size: 1em;
             font-family: inherit;
             width: 140px;
             box-sizing: border-box;
-            color: #333;
-            background: #fff;
+            color: var(--input-text);
+            background: var(--bg-input);
             text-align: left;
             margin: 0;
         }
 
         input[type="number"] {
             padding: 8px 12px;
-            border: 2px solid #ddd;
+            border: 2px solid var(--input-border);
             border-radius: 8px;
             font-size: 1em;
             font-family: inherit;
             width: 140px;
             box-sizing: border-box;
-            color: #333;
-            background: #fff;
+            color: var(--input-text);
+            background: var(--bg-input);
             text-align: center;
             margin: 0;
         }
@@ -361,29 +578,43 @@
 
         input[type="time"] {
             padding: 8px 12px;
-            border: 2px solid #ddd;
+            border: 2px solid var(--input-border);
             border-radius: 8px;
             font-size: 1em;
             font-family: inherit;
             width: 140px;
             box-sizing: border-box;
-            color: #333;
-            background: #fff;
+            color: var(--input-text);
+            background: var(--bg-input);
             text-align: left;
             margin: 0;
         }
 
         input[type="number"]:focus,
         input[type="time"]:focus,
-        input[type="text"]:focus {
+        input[type="text"]:focus,
+        textarea:focus,
+        select:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--input-border-focus);
+        }
+        
+        textarea {
+            color: var(--input-text);
+            background: var(--bg-input);
+            border: 2px solid var(--input-border);
+        }
+        
+        select {
+            color: var(--input-text);
+            background: var(--bg-input);
+            border: 2px solid var(--input-border);
         }
 
         .browse-button {
             padding: 0;
             background: transparent;
-            color: #667eea;
+            color: var(--accent-primary);
             border: none;
             border-radius: 4px;
             cursor: pointer;
@@ -422,7 +653,7 @@
             min-width: 300px;
             max-width: 90%;
             text-align: center;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+            box-shadow: var(--shadow-alert);
             animation: slideDown 0.3s ease;
         }
 
@@ -438,15 +669,15 @@
         }
 
         .alert.success {
-            background: #d4edda;
-            color: #155724;
-            border: 2px solid #28a745;
+            background: var(--alert-success-bg);
+            color: var(--alert-success-text);
+            border: 2px solid var(--alert-success-border);
         }
 
         .alert.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 2px solid #dc3545;
+            background: var(--alert-error-bg);
+            color: var(--alert-error-text);
+            border: 2px solid var(--alert-error-border);
         }
 
         .modal {
@@ -457,11 +688,11 @@
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.5);
+            background-color: var(--bg-modal);
         }
 
         .modal-content {
-            background-color: white;
+            background-color: var(--bg-modal-content);
             margin: 10% auto;
             padding: 20px;
             border-radius: 15px;
@@ -469,7 +700,7 @@
             max-width: 600px;
             max-height: 70vh;
             overflow: auto;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            box-shadow: var(--shadow-modal);
         }
 
         .modal-header {
@@ -477,19 +708,19 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
-            border-bottom: 2px solid #667eea;
+            border-bottom: 2px solid var(--modal-header-border);
             padding-bottom: 10px;
         }
 
         .close {
-            color: #aaa;
+            color: var(--modal-close);
             font-size: 28px;
             font-weight: bold;
             cursor: pointer;
         }
 
         .close:hover {
-            color: #000;
+            color: var(--modal-close-hover);
         }
 
         .directory-list {
@@ -500,7 +731,7 @@
         .directory-item {
             padding: 10px;
             margin: 5px 0;
-            background: #f8f9fa;
+            background: var(--bg-directory-item);
             border-radius: 5px;
             cursor: pointer;
             display: flex;
@@ -509,7 +740,7 @@
         }
 
         .directory-item:hover {
-            background: #e9ecef;
+            background: var(--bg-directory-item-hover);
         }
 
         .directory-item::before {
@@ -519,18 +750,18 @@
 
         .current-image {
             font-size: 1em;
-            color: #666;
+            color: var(--text-secondary);
             word-break: break-all;
             margin-top: 10px;
             padding: 10px;
-            background: #f8f9fa;
+            background: var(--bg-secondary);
             border-radius: 8px;
         }
 
         .image-preview-container {
             margin-top: 20px;
             text-align: center;
-            background: #f8f9fa;
+            background: var(--bg-secondary);
             padding: 15px;
             border-radius: 10px;
         }
@@ -552,7 +783,7 @@
             max-width: 100%;
             max-height: 400px;
             border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            box-shadow: var(--shadow-image);
             object-fit: contain;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
@@ -560,7 +791,7 @@
 
         #image-preview:hover {
             transform: scale(1.02);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+            box-shadow: var(--shadow-image-hover);
         }
 
         .image-modal {
@@ -571,7 +802,7 @@
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.9);
+            background-color: var(--bg-image-modal);
             overflow: auto;
         }
 
@@ -592,14 +823,14 @@
             max-height: 100%;
             object-fit: contain;
             border-radius: 10px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            box-shadow: var(--shadow-image-modal);
         }
 
         .image-modal-close {
             position: absolute;
             top: 20px;
             right: 40px;
-            color: #fff;
+            color: var(--image-modal-close);
             font-size: 40px;
             font-weight: bold;
             cursor: pointer;
@@ -607,7 +838,7 @@
         }
 
         .image-modal-close:hover {
-            color: #667eea;
+            color: var(--image-modal-close-hover);
         }
 
         .sticky-save-button {
@@ -618,12 +849,12 @@
             padding: 18px 30px;
             font-size: 1.2em;
             font-weight: 600;
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            background: var(--btn-save);
             color: white;
             border: none;
             border-radius: 50px;
             cursor: pointer;
-            box-shadow: 0 8px 25px rgba(17, 153, 142, 0.4);
+            box-shadow: var(--shadow-save-button);
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
@@ -641,7 +872,7 @@
 
         .sticky-save-button:hover {
             transform: translateY(-3px);
-            box-shadow: 0 12px 35px rgba(17, 153, 142, 0.5);
+            box-shadow: var(--shadow-save-button-hover);
         }
 
         .sticky-save-button:active {
@@ -649,7 +880,7 @@
         }
 
         .sticky-save-button.saved {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--btn-save-saved);
         }
 
         .log-header {
@@ -691,19 +922,56 @@
         }
 
         .caption-status {
-            color: #666;
+            color: var(--text-caption);
             font-size: 0.9em;
             flex: 1 1 auto;
             word-wrap: break-word;
             overflow-wrap: break-word;
             min-height: 20px;
-            text-align: left;
-            padding-left: 15px;
+        }
+        
+        /* Text color utility classes */
+        .text-primary {
+            color: var(--text-primary);
+        }
+        
+        .text-secondary {
+            color: var(--text-secondary);
+        }
+        
+        .text-accent {
+            color: var(--accent-primary);
+        }
+        
+        .text-label {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        .text-small {
+            color: var(--text-secondary);
+            font-size: 0.85em;
+        }
+        
+        .bg-secondary {
+            background: var(--bg-secondary);
+        }
+        
+        .bg-tertiary {
+            background: var(--bg-tertiary);
+        }
+        
+        .border-divider {
+            border: 1px solid var(--border-divider);
+        }
+        
+        .border-accent {
+            border-color: var(--accent-border);
         }
 
         .log-viewer {
-            background: #1e1e1e;
-            color: #d4d4d4;
+            background: var(--bg-log-viewer);
+            color: var(--text-log);
             padding: 15px;
             border-radius: 8px;
             font-family: 'Courier New', monospace;
@@ -850,7 +1118,7 @@
 
         <div id="tab-status" class="tab-content active">
         <div class="status-bar">
-            <h2 style="margin-bottom: 15px; color: #667eea;">📊 Current Device Status</h2>
+            <h2 style="margin-bottom: 15px;" class="text-accent">📊 Current Device Status</h2>
             <div class="status-grid">
                 <div class="status-item">
                     <div class="status-label">⏰ Time</div>
@@ -882,8 +1150,8 @@
             </div>
         </div>
             <div class="image-preview-container">
-                <h3 style="margin-bottom: 15px; color: #667eea; font-size: 1.1em;">📸 Current Image</h3>
-                <div class="current-image-info" id="current-image" style="margin-bottom: 15px; color: #666; font-size: 0.95em;">No image loaded</div>
+                <h3 style="margin-bottom: 15px; font-size: 1.1em;" class="text-accent">📸 Current Image</h3>
+                <div class="current-image-info text-secondary" id="current-image" style="margin-bottom: 15px; font-size: 0.95em;">No image loaded</div>
                 <div style="display: flex; justify-content: center; align-items: center; width: 100%;">
                     <img id="image-preview" src="" alt="Current image preview" 
                          style="max-width: 100%; max-height: 400px; border-radius: 10px; 
@@ -897,11 +1165,11 @@
                 </div>
             </div>
 
-            <div class="caption-editor-container" style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px; border: 1px solid #e0e0e0;">
-                <h3 style="margin-bottom: 15px; color: #667eea; font-size: 1.1em;">✏️ Image Caption</h3>
+            <div class="caption-editor-container bg-secondary" style="margin-top: 30px; padding: 20px; border-radius: 10px; border: 1px solid var(--border-divider);">
+                <h3 style="margin-bottom: 15px; font-size: 1.1em;" class="text-accent">✏️ Image Caption</h3>
                 <div style="margin-bottom: 10px;">
                     <textarea id="caption-text" placeholder="Enter caption for this image (saved to image metadata)..." 
-                              style="width: 100%; min-height: 100px; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 0.95em; font-family: inherit; resize: vertical; box-sizing: border-box;"></textarea>
+                              style="width: 100%; min-height: 100px; padding: 12px; border: 2px solid var(--input-border); border-radius: 8px; font-size: 0.95em; font-family: inherit; resize: vertical; box-sizing: border-box; color: var(--input-text); background: var(--bg-input);"></textarea>
                 </div>
                 <div class="caption-controls">
                     <button class="btn-success" onclick="saveCaption()" id="save-caption-btn">💾 Save Caption</button>
@@ -930,14 +1198,14 @@
                 
                 <div style="margin-top: 25px; padding-top: 25px; border-top: 1px solid #eee;"></div>
                 <h2>⚡ System Power</h2>
-                <small style="display: block; color: #666; margin-top: 10px; border-radius: 8px; padding: 10px; font-size: 0.85em;">
+                <small class="text-small" style="display: block; margin-top: 10px; border-radius: 8px; padding: 10px;">
                     ⚠️ Requires sudo privileges. System will countdown before executing.
                 </small>
                 <div class="button-group" id="power-buttons-container">
                     <button class="btn-danger" onclick="confirmShutdown()">🔴 Shutdown</button>
                     <button class="btn-info" onclick="confirmRestart()">🔄 Restart</button>
                 </div>
-                <div id="power-action-status" style="display: none; margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; color: #856404;">
+                <div id="power-action-status" style="display: none; margin-top: 10px; padding: 10px; background: var(--alert-warning-bg); border: 1px solid var(--alert-warning-border); border-radius: 8px; color: var(--alert-warning-text);">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span id="power-action-message">⏳ Power action in progress...</span>
                         <button class="btn-secondary" style="padding: 6px 15px; font-size: 0.9em;" onclick="cancelPowerAction()">❌ Cancel</button>
@@ -949,18 +1217,18 @@
                 <h2>📤 Upload Photos</h2>
                 <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
                     <p style="font-size: 1.2em; margin-bottom: 10px;">📁 Click or Drop Files Here</p>
-                    <p style="color: #666;">JPG, JPEG, PNG supported</p>
+                    <p class="text-secondary">JPG, JPEG, PNG supported</p>
                     <input type="file" id="fileInput" accept="image/jpeg,image/jpg,image/png" multiple onchange="handleFileSelect(this.files)">
                 </div>
                 
                 <div id="uploadPreview" style="display: none; margin-top: 20px;">
-                    <h3 style="font-size: 1.1em; color: #667eea; margin-bottom: 15px;">📋 Files Ready to Upload</h3>
-                    <div id="fileList" style="margin-bottom: 15px; max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 8px; background: #f8f9fa; width: 100%; box-sizing: border-box;"></div>
+                    <h3 style="font-size: 1.1em; margin-bottom: 15px;" class="text-accent">📋 Files Ready to Upload</h3>
+                    <div id="fileList" class="bg-secondary" style="margin-bottom: 15px; max-height: 200px; overflow-y: auto; border: 1px solid var(--input-border); border-radius: 8px; padding: 8px; width: 100%; box-sizing: border-box;"></div>
                     
                     <div style="margin-top: 15px;">
-                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">✏️ Caption (optional - applies to all uploaded files)</label>
+                        <label class="text-label" style="display: block; margin-bottom: 8px;">✏️ Caption (optional - applies to all uploaded files)</label>
                         <textarea id="upload-caption" placeholder="Enter a caption to add to all uploaded photos..." 
-                                  style="width: 100%; min-height: 60px; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 0.95em; font-family: inherit; resize: vertical; box-sizing: border-box;"></textarea>
+                                  style="width: 100%; min-height: 60px; padding: 10px; border: 2px solid var(--input-border); border-radius: 8px; font-size: 0.95em; font-family: inherit; resize: vertical; box-sizing: border-box; color: var(--input-text); background: var(--bg-input);"></textarea>
                     </div>
                     
                     <div style="margin-top: 15px; display: flex; gap: 8px; justify-content: center;">
@@ -972,11 +1240,11 @@
                 <div id="uploadStatus" style="margin-top: 15px;"></div>
                 
                 <div style="margin-top: 25px; padding-top: 25px; border-top: 1px solid #eee;">
-                    <h3 style="font-size: 1.3em; color: #667eea; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #667eea;">📁 Directories</h3>
+                    <h3 style="font-size: 1.3em; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid var(--accent-primary);" class="text-accent">📁 Directories</h3>
                     <div class="settings-group">
                         <div class="setting-item">
                             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                                <label style="font-weight: 500; color: #333; flex: 1;">Images Directory</label>
+                                <label class="text-label" style="flex: 1;">Images Directory</label>
                                 <button onclick="browseDirectory('images-directory')" class="browse-button" 
                                         title="Browse for directory">
                                     📁
@@ -985,11 +1253,11 @@
                             <input type="text" id="images-directory" placeholder="/path/to/images" 
                                    onchange="updateSetting('images_directory', this.value)"
                                    title="Click to edit or use browse button"
-                                   style="width: 100%; padding: 8px 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em; color: #333; background: #fff; box-sizing: border-box; text-align: left;">
+                                   style="width: 100%; padding: 8px 12px; border: 2px solid var(--input-border); border-radius: 8px; font-size: 1em; color: var(--input-text); background: var(--bg-input); box-sizing: border-box; text-align: left;">
                         </div>
                         <div class="setting-item">
                             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                                <label style="font-weight: 500; color: #333; flex: 1;">Upload Directory</label>
+                                <label class="text-label" style="flex: 1;">Upload Directory</label>
                                 <button onclick="browseDirectory('upload-directory')" class="browse-button"
                                         title="Browse for directory">
                                     📁
@@ -998,8 +1266,8 @@
                             <input type="text" id="upload-directory" placeholder="Leave empty for default" 
                                    onchange="updateSetting('upload_directory', this.value)"
                                    title="Click to edit or use browse button"
-                                   style="width: 100%; padding: 8px 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em; color: #333; background: #fff; box-sizing: border-box; text-align: left;">
-                            <small style="display: block; color: #666; margin-top: 8px;">
+                                   style="width: 100%; padding: 8px 12px; border: 2px solid var(--input-border); border-radius: 8px; font-size: 1em; color: var(--input-text); background: var(--bg-input); box-sizing: border-box; text-align: left;">
+                            <small class="text-small" style="display: block; margin-top: 8px;">
                                 default: [ImagesDirectory]/uploaded/
                             </small>
                         </div>
@@ -1059,7 +1327,7 @@
                 <h2>⚙️ Advanced Settings</h2>
                 <div class="settings-group">
                     <div class="setting-item">
-                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Location (City)</label>
+                        <label class="text-label" style="display: block; margin-bottom: 8px;">Location (City)</label>
                         <input type="text" id="location-city" list="location-list" placeholder="City, State, Country" 
                                onchange="updateSetting('location_city_suburb', this.value)"
                                style="width: 100%;">
@@ -1119,53 +1387,63 @@
                             <option value="Hong Kong">
                             <option value="Singapore">
                         </datalist>
-                        <small style="display: block; color: #666; margin-top: 8px;">
+                        <small class="text-small" style="display: block; margin-top: 8px;">
                             Formats: "City", "City, Country", or "City, State, Country" (e.g. "Sydney", "Sydney, Australia", "New York, NY, USA")
                         </small>
                     </div>
                     <div class="setting-item">
-                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Delay (seconds)</label>
+                        <label class="text-label" style="display: block; margin-bottom: 8px;">Delay (seconds)</label>
                         <input type="number" id="delay-seconds" min="1" max="3600" value="30" 
                                onchange="updateSetting('delay_seconds', this.value)">
                     </div>
                     <div class="setting-item">
-                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Display Off Time</label>
+                        <label class="text-label" style="display: block; margin-bottom: 8px;">Display Off Time</label>
                         <input type="time" id="display-off-time" onchange="updateSetting('display_off_time', this.value)">
                     </div>
                     <div class="setting-item">
-                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Display On Time</label>
+                        <label class="text-label" style="display: block; margin-bottom: 8px;">Display On Time</label>
                         <input type="time" id="display-on-time" 
                                onchange="updateSetting('display_on_time', this.value)">
                     </div>
                     <div class="setting-item">
-                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Shutdown Countdown (seconds)</label>
+                        <label class="text-label" style="display: block; margin-bottom: 8px;">Shutdown Countdown (seconds)</label>
                         <input type="number" id="shutdown-countdown" min="0" max="60" value="10" 
                                onchange="updateSetting('shutdown_countdown_seconds', this.value)">
-                        <small style="display: block; color: #665; margin-top: 8px;">
+                        <small class="text-small" style="display: block; margin-top: 8px;">
                             Countdown time before shutdown when "Shutdown on Display Off" is enabled
                         </small>
                     </div>
                     <div class="setting-item">
-                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Weather Update (seconds)</label>
+                        <label class="text-label" style="display: block; margin-bottom: 8px;">Weather Update (seconds)</label>
                         <input type="number" id="weather-update" min="60" max="3600" value="900" 
                                onchange="updateSetting('weather_update_seconds', this.value)">
                     </div>
                     <div class="setting-item">
-                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">UI Text Alpha (0-255)</label>
+                        <label class="text-label" style="display: block; margin-bottom: 8px;">UI Text Alpha (0-255)</label>
                         <input type="number" id="ui-text-alpha" min="0" max="255" value="192" 
                                onchange="updateSetting('ui_text_alpha', this.value)">
                     </div>
                     <div class="setting-item">
-                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Display Correction (Horizontal)</label>
+                        <label class="text-label" style="display: block; margin-bottom: 8px;">Display Correction (Horizontal)</label>
                         <input type="number" id="display-correction-horizontal" step="0.01" min="0.5" max="2.0" value="1.0" 
                                onchange="updateSetting('display_correction_horizontal', this.value)">
-                        <small style="color: #666; font-size: 0.85em;">Compensate for horizontal hardware stretching (default: 1.0)</small>
+                        <small class="text-small">Compensate for horizontal hardware stretching (default: 1.0)</small>
                     </div>
                     <div class="setting-item">
-                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Display Correction (Vertical)</label>
+                        <label class="text-label" style="display: block; margin-bottom: 8px;">Display Correction (Vertical)</label>
                         <input type="number" id="display-correction-vertical" step="0.01" min="0.5" max="2.0" value="1.0" 
                                onchange="updateSetting('display_correction_vertical', this.value)">
-                        <small style="color: #666; font-size: 0.85em;">Compensate for vertical hardware stretching (default: 1.0)</small>
+                        <small class="text-small">Compensate for vertical hardware stretching (default: 1.0)</small>
+                    </div>
+                    <div class="setting-item">
+                        <label class="text-label" style="display: block; margin-bottom: 8px;">Color Theme</label>
+                        <select id="theme-selector" onchange="changeTheme(this.value)" 
+                                style="padding: 8px 12px; border: 2px solid var(--input-border); border-radius: 8px; font-size: 1em; font-family: inherit; width: 100%; box-sizing: border-box; color: var(--input-text); background: var(--bg-input);">
+                            <option value="default">Default</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                        </select>
+                        <small class="text-small">Choose your preferred color scheme</small>
                     </div>
                 </div>
             </div>
@@ -1186,7 +1464,7 @@
 
         <div id="tab-system" class="tab-content">
             <div class="status-bar">
-                <h2 style="margin-bottom: 15px; color: #667eea;">💻 System Resources</h2>
+                <h2 style="margin-bottom: 15px;" class="text-accent">💻 System Resources</h2>
                 <div class="status-grid">
                     <div class="status-item">
                         <div class="status-label">💾 Free Memory</div>
@@ -1213,9 +1491,9 @@
 
             <div class="status-bar">
                 <div class="log-header">
-                    <h2 style="margin: 0; color: #667eea;">📋 Logs</h2>
+                    <h2 style="margin: 0;" class="text-accent">📋 Logs</h2>
                     <div class="log-controls">
-                        <select id="log-lines" onchange="loadLogs()" style="padding: 5px 10px; border: 2px solid #ddd; border-radius: 5px;">
+                        <select id="log-lines" onchange="loadLogs()" style="padding: 5px 10px; border: 2px solid var(--input-border); border-radius: 5px; color: var(--input-text); background: var(--bg-input);">
                             <option value="50">Last 50 lines</option>
                             <option value="100" selected>Last 100 lines</option>
                             <option value="200">Last 200 lines</option>
@@ -1283,6 +1561,22 @@
 
     <script>
         let settings = {};
+        
+        // Theme management
+        function changeTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('piGallery-theme', theme);
+            // Update selector if it exists
+            const selector = document.getElementById('theme-selector');
+            if (selector) {
+                selector.value = theme;
+            }
+        }
+        
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('piGallery-theme') || 'default';
+            changeTheme(savedTheme);
+        }
         let isPaused = false;
 
         // Initialize
@@ -1296,6 +1590,8 @@
         let powerActionCompleteTimeout = null;
 
         document.addEventListener('DOMContentLoaded', function() {
+            // Load theme first
+            loadTheme();
             updateStatus();
             loadSettings();
             setInterval(updateStatus, 3000); // Update every 3 seconds
@@ -1442,7 +1738,7 @@
                 }
             } catch (error) {
                 document.getElementById('directoryBrowser').innerHTML = 
-                    `<p style="color: red;">Error loading directories: ${error.message}</p>`;
+                    `<p style="color: var(--alert-error-text);">Error loading directories: ${error.message}</p>`;
             }
         }
 
@@ -1614,6 +1910,12 @@
         }
 
         async function loadSettings() {
+            // Load theme selector value
+            const themeSelector = document.getElementById('theme-selector');
+            if (themeSelector) {
+                const savedTheme = localStorage.getItem('piGallery-theme') || 'default';
+                themeSelector.value = savedTheme;
+            }
             try {
                 const response = await fetch('/api/settings');
                 settings = await response.json();
@@ -2065,11 +2367,11 @@
                         successCount++;
                     } else {
                         const data = await response.json();
-                        uploadStatus.innerHTML += `<p style="color: red;">❌ ${file.name}: ${data.error}</p>`;
+                        uploadStatus.innerHTML += `<p style="color: var(--alert-error-text);">❌ ${file.name}: ${data.error}</p>`;
                         failCount++;
                     }
                 } catch (error) {
-                    uploadStatus.innerHTML += `<p style="color: red;">❌ ${file.name}: ${error.message}</p>`;
+                    uploadStatus.innerHTML += `<p style="color: var(--alert-error-text);">❌ ${file.name}: ${error.message}</p>`;
                     failCount++;
                 }
             }
