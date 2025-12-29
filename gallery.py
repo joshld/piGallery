@@ -640,30 +640,22 @@ def monitor_system_resources(telegram_notifier, check_interval=120):
 def scale_image(img, screen_w, screen_h, ar_landscape=1.5, ar_portrait=0.667):
     """
     Scale image to fit screen while maintaining aspect ratio.
-    Prioritizes filling screen width to avoid pillarboxing.
+    Compares image aspect to screen aspect to determine scaling.
     """
     img_w, img_h = img.get_size()
     img_aspect = img_w / img_h
-    screen_aspect = screen_w / screen_h
+    screen_aspect = screen_w / screen_h  # 1920/1080 = 1.778
     
-    # Determine which physical aspect ratio to use based on image orientation
-    if img_aspect >= 1.0:
-        physical_aspect = ar_landscape
+    # Compare image aspect ratio to screen aspect ratio
+    # This determines which dimension will be the limiting factor
+    if img_aspect > screen_aspect:
+        # Image is wider than screen (relative to their heights)
+        # Scale based on width to fill screen width
+        scale = screen_w / img_w
     else:
-        physical_aspect = ar_portrait
-    
-    # Calculate scale factors
-    scale_by_width = screen_w / img_w  # Fill screen width
-    scale_by_height = screen_h / img_h
-    
-    # For landscape images, prioritize filling width to avoid pillarboxing
-    # Only constrain if it would exceed height
-    if img_aspect >= 1.0:
-        # Landscape: scale to fill width, but don't exceed height
-        scale = min(scale_by_width, scale_by_height)
-    else:
-        # Portrait: scale to fill height, but don't exceed width
-        scale = min(scale_by_width, scale_by_height)
+        # Image is taller than screen (relative to their widths)
+        # Scale based on height to fill screen height
+        scale = screen_h / img_h
     
     # Calculate new dimensions
     new_w = int(img_w * scale)
