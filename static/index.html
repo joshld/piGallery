@@ -1342,6 +1342,9 @@
                             <option value="catppuccin-latte">Catppuccin Latte</option>
                         </select>
                         <small class="text-small">Choose your preferred color scheme</small>
+                        <div id="theme-debug" style="margin-top: 8px; padding: 8px; background: var(--bg-secondary); border-radius: 4px; font-size: 0.85em; color: var(--text-secondary);">
+                            <strong>Debug:</strong> Current theme: <span id="current-theme-display">loading...</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1475,6 +1478,17 @@
             if (selector) {
                 selector.value = theme || 'default';
             }
+            // Update debug display
+            updateThemeDebug();
+        }
+        
+        function updateThemeDebug() {
+            const debugDisplay = document.getElementById('current-theme-display');
+            if (debugDisplay) {
+                const currentTheme = document.documentElement.getAttribute('data-theme') || 'default (:root)';
+                const cssLoaded = document.querySelector('link[href="/static/themes.css"]') ? 'Yes' : 'No';
+                debugDisplay.textContent = currentTheme + ' | CSS loaded: ' + cssLoaded;
+            }
         }
         
         function loadTheme() {
@@ -1484,6 +1498,7 @@
             } else {
                 // No saved theme, use default (no data-theme attribute = uses :root styles)
                 document.documentElement.removeAttribute('data-theme');
+                updateThemeDebug();
             }
         }
         let isPaused = false;
@@ -1501,6 +1516,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Load theme first
             loadTheme();
+            // Update debug after a short delay to ensure CSS is loaded
+            setTimeout(updateThemeDebug, 100);
             updateStatus();
             loadSettings();
             setInterval(updateStatus, 3000); // Update every 3 seconds
