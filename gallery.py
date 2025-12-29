@@ -2050,8 +2050,6 @@ def api_restart():
 @app.route('/api/system/cancel', methods=['POST'])
 def api_cancel_power_action():
     """Cancel ongoing shutdown or restart"""
-    global power_action_in_progress, power_action_cancel_event
-    
     if not power_action_in_progress:
         return jsonify({'error': 'No power action in progress'}), 400
     
