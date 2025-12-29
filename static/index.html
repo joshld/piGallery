@@ -903,14 +903,21 @@
                                onchange="updateSetting('delay_seconds', this.value)">
                     </div>
                     <div class="setting-item">
+                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Display Off Time</label>
+                        <input type="time" id="display-off-time" onchange="updateSetting('display_off_time', this.value)">
+                    </div>
+                    <div class="setting-item">
                         <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Display On Time</label>
                         <input type="time" id="display-on-time" 
                                onchange="updateSetting('display_on_time', this.value)">
                     </div>
                     <div class="setting-item">
-                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Display Off Time</label>
-                        <input type="time" id="display-off-time" 
-                               onchange="updateSetting('display_off_time', this.value)">
+                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Shutdown Countdown (seconds)</label>
+                        <input type="number" id="shutdown-countdown" min="0" max="60" value="10" 
+                               onchange="updateSetting('shutdown_countdown_seconds', this.value)">
+                        <small style="display: block; color: #665; margin-top: 8px;">
+                            Countdown time before shutdown when "Shutdown on Display Off" is enabled
+                        </small>
                     </div>
                     <div class="setting-item">
                         <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Weather Update (seconds)</label>
@@ -931,14 +938,6 @@
                         <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Aspect Ratio (Portrait)</label>
                         <input type="number" id="aspect-portrait" step="0.1" min="0.1" max="1.0" value="0.667" 
                                onchange="updateSetting('aspect_ratio_portrait', this.value)">
-                    </div>
-                    <div class="setting-item">
-                        <label style="display: block; font-weight: 500; color: #333; margin-bottom: 8px;">Shutdown Countdown (seconds)</label>
-                        <input type="number" id="shutdown-countdown" min="1" max="60" value="10" 
-                               onchange="updateSetting('shutdown_countdown_seconds', this.value)">
-                        <small style="display: block; color: #666; margin-top: 8px;">
-                            Countdown time before shutdown when "Shutdown on Display Off" is enabled
-                        </small>
                     </div>
                 </div>
                 <button class="btn-success btn-full" onclick="saveSettings()">💾 Save Settings</button>
