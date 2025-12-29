@@ -50,7 +50,9 @@ DEFAULT_CONFIG = {
         "show_temperature": "true",
         "show_weather_code": "true",
         "show_filename": "true",
-        "show_caption": "true"
+        "show_caption": "true",
+        "shutdown_on_display_off": "true",
+        "shutdown_countdown_seconds": "10"
     },
     "telegram": {
         "bot_token": "",
@@ -68,11 +70,30 @@ DEFAULT_CONFIG = {
 
 config = configparser.ConfigParser()
 if not os.path.exists(CONFIG_PATH):
+    # Create new config with all defaults
     config.read_dict(DEFAULT_CONFIG)
     with open(CONFIG_PATH, "w") as f:
         config.write(f)
 else:
+    # Read existing config
     config.read(CONFIG_PATH)
+    
+    # Merge missing keys from defaults (preserve existing values)
+    updated = False
+    for section, keys in DEFAULT_CONFIG.items():
+        if section not in config:
+            config[section] = {}
+        for key, default_value in keys.items():
+            if key not in config[section]:
+                config[section][key] = default_value
+                updated = True
+                print(f"[Config] Adding missing key: [{section}] {key} = {default_value}")
+    
+    # Write back if any keys were added
+    if updated:
+        with open(CONFIG_PATH, "w") as f:
+            config.write(f)
+        print(f"[Config] Updated {CONFIG_PATH} with missing default settings")
 
 GALLERY_CONFIG = config["gallery"] if "gallery" in config else DEFAULT_CONFIG["gallery"]
 TELEGRAM_CONFIG = config["telegram"] if "telegram" in config else DEFAULT_CONFIG["telegram"]
@@ -667,6 +688,10 @@ class Slideshow:
         self.manual_display_override = None  # None = auto, True = force on, False = force off
         self.control_lock = threading.Lock()
         self.force_redraw = False
+        
+        # Countdown tracking for web UI
+        self.image_display_start_time = time.time()
+        self.time_remaining = display_time_seconds
 
         self.fonts = {
             "filename": pygame.font.SysFont("Arial", 14),
@@ -1064,6 +1089,8 @@ class Slideshow:
                     self.next_image()
                     self.draw_image()
                     pygame.display.flip()
+                    # Reset countdown timer
+                    self.image_display_start_time = time.time()
                 
                 display_was_on = True
             else:
@@ -1073,6 +1100,19 @@ class Slideshow:
                 self.draw_blank_screen()
                 pygame.display.flip()
                 self.set_display_power(False)
+                
+                # Optional automatic shutdown if configured
+                shutdown_enabled = self.config.get('shutdown_on_display_off', 'false').lower() == 'true'
+                if shutdown_enabled:
+                    countdown_seconds = int(self.config.get('shutdown_countdown_seconds', '10'))
+                    # Notify via Telegram before shutting down
+                    if self.telegram:
+                        self.telegram.notify_system_alert(
+                            'shutdown',
+                            f'Automatic shutdown in {countdown_seconds} seconds (display off time reached)',
+                            f'{countdown_seconds}s countdown'
+                        )
+                    shutdown(countdown_seconds)
 
             # Wait for display_time_seconds, handling events (original structure)
             start_time = time.time()
@@ -1177,6 +1217,10 @@ def api_status():
     except Exception as e:
         print(f"[API] Error getting system stats: {e}")
     
+    # Calculate time remaining until next image
+    elapsed = time.time() - slideshow_instance.image_display_start_time
+    time_remaining = max(0, slideshow_instance.display_time_seconds - int(elapsed))
+    
     response = {
         'current_image': slideshow_instance.current_img,
         'current_index': slideshow_instance.current_index + 1,
@@ -1187,7 +1231,9 @@ def api_status():
         'date': datetime.datetime.now().strftime("%d %b %Y"),
         'paused': slideshow_instance.paused,
         'display_on': slideshow_instance.is_display_on(),
-        'manual_override': slideshow_instance.manual_display_override
+        'manual_override': slideshow_instance.manual_display_override,
+        'time_remaining': time_remaining,
+        'delay_seconds': slideshow_instance.display_time_seconds
     }
     
     if system_stats:
@@ -1637,6 +1683,7 @@ def api_next():
     with slideshow_instance.control_lock:
         slideshow_instance.next_image()
         slideshow_instance.force_redraw = True  # Force immediate redraw
+        slideshow_instance.image_display_start_time = time.time()  # Reset countdown
     
     return jsonify({'status': 'ok', 'current_image': slideshow_instance.current_img})
 
@@ -1649,6 +1696,7 @@ def api_prev():
     with slideshow_instance.control_lock:
         slideshow_instance.prev_image()
         slideshow_instance.force_redraw = True  # Force immediate redraw
+        slideshow_instance.image_display_start_time = time.time()  # Reset countdown
     
     return jsonify({'status': 'ok', 'current_image': slideshow_instance.current_img})
 
@@ -1800,7 +1848,9 @@ def api_settings():
             'ui_text_alpha': slideshow_instance.config.get('ui_text_alpha', '192'),
             'weather_update_seconds': slideshow_instance.config.get('weather_update_seconds', '900'),
             'upload_directory': slideshow_instance.config.get('upload_directory', ''),
-            'images_directory': slideshow_instance.folder
+            'images_directory': slideshow_instance.folder,
+            'shutdown_on_display_off': slideshow_instance.config.get('shutdown_on_display_off', 'true'),
+            'shutdown_countdown_seconds': slideshow_instance.config.get('shutdown_countdown_seconds', '10')
         })
     
     elif request.method == 'POST':
@@ -1848,6 +1898,8 @@ def api_settings():
             old_val = slideshow_instance.display_time_seconds
             new_val = int(data['delay_seconds'])
             slideshow_instance.display_time_seconds = new_val
+            # Reset countdown timer when delay changes
+            slideshow_instance.image_display_start_time = time.time()
             if telegram_notifier and old_val != new_val:
                 telegram_notifier.notify_settings_change('delay_seconds', str(old_val), str(new_val))
         if 'display_off_time' in data:
@@ -1905,6 +1957,18 @@ def api_settings():
             slideshow_instance.config['upload_directory'] = new_val
             if telegram_notifier and old_val != new_val:
                 telegram_notifier.notify_settings_change('upload_directory', old_val or '(empty)', new_val or '(empty)')
+        if 'shutdown_on_display_off' in data:
+            old_val = slideshow_instance.config.get('shutdown_on_display_off', 'true')
+            new_val = str(data['shutdown_on_display_off']).lower()
+            slideshow_instance.config['shutdown_on_display_off'] = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('shutdown_on_display_off', old_val, new_val)
+        if 'shutdown_countdown_seconds' in data:
+            old_val = slideshow_instance.config.get('shutdown_countdown_seconds', '10')
+            new_val = str(int(data['shutdown_countdown_seconds']))
+            slideshow_instance.config['shutdown_countdown_seconds'] = new_val
+            if telegram_notifier and old_val != new_val:
+                telegram_notifier.notify_settings_change('shutdown_countdown_seconds', old_val, new_val)
         if 'images_directory' in data:
             # Update images directory (requires restart to take full effect)
             old_val = slideshow_instance.folder
@@ -1953,7 +2017,8 @@ def api_settings():
             for key in ['show_time', 'show_date', 'show_temperature', 'show_weather_code', 
                        'show_filename', 'show_caption', 'display_off_time', 'display_on_time',
                        'location_city_suburb', 'aspect_ratio_landscape', 'aspect_ratio_portrait',
-                       'ui_text_alpha', 'weather_update_seconds', 'upload_directory', 'images_directory']:
+                       'ui_text_alpha', 'weather_update_seconds', 'upload_directory', 'images_directory',
+                       'shutdown_on_display_off', 'shutdown_countdown_seconds']:
                 if key in data:
                     config['gallery'][key] = str(data[key])
             
@@ -2075,7 +2140,9 @@ def main():
         'weather_update_seconds': get_config_value('weather_update_seconds', '900'),
         'aspect_ratio_landscape': get_config_value('aspect_ratio_landscape', '1.5'),
         'aspect_ratio_portrait': get_config_value('aspect_ratio_portrait', '0.667'),
-        'image_history_size': get_config_value('image_history_size', '5')
+        'image_history_size': get_config_value('image_history_size', '5'),
+        'shutdown_on_display_off': get_config_value('shutdown_on_display_off', 'true'),
+        'shutdown_countdown_seconds': get_config_value('shutdown_countdown_seconds', '10')
     }
 
     # Initialize Telegram notifier

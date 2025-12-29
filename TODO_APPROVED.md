@@ -4,16 +4,16 @@
 
 ### 1. Telegram Integration (Full Featured) ⭐ PRIORITY
 **Phase 1 - Status Updates TO Telegram:** (~2 hours - Start Here!)
-- [ ] Setup Telegram bot via BotFather
-- [ ] Send status updates to group/channel
-- [ ] Startup/shutdown notifications
-- [ ] Error notifications (immediate alerts)
-- [ ] Image change notifications (configurable frequency)
-- [ ] Upload notifications
-- [ ] Settings change notifications
-- [ ] System alerts (low memory, high CPU, high temp)
+- [x] Setup Telegram bot via BotFather
+- [x] Send status updates to group/channel
+- [x] Startup/shutdown notifications
+- [x] Error notifications (immediate alerts)
+- [x] Image change notifications (configurable frequency)
+- [x] Upload notifications
+- [x] Settings change notifications
+- [x] System alerts (low memory, high CPU, high temp)
 - [ ] Daily summary reports
-- [ ] Configure notification types in settings
+- [x] Configure notification types in settings
 
 **Phase 2 - Commands FROM Telegram:** (~4 hours)
 - [ ] Receive and process Telegram commands
@@ -43,17 +43,20 @@
 - [ ] Security settings (allowed users, rate limits)
 - [ ] Add python-telegram-bot to requirements.txt
 
-### 2. Image Captions from Metadata
-- [ ] Read EXIF/IPTC metadata from images
-- [ ] Display captions overlaid on images
-- [ ] Toggle caption display on/off
-- [ ] Configure caption position and styling
+### 2. Image Captions from Metadata ✅ COMPLETED
+- [x] Read EXIF/IPTC metadata from images
+- [x] Display captions overlaid on images
+- [x] Toggle caption display on/off
+- [x] Configure caption position and styling
 
-### 3. Shutdown Button
-- [ ] Add shutdown button to web UI
-- [ ] Confirmation dialog before shutdown
-- [ ] Countdown timer display
-- [ ] Graceful cleanup
+### 3. Automatic Shutdown & Power Management ✅ COMPLETED
+- [x] Configurable automatic shutdown at display off time
+- [x] Countdown timer display before shutdown
+- [x] Telegram notification before shutdown
+- [x] Default enabled for power savings
+- [x] Documented power-saving options (smart plugs, timers, etc.)
+- [ ] Add shutdown button to web UI (manual shutdown)
+- [ ] Confirmation dialog for manual shutdown
 
 ### 4. Color Schemes for Web UI
 - [ ] Light mode (current)
@@ -74,10 +77,10 @@
 - [ ] Auto-advance after video completes
 - [ ] Audio playback option
 
-### 7. Error Detection & Reporting
-- [ ] Capture and log all errors
-- [ ] Error log viewer in web UI
-- [ ] Error details (timestamp, type, context)
+### 7. Error Detection & Reporting (Partially Complete)
+- [x] Capture and log all errors
+- [x] Error log viewer in web UI
+- [x] Error details (timestamp, type, context)
 - [ ] Export error logs
 - [ ] Clear error log option
 
@@ -116,13 +119,13 @@
 - [ ] User feedback history view
 - [ ] Anonymous submission option
 
-### 11. Performance Monitoring & System Health
+### 11. Performance Monitoring & System Health (Partially Complete)
 **Real-time Metrics:**
-- [ ] CPU usage (current, average, per-core if multi-core)
-- [ ] Memory usage (total, used, free, available, swap)
+- [x] CPU usage (current, average, per-core if multi-core)
+- [x] Memory usage (total, used, free, available, swap)
 - [ ] Memory leak detection (track growth over time)
-- [ ] Temperature monitoring (CPU temp, GPU temp if available)
-- [ ] Disk/filesystem usage (used, free, percentage)
+- [x] Temperature monitoring (CPU temp, GPU temp if available)
+- [x] Disk/filesystem usage (used, free, percentage)
 - [ ] Network usage (bandwidth, requests per minute)
 - [ ] Process uptime and restart count
 
@@ -134,21 +137,21 @@
 - [ ] Export metrics data (CSV/JSON)
 
 **Web UI Dashboard:**
-- [ ] System status card with live metrics
-- [ ] Visual indicators (gauges, progress bars)
+- [x] System status card with live metrics
+- [x] Visual indicators (gauges, progress bars)
 - [ ] Color-coded warnings (green/yellow/red)
 - [ ] Performance graphs (CPU, memory over time)
 - [ ] Disk space breakdown by directory
 - [ ] Alert thresholds configuration
 
 **Alerts & Warnings:**
-- [ ] High CPU usage alert (>80% sustained)
-- [ ] Low memory warning (<100 MB free)
+- [x] High CPU usage alert (>80% sustained)
+- [x] Low memory warning (<100 MB free)
 - [ ] Disk space warning (<1 GB free)
-- [ ] High temperature alert (>80°C)
+- [x] High temperature alert (>80°C)
 - [ ] Memory leak detection (continuous growth)
 - [ ] Swap usage warning
-- [ ] Send alerts via Telegram (if enabled)
+- [x] Send alerts via Telegram (if enabled)
 - [ ] Log performance issues to error log
 
 **Optimization Tools:**
@@ -162,7 +165,7 @@
 - [ ] GPU memory split monitoring
 - [ ] Throttling detection (under-voltage, thermal)
 - [ ] SD card health monitoring
-- [ ] vcgencmd integration for Pi metrics
+- [x] vcgencmd integration for Pi metrics
 
 ---
 
