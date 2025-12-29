@@ -99,129 +99,7 @@
             --border-setting: 1px solid #eee;
         }
         
-        /* Light Theme */
-        [data-theme="light"] {
-            --bg-primary: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            --bg-card: #ffffff;
-            --bg-input: #ffffff;
-            --bg-hover: #f0f4ff;
-            --bg-dragover: #e8ecff;
-            --bg-secondary: #f8f9fa;
-            --bg-tertiary: #e9ecef;
-            --bg-modal: rgba(0,0,0,0.3);
-            --bg-modal-content: #ffffff;
-            --bg-image-modal: rgba(0,0,0,0.85);
-            --bg-log-viewer: #f5f5f5;
-            --bg-directory-item: #f8f9fa;
-            --bg-directory-item-hover: #e9ecef;
-            --bg-toggle: #ccc;
-            --bg-toggle-active: #667eea;
-            
-            --text-primary: #1a1a1a;
-            --text-secondary: #555555;
-            --text-header: #2c3e50;
-            --text-log: #2c3e50;
-            --text-caption: #555555;
-            
-            --accent-primary: #667eea;
-            --accent-secondary: #764ba2;
-            --accent-border: #667eea;
-            --accent-border-hover: #764ba2;
-            
-            --status-value: #667eea;
-            
-            --tab-bg: rgba(44, 62, 80, 0.1);
-            --tab-bg-hover: rgba(44, 62, 80, 0.2);
-            --tab-bg-active: #ffffff;
-            --tab-text: #2c3e50;
-            --tab-text-active: #667eea;
-            --tab-border: rgba(44, 62, 80, 0.2);
-            
-            --input-border: #cccccc;
-            --input-border-focus: #667eea;
-            --input-text: #1a1a1a;
-            
-            --modal-close: #888888;
-            --modal-close-hover: #000000;
-            --image-modal-close: #ffffff;
-            --image-modal-close-hover: #667eea;
-            
-            --shadow-card: 0 10px 30px rgba(0,0,0,0.15);
-            --shadow-button: 0 4px 15px rgba(0,0,0,0.08);
-            --shadow-button-hover: 0 6px 20px rgba(0,0,0,0.15);
-        }
-        
-        /* Dark Theme */
-        [data-theme="dark"] {
-            --bg-primary: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            --bg-card: #2d3748;
-            --bg-input: #2d3748;
-            --bg-hover: #3a4556;
-            --bg-dragover: #4a5568;
-            --bg-secondary: #1a202c;
-            --bg-tertiary: #2d3748;
-            --bg-modal: rgba(0,0,0,0.7);
-            --bg-modal-content: #2d3748;
-            --bg-image-modal: rgba(0,0,0,0.95);
-            --bg-log-viewer: #1a1a1a;
-            --bg-directory-item: #2d3748;
-            --bg-directory-item-hover: #3a4556;
-            --bg-toggle: #4a5568;
-            --bg-toggle-active: #667eea;
-            
-            --text-primary: #e2e8f0;
-            --text-secondary: #a0aec0;
-            --text-header: #e2e8f0;
-            --text-log: #d4d4d4;
-            --text-caption: #a0aec0;
-            
-            --accent-primary: #667eea;
-            --accent-secondary: #764ba2;
-            --accent-border: #667eea;
-            --accent-border-hover: #8b9fff;
-            
-            --status-value: #8b9fff;
-            
-            --alert-success-bg: #1e4620;
-            --alert-success-text: #a5d6a7;
-            --alert-success-border: #4caf50;
-            --alert-error-bg: #5c1e1e;
-            --alert-error-text: #ef9a9a;
-            --alert-error-border: #f44336;
-            --alert-warning-bg: #5c4a1e;
-            --alert-warning-text: #fff59d;
-            --alert-warning-border: #ffc107;
-            
-            --tab-bg: rgba(255, 255, 255, 0.1);
-            --tab-bg-hover: rgba(255, 255, 255, 0.2);
-            --tab-bg-active: #2d3748;
-            --tab-text: #e2e8f0;
-            --tab-text-active: #8b9fff;
-            --tab-border: rgba(255, 255, 255, 0.2);
-            
-            --input-border: #4a5568;
-            --input-border-focus: #667eea;
-            --input-text: #e2e8f0;
-            
-            --modal-close: #a0aec0;
-            --modal-close-hover: #e2e8f0;
-            --image-modal-close: #ffffff;
-            --image-modal-close-hover: #8b9fff;
-            
-            --shadow-card: 0 10px 30px rgba(0,0,0,0.4);
-            --shadow-button: 0 4px 15px rgba(0,0,0,0.3);
-            --shadow-button-hover: 0 6px 20px rgba(0,0,0,0.4);
-            --shadow-save-button: 0 8px 25px rgba(17, 153, 142, 0.5);
-            --shadow-save-button-hover: 0 12px 35px rgba(17, 153, 142, 0.6);
-            --shadow-modal: 0 10px 30px rgba(0,0,0,0.5);
-            --shadow-image: 0 4px 15px rgba(0,0,0,0.4);
-            --shadow-image-hover: 0 6px 20px rgba(0,0,0,0.5);
-            --shadow-image-modal: 0 8px 32px rgba(0,0,0,0.7);
-            --shadow-alert: 0 8px 25px rgba(0,0,0,0.5);
-            
-            --border-divider: #4a5568;
-            --border-setting: 1px solid #4a5568;
-        }
+        /* All theme definitions are loaded from themes.css - loaded after inline styles to ensure they override */
         
         * {
             margin: 0;
@@ -1102,6 +980,7 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="/static/themes.css">
 </head>
 <body>
     <div class="container">
@@ -1443,8 +1322,29 @@
                             <option value="default">Default</option>
                             <option value="light">Light</option>
                             <option value="dark">Dark</option>
+                            <option value="nord">Nord</option>
+                            <option value="dracula">Dracula</option>
+                            <option value="solarized-dark">Solarized Dark</option>
+                            <option value="solarized-light">Solarized Light</option>
+                            <option value="gruvbox">Gruvbox</option>
+                            <option value="one-dark">One Dark</option>
+                            <option value="material-dark">Material Dark</option>
+                            <option value="material-light">Material Light</option>
+                            <option value="high-contrast">High Contrast</option>
+                            <option value="forest">Forest</option>
+                            <option value="ocean">Ocean</option>
+                            <option value="monochrome">Monochrome</option>
+                            <option value="monokai">Monokai</option>
+                            <option value="flatland">Flatland</option>
+                            <option value="catppuccin-mocha">Catppuccin Mocha</option>
+                            <option value="catppuccin-macchiato">Catppuccin Macchiato</option>
+                            <option value="catppuccin-frappe">Catppuccin Frappé</option>
+                            <option value="catppuccin-latte">Catppuccin Latte</option>
                         </select>
                         <small class="text-small">Choose your preferred color scheme</small>
+                        <div id="theme-debug" style="margin-top: 8px; padding: 8px; background: var(--bg-secondary); border-radius: 4px; font-size: 0.85em; color: var(--text-secondary);">
+                            <strong>Debug:</strong> Current theme: <span id="current-theme-display">loading...</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1565,18 +1465,41 @@
         
         // Theme management
         function changeTheme(theme) {
-            document.documentElement.setAttribute('data-theme', theme);
-            localStorage.setItem('piGallery-theme', theme);
+            if (theme === 'default' || !theme) {
+                // Remove data-theme attribute to use :root styles
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.setItem('piGallery-theme', 'default');
+            } else {
+                document.documentElement.setAttribute('data-theme', theme);
+                localStorage.setItem('piGallery-theme', theme);
+            }
             // Update selector if it exists
             const selector = document.getElementById('theme-selector');
             if (selector) {
-                selector.value = theme;
+                selector.value = theme || 'default';
+            }
+            // Update debug display
+            updateThemeDebug();
+        }
+        
+        function updateThemeDebug() {
+            const debugDisplay = document.getElementById('current-theme-display');
+            if (debugDisplay) {
+                const currentTheme = document.documentElement.getAttribute('data-theme') || 'default (:root)';
+                const cssLoaded = document.querySelector('link[href="/static/themes.css"]') ? 'Yes' : 'No';
+                debugDisplay.textContent = currentTheme + ' | CSS loaded: ' + cssLoaded;
             }
         }
         
         function loadTheme() {
-            const savedTheme = localStorage.getItem('piGallery-theme') || 'default';
-            changeTheme(savedTheme);
+            const savedTheme = localStorage.getItem('piGallery-theme');
+            if (savedTheme) {
+                changeTheme(savedTheme);
+            } else {
+                // No saved theme, use default (no data-theme attribute = uses :root styles)
+                document.documentElement.removeAttribute('data-theme');
+                updateThemeDebug();
+            }
         }
         let isPaused = false;
 
@@ -1593,6 +1516,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Load theme first
             loadTheme();
+            // Update debug after a short delay to ensure CSS is loaded
+            setTimeout(updateThemeDebug, 100);
             updateStatus();
             loadSettings();
             setInterval(updateStatus, 3000); // Update every 3 seconds
@@ -1915,7 +1840,7 @@
             const themeSelector = document.getElementById('theme-selector');
             if (themeSelector) {
                 const savedTheme = localStorage.getItem('piGallery-theme') || 'default';
-                themeSelector.value = savedTheme;
+                themeSelector.value = savedTheme || 'default';
             }
             try {
                 const response = await fetch('/api/settings');
