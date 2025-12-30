@@ -1186,20 +1186,41 @@ class Slideshow:
                     else:
                         full_path = os.path.join(self.folder, img_path)
 
-                    if sort_order in ['date_taken', 'date_created', 'date_modified']:
-                        sort_key = self.get_image_date(img_path, sort_order)
-                        print(f"[Slideshow] Sort key for {os.path.basename(img_path)}: {sort_key} ({sort_order})")
-                    elif sort_order == 'size':
-                        # Get file size
-                        sort_key = os.path.getsize(full_path)
+                    sort_key = self.get_image_date(img_path, sort_order)
+                    print(f"[Slideshow] Sort key for {os.path.basename(img_path)}: {sort_key} ({sort_order})")
 
-                # Default fallback
+                elif sort_order == 'size':
+                    # Get file path for size operations
+                    if img_path.startswith('uploaded/'):
+                        upload_dir = self.config.get('upload_directory', '').strip()
+                        if upload_dir:
+                            full_path = os.path.join(os.path.expanduser(upload_dir), img_path[9:])
+                        else:
+                            full_path = os.path.join(self.folder, img_path[9:])
+                    else:
+                        full_path = os.path.join(self.folder, img_path)
+
+                    if os.path.exists(full_path):
+                        sort_key = os.path.getsize(full_path)
+                    else:
+                        sort_key = 0
+
+                # Default fallback - use appropriate type for sort_order
                 if sort_key is None:
-                    sort_key = self.natural_sort_key(os.path.basename(img_path))
+                    if sort_order in ['date_taken', 'date_created', 'date_modified']:
+                        # For date sorting, use None (will be handled in sorting logic)
+                        sort_key = None
+                    else:
+                        # For other sorting, use filename
+                        sort_key = self.natural_sort_key(os.path.basename(img_path))
 
             except Exception as e:
                 print(f"[Slideshow] Error getting sort key for {img_path}: {e}")
-                sort_key = os.path.basename(img_path).lower()
+                # Use appropriate fallback based on sort_order
+                if sort_order in ['date_taken', 'date_created', 'date_modified']:
+                    sort_key = None  # Will be handled in sorting logic
+                else:
+                    sort_key = self.natural_sort_key(os.path.basename(img_path))
 
             image_sort_data.append((img_path, sort_key))
 
@@ -1210,10 +1231,14 @@ class Slideshow:
             if sort_order == 'size':
                 # For size, we want largest first by default (most interesting images)
                 # But since we pop from end, largest should be at end for "largest first"
-                image_sort_data.sort(key=lambda x: x[1] or 0, reverse=reverse_order)
+                image_sort_data.sort(key=lambda x: x[1] if x[1] is not None else 0, reverse=reverse_order)
+            elif sort_order in ['date_taken', 'date_created', 'date_modified']:
+                # For dates, use a very old date for None values so they sort to the end/beginning
+                import datetime
+                default_date = datetime.datetime.min if reverse_order else datetime.datetime.max
+                image_sort_data.sort(key=lambda x: x[1] if x[1] is not None else default_date, reverse=not reverse_order)
             else:
-                # For dates and filenames, chronological/alphabetical order
-                # Since we pop from end, we need to reverse the sort order
+                # For filenames, use the natural sort key
                 image_sort_data.sort(key=lambda x: x[1], reverse=not reverse_order)
         except Exception as e:
             print(f"[Slideshow] Error sorting images: {e}")
