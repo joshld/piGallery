@@ -1201,8 +1201,6 @@ class Slideshow:
         # Sort the images
         # Note: Since we pop() from the end of the list, we need to reverse the sort
         # so that the "first" items are at the end and get popped first
-        print(f"[Slideshow] Before sort: image_sort_data[0] = {os.path.basename(image_sort_data[0][0])} ({image_sort_data[0][1]})")
-        print(f"[Slideshow] Before sort: image_sort_data[-1] = {os.path.basename(image_sort_data[-1][0])} ({image_sort_data[-1][1]})")
         try:
             if sort_order == 'size':
                 # For size, we want largest first by default (most interesting images)
@@ -1212,8 +1210,6 @@ class Slideshow:
                 # For dates and filenames, chronological/alphabetical order
                 # Since we pop from end, we need to reverse the sort order
                 image_sort_data.sort(key=lambda x: x[1], reverse=not reverse_order)
-                print(f"[Slideshow] After sort with reverse={not reverse_order}: image_sort_data[0] = {os.path.basename(image_sort_data[0][0])} ({image_sort_data[0][1]})")
-                print(f"[Slideshow] After sort: image_sort_data[-1] = {os.path.basename(image_sort_data[-1][0])} ({image_sort_data[-1][1]})")
         except Exception as e:
             print(f"[Slideshow] Error sorting images: {e}")
             # Fallback to filename sort with natural sorting
@@ -1224,15 +1220,6 @@ class Slideshow:
 
         order_desc = "ascending" if not reverse_order else "descending"
         print(f"[Slideshow] Sorted {len(sorted_images)} images by {sort_order} ({order_desc})")
-
-        # Debug: Print first and last few sorted images with dates
-        print("[Slideshow] First 3 sorted images (latest dates):")
-        for i, (img_path, sort_key) in enumerate(image_sort_data[:3]):
-            print(f"[Slideshow]   {i+1}. {os.path.basename(img_path)} ({sort_key})")
-        print("[Slideshow] Last 3 sorted images (earliest dates):")
-        for i, (img_path, sort_key) in enumerate(image_sort_data[-3:]):
-            print(f"[Slideshow]   {len(image_sort_data)-3+i+1}. {os.path.basename(img_path)} ({sort_key})")
-
         return sorted_images
 
     def refresh_images(self):
@@ -1326,7 +1313,7 @@ class Slideshow:
                 # First time, refresh to get images
                 self.refresh_images()
 
-            if self.images and not hasattr(self, '_all_images'):
+            if self.images and (not hasattr(self, '_all_images') or not self._all_images):
                 # Build the complete image list for circular navigation
                 # self.images is already sorted with latest dates first
                 # Popping gives us earliest dates first (correct viewing order)
@@ -1335,9 +1322,6 @@ class Slideshow:
                 while temp_queue:
                     self._all_images.append(temp_queue.pop())
                 # _all_images now has earliest dates first (correct viewing order)
-                print(f"[Slideshow] Built _all_images with {len(self._all_images)} images")
-                print(f"[Slideshow] _all_images[0]: {os.path.basename(self._all_images[0])}")
-                print(f"[Slideshow] _all_images[-1]: {os.path.basename(self._all_images[-1])}")
 
                 # Start circular navigation
                 self.current_index = 0
@@ -1363,9 +1347,7 @@ class Slideshow:
                     self.refresh_images()
 
                 if self.images:
-                    print(f"[Slideshow] Popping from images: images[-1] = {self.images[-1] if self.images else 'None'}")
                     self.current_img = self.images.pop()
-                    print(f"[Slideshow] Popped: {self.current_img}")
                     self.history.append(self.current_img)
                     self.current_index = len(self.history) - 1
                 elif self.history:
@@ -1406,7 +1388,6 @@ class Slideshow:
                 self.telegram.notify_image_change(self.current_img, self.current_index + 1, len(self._all_images))
         else:
             # Fallback to old navigation logic
-            print(f"[Slideshow] Using fallback prev navigation, current_index={self.current_index}")
             if self.current_index > 0:
                 # Go back in history
                 self.current_index -= 1
