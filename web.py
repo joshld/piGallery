@@ -1639,11 +1639,11 @@ def register_routes():
                     config['gallery'] = {}
                 
                 # Update config file
-                for key in ['show_time', 'show_date', 'show_temperature', 'show_weather_code', 
+                for key in ['show_time', 'show_date', 'show_temperature', 'show_weather_code',
                            'show_filename', 'show_caption', 'display_off_time', 'display_on_time',
                            'location_city_suburb', 'display_correction_horizontal', 'display_correction_vertical',
                            'ui_text_alpha', 'weather_update_seconds', 'upload_directory', 'images_directory',
-                           'shutdown_on_display_off', 'shutdown_countdown_seconds']:
+                           'shutdown_on_display_off', 'shutdown_countdown_seconds', 'sort_order', 'sort_reverse']:
                     if key in data:
                         config['gallery'][key] = str(data[key])
                 

@@ -1643,7 +1643,9 @@ def main():
         'display_correction_vertical': get_config_value('display_correction_vertical', '1.0'),
         'image_history_size': get_config_value('image_history_size', '5'),
         'shutdown_on_display_off': get_config_value('shutdown_on_display_off', 'true'),
-        'shutdown_countdown_seconds': get_config_value('shutdown_countdown_seconds', '10')
+        'shutdown_countdown_seconds': get_config_value('shutdown_countdown_seconds', '10'),
+        'sort_order': get_config_value('sort_order', 'random'),
+        'sort_reverse': get_config_value('sort_reverse', 'false')
     }
 
     # Initialize Telegram notifier
