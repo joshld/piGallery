@@ -65,8 +65,9 @@ Once the gallery is running, you can control it from any device on your network:
 
 **Access URLs:**
 - **Local computer:** `http://localhost:5000`
-- **Same network:** `http://[YOUR_IP_ADDRESS]:5000`
-- **Raspberry Pi (if applicable):** `http://raspberrypi.local:5000`
+- **Via hostname:** `http://[HOSTNAME]:5000` (e.g., `http://Josh-PC:5000`)
+- **Via IP address:** `http://[YOUR_IP_ADDRESS]:5000`
+- **Raspberry Pi (mDNS):** `http://raspberrypi.local:5000`
 
 **From any device:**
 - Open the URL above in any browser (Chrome, Firefox, Safari, Edge)
@@ -218,9 +219,14 @@ If you want to integrate with other systems, the following API endpoints are ava
 
 ### Access URLs
 - **Local computer:** `http://localhost:5000`
-- **Windows network:** `http://[YOUR_IP]:5000` (find IP with `ipconfig`)
-- **Linux/Raspberry Pi:** `http://[YOUR_IP]:5000` (find IP with `hostname -I`)
+- **Via hostname:** `http://[HOSTNAME]:5000` (e.g., `http://Josh-PC:5000`)
+- **Via IP address:** `http://[YOUR_IP]:5000`
 - **Raspberry Pi (mDNS):** `http://raspberrypi.local:5000`
+
+**Find your hostname:**
+- **Windows:** Run `hostname` in Command Prompt
+- **Linux/Raspberry Pi:** Run `hostname` in terminal
+- **macOS:** Run `hostname` in terminal
 
 ### Web Interface Features
 - **Playback:** Previous, Next, Pause/Resume

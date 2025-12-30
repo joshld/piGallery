@@ -18,15 +18,18 @@ def main():
     # Check Python version
     print('1. Checking Python version...')
     try:
-        result = subprocess.run([sys.executable, '--version'], capture_output=True, text=True)
-        if result.returncode == 0:
-            print(f'Python version: {result.stdout.strip()}')
-            print('Python is installed [OK]')
+        version_info = sys.version_info
+        version_str = f'{version_info.major}.{version_info.minor}.{version_info.micro}'
+        print(f'Python version: {version_str}')
+
+        if version_info >= (3, 7):
+            print('Python 3.7+ is installed [OK]')
         else:
-            print('Python not found [FAIL]')
+            print(f'Python {version_str} found, but 3.7+ required [FAIL]')
+            print('Please upgrade Python: https://python.org/downloads/')
             sys.exit(1)
     except Exception as e:
-        print(f'Error checking Python: {e}')
+        print(f'Error checking Python version: {e}')
         sys.exit(1)
 
     print()
@@ -51,7 +54,8 @@ def main():
 
     # Check if dependencies are installed
     print('3. Checking Python dependencies...')
-    dependencies = ['flask', 'flask_cors', 'pygame', 'requests', 'geopy']
+    # Core dependencies from requirements.txt (excluding optional telegram bot)
+    dependencies = ['flask', 'flask_cors', 'pygame', 'requests', 'geopy', 'psutil', 'PIL', 'piexif']
     missing_deps = []
 
     for dep in dependencies:
@@ -105,8 +109,40 @@ def main():
 
     print()
 
+    # Check port availability
+    print('7. Checking port availability...')
+    try:
+        import socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        result = sock.connect_ex(('127.0.0.1', 5000))
+        sock.close()
+        if result == 0:
+            print('Port 5000 is in use [WARNING]')
+            print('  Make sure no other web server is running on port 5000')
+        else:
+            print('Port 5000 is available [OK]')
+    except Exception as e:
+        print(f'Could not check port 5000: {e}')
+
+    print()
+
+    # Check file permissions
+    print('8. Checking file permissions...')
+    try:
+        # Check if we can write to current directory (needed for config.ini and uploads)
+        test_file = '.permission_test'
+        with open(test_file, 'w') as f:
+            f.write('test')
+        os.remove(test_file)
+        print('Write permissions in current directory [OK]')
+    except Exception as e:
+        print(f'Cannot write to current directory [WARNING]')
+        print('  This may cause issues with config saving and uploads')
+
+    print()
+
     # Network check
-    print('7. Network information...')
+    print('9. Network information...')
     try:
         hostname = socket.gethostname()
         print(f'  Hostname: {hostname}')
@@ -114,9 +150,11 @@ def main():
         try:
             ip = socket.gethostbyname(hostname)
             print(f'  IP Address: {ip}')
-            print(f'  Web interface will be available at: http://{ip}:5000')
+            print(f'  Hostname access: http://{hostname}:5000')
+            print(f'  IP access: http://{ip}:5000')
         except:
             print('  Could not determine IP address')
+            print(f'  Hostname access: http://{hostname}:5000')
     except Exception as e:
         print(f'Error getting network info: {e}')
 
@@ -129,7 +167,7 @@ def main():
     print('1. If dependencies are missing, run: pip install -r requirements.txt')
     print('2. Edit config.ini to set your images directory')
     print('3. Run the gallery: python gallery.py')
-    print('4. Access web interface at: http://[YOUR_IP]:5000')
+    print('4. Access web interface at: http://[YOUR_IP]:5000 or http://[HOSTNAME]:5000')
     print()
 
 if __name__ == '__main__':
