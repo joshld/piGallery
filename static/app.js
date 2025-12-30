@@ -24,7 +24,7 @@ function updateThemeDebug() {
     if (debugDisplay) {
         const currentTheme = document.documentElement.getAttribute('data-theme') || 'default (:root)';
         const cssLoaded = document.querySelector('link[href="/static/themes.css"]') ? 'Yes' : 'No';
-        debugDisplay.textContent = currentTheme + ' | CSS loaded: ' + cssLoaded;
+        debugDisplay.textContent = currentTheme;
     }
 }
 
@@ -1216,6 +1216,9 @@ async function loadUploadedImages() {
         if (uploadedImages.length === 0) {
             // Show empty state
             document.getElementById('images-empty').style.display = 'block';
+            document.getElementById('images-grid').style.display = 'none';
+            // Keep actions visible so delete button can be updated
+            document.getElementById('images-actions').style.display = 'block';
         } else {
             // Show images grid
             document.getElementById('images-grid').style.display = 'block';
@@ -1414,19 +1417,34 @@ function toggleEditMode() {
 }
 
 function updateDeleteButton() {
+    const modal = document.getElementById('manageImagesModal');
+
+    // Only update if modal is actually open
+    if (!modal || modal.style.display !== 'block') {
+        console.log('Modal not open, skipping updateDeleteButton');
+        return;
+    }
+
     const deleteBtn = document.getElementById('delete-selected-btn');
     const selectedCount = document.getElementById('selected-count');
     const selectAllBtn = document.getElementById('select-all-btn');
+
+    // Double-check elements exist (belt and suspenders)
+    if (!deleteBtn || !selectedCount || !selectAllBtn) {
+        console.warn('Modal is open but required elements not found');
+        console.log('deleteBtn exists:', !!deleteBtn);
+        console.log('selectedCount exists:', !!selectedCount);
+        console.log('selectAllBtn exists:', !!selectAllBtn);
+        return;
+    }
 
     selectedCount.textContent = selectedImages.size;
     deleteBtn.disabled = selectedImages.size === 0;
 
     // Update select all button text and styling
-    if (uploadedImages.length > 0) {
-        const allSelected = selectedImages.size === uploadedImages.length;
-        selectAllBtn.textContent = allSelected ? 'Deselect All' : 'Select All';
-        selectAllBtn.className = allSelected ? 'btn-success' : 'btn-secondary';
-    }
+    const allSelected = uploadedImages.length > 0 && selectedImages.size === uploadedImages.length;
+    selectAllBtn.textContent = allSelected ? 'Deselect All' : 'Select All';
+    selectAllBtn.className = allSelected ? 'btn-success' : 'btn-secondary';
 }
 
 async function deleteSelectedImages() {
@@ -1488,6 +1506,12 @@ async function deleteSelectedImages() {
         // Restore button
         deleteBtn.innerHTML = originalText;
         deleteBtn.disabled = false;
+
+        // Now refresh the grid and update the delete button state after it's restored
+        if (uploadedImages.length > 0) {
+            renderImagesGrid();
+        }
+        updateDeleteButton();
     }
 }
 
