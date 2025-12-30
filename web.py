@@ -53,7 +53,31 @@ def get_image_caption(img_path):
             return None
         
         img = Image.open(img_path)
+        img_format = img.format or 'JPEG'
         caption = None
+        
+        # For PNG files, check text chunks first
+        if img_format == 'PNG':
+            try:
+                # PNG stores text in info dict
+                if img.info:
+                    # Check for "Comment" key first (Windows Explorer "Comments" property)
+                    if 'Comment' in img.info:
+                        caption = img.info['Comment']
+                        if caption and isinstance(caption, str) and caption.strip():
+                            return caption.strip()
+                    # Also check for "Description" key (fallback)
+                    if 'Description' in img.info:
+                        caption = img.info['Description']
+                        if caption and isinstance(caption, str) and caption.strip():
+                            return caption.strip()
+                    # Also check for "caption" key
+                    if 'caption' in img.info:
+                        caption = img.info['caption']
+                        if caption and isinstance(caption, str) and caption.strip():
+                            return caption.strip()
+            except Exception:
+                pass
         
         # Try EXIF UserComment (tag 37510) - this is the "Comments" field
         # Use piexif for better UserComment reading support
@@ -344,99 +368,210 @@ def register_routes():
         return img_path if os.path.exists(img_path) else None
     
     def set_image_caption(img_path, caption):
-        """Write caption to image metadata (EXIF/IPTC)
+        """Write caption to image metadata (EXIF for JPEG, text chunks for PNG)
         Returns True if successful, False otherwise
         
-        Note: PIL's EXIF writing is limited. For best results, use piexif library.
-        This function will try piexif first, then fall back to PIL's basic capabilities."""
+        JPEG files: Uses piexif library for EXIF UserComment
+        PNG files: Uses PIL's text chunk support (tEXt)
+        Other formats: Attempts PIL's info dict"""
         try:
             from PIL import Image
             from PIL.ExifTags import TAGS
+            import tempfile
+            import shutil
             
             if not os.path.exists(img_path):
                 return False
             
-            # Try using piexif library (better EXIF support)
-            try:
-                import piexif
-                import tempfile
-                import shutil
-                
-                # Read current EXIF data (or create new if none exists)
+            # Open image to determine format
+            img = Image.open(img_path)
+            img_format = img.format or 'JPEG'
+            
+            # Handle PNG files using text chunks
+            if img_format == 'PNG':
                 try:
-                    with open(img_path, 'rb') as f:
-                        exif_dict = piexif.load(f.read())
-                except Exception:
-                    # No existing EXIF, create new dict
-                    exif_dict = {'0th': {}, 'Exif': {}, 'GPS': {}, '1st': {}, 'thumbnail': None}
-                
-                # Set UserComment (tag 37510 in Exif IFD) - this is the "Comments" field in image viewers
-                # UserComment format: 8-byte encoding identifier + text bytes
-                # Format: "ASCII\0\0\0" + text (for ASCII) or "UNICODE\0\0\0\0" + text (for Unicode)
-                if 'Exif' not in exif_dict:
-                    exif_dict['Exif'] = {}
-                
-                if caption:
-                    # Use ASCII encoding prefix for better compatibility
-                    # Format: "ASCII\0\0\0" (8 bytes) + text bytes
-                    caption_bytes = caption.encode('utf-8')
-                    user_comment = b'ASCII\x00\x00\x00' + caption_bytes
-                else:
-                    user_comment = b'ASCII\x00\x00\x00'
-                
-                exif_dict['Exif'][piexif.ExifIFD.UserComment] = user_comment
-                
-                # Convert EXIF dict to bytes
-                exif_bytes = piexif.dump(exif_dict)
-                
-                # Read original image data
-                with open(img_path, 'rb') as f:
-                    img_data = f.read()
-                
-                # Create temporary file for output
-                temp_fd, temp_path = tempfile.mkstemp(suffix='.jpg')
-                try:
-                    os.close(temp_fd)
+                    from PIL import PngImagePlugin
                     
-                    # Insert EXIF into image and write to temp file
-                    piexif.insert(exif_bytes, img_data, temp_path)
+                    # PNG supports text chunks (tEXt, zTXt, iTXt)
+                    # Use PngInfo for proper PNG metadata support
+                    pnginfo = PngImagePlugin.PngInfo()
                     
-                    # Replace original file with updated one
-                    shutil.move(temp_path, img_path)
-                    return True
-                except Exception as e:
-                    # Clean up temp file on error
+                    # Copy existing text chunks from original image (except Comment if we're updating it)
+                    if img.info:
+                        for key, value in img.info.items():
+                            # Skip Comment if we're setting a new caption
+                            if key == 'Comment' and caption:
+                                continue
+                            # Only copy text values (PNG text chunks are strings)
+                            if isinstance(value, str):
+                                pnginfo.add_text(key, value)
+                    
+                    # Store caption in PNG text chunk
+                    # Try multiple keys for maximum compatibility
+                    # "Comment" is the standard PNG text chunk key
+                    # Windows Explorer may or may not display this depending on version
+                    if caption:
+                        pnginfo.add_text("Comment", caption)
+                        # Also add as Description for compatibility
+                        pnginfo.add_text("Description", caption)
+                    # If caption is empty and Comment existed, it will be omitted (removed)
+                    
+                    # Ensure image is fully loaded (convert to RGB/RGBA if needed for saving)
+                    img.load()  # Ensure image is loaded
+                    
+                    # Convert palette images to RGB for better compatibility
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    elif img.mode not in ('RGB', 'RGBA', 'L', 'LA'):
+                        # Convert unsupported modes to RGB
+                        if img.mode in ('1', 'I', 'F'):
+                            img = img.convert('RGB')
+                    
+                    # Save with PngInfo (this properly writes text chunks)
+                    # Note: We need to preserve other PNG settings like compression
+                    save_kwargs = {'format': 'PNG', 'pnginfo': pnginfo}
+                    if 'compress_level' in (img.info or {}):
+                        save_kwargs['compress_level'] = img.info.get('compress_level', 6)
+                    
+                    # Save to a temporary file first, then move it (safer)
+                    import tempfile
+                    import shutil
+                    temp_fd, temp_path = tempfile.mkstemp(suffix='.png', dir=os.path.dirname(img_path) or '.')
                     try:
-                        if os.path.exists(temp_path):
-                            os.remove(temp_path)
+                        os.close(temp_fd)
+                        img.save(temp_path, **save_kwargs)
+                        img.close()
+                        
+                        # Replace original file
+                        shutil.move(temp_path, img_path)
+                        
+                        # Verify the caption was written
+                        verify_img = Image.open(img_path)
+                        written_caption = verify_img.info.get('Comment', '')
+                        written_description = verify_img.info.get('Description', '')
+                        has_comment = 'Comment' in verify_img.info
+                        has_description = 'Description' in verify_img.info
+                        all_text_keys = [k for k, v in verify_img.info.items() if isinstance(v, str)]
+                        verify_img.close()
+                        
+                        if caption:
+                            if written_caption == caption or written_description == caption:
+                                print(f"[Caption] Successfully wrote caption to PNG")
+                                print(f"[Caption] Text chunks in file: {all_text_keys}")
+                                print(f"[Caption] Comment value: '{written_caption}'")
+                                print(f"[Caption] Description value: '{written_description}'")
+                                print(f"[Caption] Note: Windows Explorer may not display PNG text chunks in Properties.")
+                                print(f"[Caption] The comment is embedded in the file and can be read by image viewers.")
+                                return True
+                            else:
+                                print(f"[Caption] Warning: Caption may not have been written correctly.")
+                                print(f"[Caption] Expected: '{caption}'")
+                                print(f"[Caption] Got Comment: '{written_caption}', Description: '{written_description}'")
+                                return False
+                        else:
+                            # Caption removed
+                            if not has_comment and not has_description:
+                                print(f"[Caption] Successfully removed caption from PNG")
+                                return True
+                            else:
+                                print(f"[Caption] Warning: Caption may not have been fully removed")
+                                return False
+                    except Exception as e:
+                        # Clean up temp file on error
+                        try:
+                            if os.path.exists(temp_path):
+                                os.remove(temp_path)
+                        except:
+                            pass
+                        raise e
+                except Exception as e:
+                    print(f"[Caption] Error writing PNG text chunk: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    try:
+                        img.close()
                     except:
                         pass
-                    raise e
-            except ImportError:
-                # piexif not available, try PIL's basic approach
-                # Note: PIL's EXIF writing is very limited
-                print("[Caption] piexif not available. Install with: pip install piexif for better EXIF support.")
-                
-                # For now, we'll save a note that piexif is recommended
-                # PIL can read EXIF but writing is problematic without piexif
-                return False
-            except Exception as e:
-                print(f"[Caption] Error using piexif: {e}, trying PIL fallback...")
-                # Fall through to PIL attempt below
-                pass
+                    return False
             
-            # Fallback: Try PIL (limited support)
-            try:
-                img = Image.open(img_path)
-                img_format = img.format or 'JPEG'
-                
-                # PIL's EXIF writing is very limited - we can't easily modify existing EXIF
-                # For now, just return False and recommend piexif
-                print(f"[Caption] PIL cannot reliably write EXIF. Install piexif for full support.")
-                return False
-            except Exception as e:
-                print(f"[Caption] Error with PIL fallback: {e}")
-                return False
+            # Handle JPEG files using EXIF (piexif)
+            elif img_format in ('JPEG', 'JPG'):
+                try:
+                    import piexif
+                    
+                    # Read current EXIF data (or create new if none exists)
+                    try:
+                        with open(img_path, 'rb') as f:
+                            exif_dict = piexif.load(f.read())
+                    except Exception:
+                        # No existing EXIF, create new dict
+                        exif_dict = {'0th': {}, 'Exif': {}, 'GPS': {}, '1st': {}, 'thumbnail': None}
+                    
+                    # Set UserComment (tag 37510 in Exif IFD) - this is the "Comments" field in image viewers
+                    # UserComment format: 8-byte encoding identifier + text bytes
+                    if 'Exif' not in exif_dict:
+                        exif_dict['Exif'] = {}
+                    
+                    if caption:
+                        # Use ASCII encoding prefix for better compatibility
+                        # Format: "ASCII\0\0\0" (8 bytes) + text bytes
+                        caption_bytes = caption.encode('utf-8')
+                        user_comment = b'ASCII\x00\x00\x00' + caption_bytes
+                    else:
+                        user_comment = b'ASCII\x00\x00\x00'
+                    
+                    exif_dict['Exif'][piexif.ExifIFD.UserComment] = user_comment
+                    
+                    # Convert EXIF dict to bytes
+                    exif_bytes = piexif.dump(exif_dict)
+                    
+                    # Read original image data
+                    with open(img_path, 'rb') as f:
+                        img_data = f.read()
+                    
+                    # Create temporary file for output
+                    temp_fd, temp_path = tempfile.mkstemp(suffix='.jpg')
+                    try:
+                        os.close(temp_fd)
+                        
+                        # Insert EXIF into image and write to temp file
+                        piexif.insert(exif_bytes, img_data, temp_path)
+                        
+                        # Replace original file with updated one
+                        shutil.move(temp_path, img_path)
+                        return True
+                    except Exception as e:
+                        # Clean up temp file on error
+                        try:
+                            if os.path.exists(temp_path):
+                                os.remove(temp_path)
+                        except:
+                            pass
+                        raise e
+                except ImportError:
+                    print("[Caption] piexif not available for JPEG. Install with: pip install piexif")
+                    return False
+                except Exception as e:
+                    print(f"[Caption] Error using piexif for JPEG: {e}")
+                    return False
+            
+            # Handle other formats (TIFF, etc.) - try PIL's info dict
+            else:
+                try:
+                    # For other formats, try to save in info dict
+                    info = img.info.copy() if img.info else {}
+                    if caption:
+                        info['caption'] = caption
+                    else:
+                        if 'caption' in info:
+                            del info['caption']
+                    
+                    # Save with updated info
+                    img.save(img_path, format=img_format, **info)
+                    return True
+                except Exception as e:
+                    print(f"[Caption] Error writing caption for {img_format}: {e}")
+                    return False
                 
         except Exception as e:
             print(f"[Caption] Error setting caption for {img_path}: {e}")
