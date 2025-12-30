@@ -873,7 +873,18 @@ class Slideshow:
         # filename
         show_filename = self.config.get('show_filename', 'true').lower() == 'true'
         if show_filename and self.current_img:
-            text = f"{self.current_img} ({new_w}x{self.screen_h})"
+            # Add image index if available
+            index_text = ""
+            if hasattr(self, '_all_images') and self._all_images:
+                current_pos = self.current_index + 1
+                total_count = len(self._all_images)
+                index_text = f" {current_pos}/{total_count}"
+            elif hasattr(self, 'total_images') and self.total_images > 0:
+                # Fallback for when _all_images isn't available
+                current_pos = len(self.history)
+                index_text = f"{current_pos}/{self.total_images}"
+
+            text = f"{index_text} | {self.current_img} | {new_w}x{self.screen_h}"
 
             # Add sort metadata if sorting by size or date
             sort_order = self.config.get('sort_order', 'random')
@@ -899,14 +910,14 @@ class Slideshow:
                                 size_str = f"{size_bytes / 1024:.1f}KB"
                             else:
                                 size_str = f"{size_bytes}B"
-                            text += f" [{size_str}]"
+                            text += f" | {size_str}"
 
                         elif sort_order in ['date_taken', 'date_created', 'date_modified']:
                             # Show date
                             date_obj = self.get_image_date(self.current_img, sort_order)
                             if date_obj:
                                 date_str = date_obj.strftime('%Y-%m-%d %H:%M')
-                                text += f" [{date_str}]"
+                                text += f" | {date_str}"
                                 print(f"[Slideshow] Image {self.current_img} has {sort_order} date: {date_str}")
 
                 except Exception as e:
