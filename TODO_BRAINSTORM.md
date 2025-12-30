@@ -2,27 +2,39 @@
 
 ## 🎯 High Priority / Requested Features
 
-### 1. Image Captions from Metadata
-- [ ] Read EXIF/IPTC metadata from images
-- [ ] Support common caption fields (Title, Description, Caption)
-- [ ] Overlay captions on display (configurable position)
-- [ ] Add caption toggle in web UI settings
-- [ ] Support multi-line captions with word wrap
-- [ ] Font size/style configuration for captions
+### 1. Image Captions from Metadata ✅ COMPLETED (Major Enhancement)
+- [x] Read EXIF/IPTC metadata from images
+- [x] Support common caption fields (Title, Description, Caption)
+- [x] Overlay captions on display (configurable position)
+- [x] Add caption toggle in web UI settings
+- [x] Support multi-line captions with word wrap
+- [x] Font size/style configuration for captions
+- [x] **NEW:** Set/edit captions via web UI (`/api/image/caption`)
+- [x] **NEW:** Advanced metadata reading (EXIF, IPTC, XMP, PNG text chunks)
+- [x] **NEW:** Multi-format support (JPG, JPEG, PNG)
+- [x] **NEW:** Cross-platform metadata compatibility
+- [x] **NEW:** Caption validation and error handling
 
-### 2. Shutdown Button
-- [ ] Add shutdown button to web UI
-- [ ] Confirmation dialog before shutdown
-- [ ] Countdown timer display (e.g., "Shutting down in 10s...")
-- [ ] Graceful cleanup (save state, close connections)
-- [ ] Restart button option
-- [ ] Require sudo permissions handling
+### 2. Shutdown Button ✅ COMPLETED (Expanded)
+- [x] Add shutdown button to web UI
+- [x] Confirmation dialog before shutdown
+- [x] Countdown timer display (e.g., "Shutting down in 10s...")
+- [x] Graceful cleanup (save state, close connections)
+- [x] Restart button option
+- [x] Require sudo permissions handling
+- [x] **NEW:** Automatic shutdown at display off time (power savings)
+- [x] **NEW:** Configurable countdown duration
+- [x] **NEW:** Telegram notifications before shutdown
+- [x] **NEW:** Smart plug/timer setup guides
+- [x] **NEW:** Manual shutdown via web UI (`/api/system/shutdown`)
+- [x] **NEW:** System restart capability (`/api/system/restart`)
+- [x] **NEW:** Cancel pending operations (`/api/system/cancel`)
 
-### 2a. Error Detection & Reporting System ⭐ NEW
-- [ ] Structured error logging (timestamp, error type, stack trace)
-- [ ] Error log viewer in web UI
-- [ ] Error categories (file system, network, display, etc.)
-- [ ] Automatic error capture (unhandled exceptions)
+### 2a. Error Detection & Reporting System ⭐ PARTIALLY COMPLETE
+- [x] Structured error logging (timestamp, error type, stack trace)
+- [x] Error log viewer in web UI (`/api/logs`)
+- [x] Error categories (file system, network, display, etc.)
+- [x] Automatic error capture (unhandled exceptions)
 - [ ] Error notification alerts (email, web UI banner)
 - [ ] Error statistics dashboard
 - [ ] Export error logs (download as JSON/CSV)
@@ -31,6 +43,12 @@
 - [ ] Debug mode with verbose logging
 - [ ] Error rate limiting (prevent log spam)
 - [ ] Context capture (system state at time of error)
+- [x] **NEW:** Enhanced setup verification with comprehensive error checking
+- [x] **NEW:** Ultra-basic environment validation (before imports)
+- [x] **NEW:** Cross-platform error handling (Windows, Linux, macOS)
+- [x] **NEW:** Port availability testing
+- [x] **NEW:** File permission validation
+- [x] **NEW:** Detailed troubleshooting guidance
 
 ### 2b. Delete Uploaded Images ⭐ NEW
 - [ ] Identify uploaded vs original images
@@ -45,6 +63,25 @@
 - [ ] Warning if trying to delete non-uploaded images
 - [ ] Disk space freed indicator
 - [ ] Delete history/audit log
+
+### 2c. Cross-Platform Support ⭐ COMPLETED
+- [x] **Windows compatibility** - Full support for Windows PCs
+- [x] **Cross-platform setup** - Works on Windows, Linux, macOS, Raspberry Pi
+- [x] **Enhanced setup verification** - `test_setup.py` with comprehensive error checking
+- [x] **Platform-specific instructions** - Updated documentation for each platform
+- [x] **Unicode-safe error messages** - ASCII-only output for Windows terminal compatibility
+- [x] **Network configuration** - IP and hostname access verification
+- [x] **File permission validation** - Cross-platform permission checking
+- [x] **Port availability testing** - Checks if port 5000 is free on all platforms
+
+### 2d. System Control & Management ⭐ COMPLETED
+- [x] **Remote shutdown** - Safe system shutdown via web UI
+- [x] **Remote restart** - System restart capability
+- [x] **Cancel operations** - Cancel pending shutdown/restart
+- [x] **Countdown display** - Visual countdown timer before operations
+- [x] **Safety measures** - Confirmation dialogs and notifications
+- [x] **Security considerations** - Proper access control for system operations
+- [x] **Telegram integration** - Notifications for system operations
 
 ### 3. Web UI Color Schemes
 - [ ] Light mode (current)
@@ -346,18 +383,23 @@
 
 ---
 
-## 🎯 Quick Wins (Easy + High Impact)
+## ✅ Completed Quick Wins
+
+1. **Shutdown button** ✅ (expanded with auto-shutdown)
+2. **Basic error logging** ✅ (comprehensive error detection)
+3. **Error log viewer** ✅ (`/api/logs` endpoint)
+4. **Image captions** ✅ (full EXIF/IPTC/XMP support + editing)
+5. **Cross-platform setup** ✅ (Windows, Linux, macOS support)
+6. **Enhanced setup verification** ✅ (ultra-basic checks + comprehensive validation)
+
+## 🎯 Remaining Quick Wins (Still Available)
 
 1. **Adaptive frame rate** (30 min, huge CPU savings)
 2. **Time/date caching** (30 min, smoother display)
 3. **History limiting** (10 min, memory safety)
-4. **Shutdown button** (1 hour, useful feature)
-5. **Dark mode for web UI** (2 hours, better UX)
-6. **Image captions from .txt files** (2 hours, easy to implement)
-7. **Simple fade transition** (2 hours, looks professional)
-8. **Delete uploaded images button** (2 hours, safety + useful) ⭐ NEW
-9. **Basic error logging** (1 hour, debugging essential) ⭐ NEW
-10. **Error log viewer** (2 hours, see what went wrong) ⭐ NEW
+4. **Dark mode for web UI** (2 hours, better UX)
+5. **Simple fade transition** (2 hours, looks professional)
+6. **Delete uploaded images button** (2 hours, safety + useful)
 
 ---
 
@@ -393,43 +435,64 @@
 
 ## Priority Ranking
 
-### Must Have (v1.0)
-- Image captions
-- Shutdown button
-- Dark mode
-- Basic transitions
-- Live settings preview
-- Error detection & logging ⭐ NEW
-- Delete uploaded images ⭐ NEW
+### ✅ COMPLETED (v1.0 Core)
+- Image captions (enhanced with editing)
+- Shutdown button (expanded with auto-shutdown)
+- Error detection & logging (core features)
+- Cross-platform support (Windows, Linux, macOS)
+- System control features (shutdown/restart/cancel)
+- Enhanced setup verification
+- Performance monitoring (real-time metrics)
 
-### Should Have (v1.5)
+### 🔄 IN PROGRESS (v1.1)
+- Dark mode for web UI
+- Basic transitions (fade effects)
+- Delete uploaded images
+- Live settings preview
+
+### 📋 NEXT (v1.5)
 - Video support
-- Delete images
+- Image sorting/display order
 - Favorites system
-- Authentication
+- Authentication/security
 - Performance optimizations
 
-### Could Have (v2.0)
-- Cloud integration
-- Face detection
-- Smart features
-- Mobile app
-- Playlists
+### 🚀 FUTURE (v2.0+)
+- Cloud integration (Google Photos, Dropbox)
+- Face detection & recognition
+- Smart features (AI/ML)
+- Mobile app companion
+- Advanced playlists
 
-### Nice to Have (v3.0+)
-- AI features
-- Multi-display
-- Advanced analytics
-- Plugin system
-- Alternative display tech
+### 🌟 LONG TERM (v3.0++)
+- AI/ML features (scene detection, auto-tagging)
+- Multi-display support
+- Advanced analytics & monitoring
+- Plugin system & marketplace
+- Alternative display technologies (E-ink, etc.)
 
 ---
 
+## 📊 Current Project Status
+
+**Major Milestones Achieved:**
+- ✅ **Cross-platform compatibility** (Windows, Linux, macOS, Raspberry Pi)
+- ✅ **System management capabilities** (shutdown, restart, monitoring)
+- ✅ **Enhanced error handling** (comprehensive setup verification)
+- ✅ **Advanced image captioning** (metadata reading + editing)
+- ✅ **API expansion** (18 endpoints vs original ~11)
+- ✅ **Production readiness** (robust error handling, documentation)
+
+**Current Version:** v1.0 (feature complete for core functionality)
+
 ## Next Steps
 
-1. Prioritize features based on your needs
-2. Estimate effort for each feature
-3. Create milestone plan (v1.1, v1.2, etc.)
-4. Start with quick wins for momentum
-5. Get user feedback early and often
+1. **Polish existing features** (dark mode, transitions, delete functionality)
+2. **Performance optimization** (adaptive framerate, caching)
+3. **User experience improvements** (sorting, favorites, search)
+4. **Advanced features** (video support, authentication, cloud integration)
+5. **Community feedback** and testing on different platforms
+6. **Documentation updates** for new features
+
+**Priority Focus:** User experience and stability before adding more features.
 

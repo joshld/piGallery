@@ -287,11 +287,14 @@ def main():
         try:
             ip = socket.gethostbyname(hostname)
             print(f'  IP Address: {ip}')
-            print(f'  Hostname access: http://{hostname}:5000')
-            print(f'  IP access: http://{ip}:5000')
+            print(f'  Access URLs:')
+            print(f'    Via hostname: http://{hostname}:5000')
+            print(f'    Via IP: http://{ip}:5000')
+            print(f'    Local access: http://localhost:5000')
         except:
             print('  Could not determine IP address')
             print(f'  Hostname access: http://{hostname}:5000')
+            print(f'  Local access: http://localhost:5000')
     except Exception as e:
         print(f'Error getting network info: {e}')
 

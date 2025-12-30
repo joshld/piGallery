@@ -65,7 +65,7 @@ Once the gallery is running, you can control it from any device on your network:
 
 **Access URLs:**
 - **Local computer:** `http://localhost:5000`
-- **Via hostname:** `http://[HOSTNAME]:5000` (e.g., `http://Josh-PC:5000`)
+- **Via hostname:** `http://[HOSTNAME]:5000` (e.g., `http://COMPUTER-NAME:5000`)
 - **Via IP address:** `http://[YOUR_IP_ADDRESS]:5000`
 - **Raspberry Pi (mDNS):** `http://raspberrypi.local:5000`
 
@@ -219,7 +219,7 @@ If you want to integrate with other systems, the following API endpoints are ava
 
 ### Access URLs
 - **Local computer:** `http://localhost:5000`
-- **Via hostname:** `http://[HOSTNAME]:5000` (e.g., `http://Josh-PC:5000`)
+- **Via hostname:** `http://[HOSTNAME]:5000` (e.g., `http://COMPUTER-NAME:5000`)
 - **Via IP address:** `http://[YOUR_IP]:5000`
 - **Raspberry Pi (mDNS):** `http://raspberrypi.local:5000`
 

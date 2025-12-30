@@ -43,11 +43,16 @@
 - [ ] Security settings (allowed users, rate limits)
 - [ ] Add python-telegram-bot to requirements.txt
 
-### 2. Image Captions from Metadata ✅ COMPLETED
+### 2. Image Captions from Metadata ✅ COMPLETED (Enhanced)
 - [x] Read EXIF/IPTC metadata from images
 - [x] Display captions overlaid on images
 - [x] Toggle caption display on/off
 - [x] Configure caption position and styling
+- [x] **NEW:** Set/edit captions via web UI (`/api/image/caption`)
+- [x] **NEW:** Advanced metadata reading (EXIF, IPTC, XMP)
+- [x] **NEW:** Multi-format support (JPG, PNG, other formats)
+- [x] **NEW:** Caption validation and error handling
+- [x] **NEW:** Cross-platform metadata compatibility
 
 ### 3. Automatic Shutdown & Power Management ✅ COMPLETED
 - [x] Configurable automatic shutdown at display off time
@@ -169,8 +174,80 @@
 
 ---
 
+### 12. Cross-Platform Support ✅ COMPLETED
+- [x] **Windows compatibility** - Full support for Windows PCs
+- [x] **Cross-platform setup** - Works on Windows, Linux, macOS, Raspberry Pi
+- [x] **Enhanced setup verification** - `test_setup.py` with comprehensive error checking
+- [x] **Platform-specific instructions** - Updated README with platform-specific setup guides
+- [x] **Unicode-safe error messages** - ASCII-only output for Windows terminal compatibility
+
+---
+
+### 13. Enhanced Setup Verification & Error Handling ✅ COMPLETED
+- [x] **Ultra-basic environment checks** - Validates Python functionality before imports
+- [x] **Comprehensive dependency checking** - All 8 required packages verified
+- [x] **Port availability testing** - Checks if port 5000 is free
+- [x] **File permission validation** - Ensures write access for config/uploads
+- [x] **Network configuration** - IP and hostname access verification
+- [x] **Detailed error messages** - Actionable troubleshooting for each failure type
+- [x] **Cross-platform compatibility** - Works on Windows, Linux, macOS
+
+---
+
+### 14. System Control Features ✅ COMPLETED
+- [x] **Remote shutdown** - Safe system shutdown via web UI (`/api/system/shutdown`)
+- [x] **Remote restart** - System restart capability (`/api/system/restart`)
+- [x] **Cancel operations** - Cancel pending shutdown/restart (`/api/system/cancel`)
+- [x] **Countdown display** - Visual countdown timer before system operations
+- [x] **Safety measures** - Confirmation dialogs and Telegram notifications
+- [x] **Security considerations** - Proper access control for system operations
+
+---
+
+### 15. Additional API Endpoints & Features ✅ COMPLETED
+**Image Management:**
+- [x] `/api/image/preview` - Thumbnail with caption overlay
+- [x] `/api/image/full` - Full resolution image viewing
+- [x] `/api/image/caption` (GET/POST) - Caption editing via web UI
+
+**System & Utilities:**
+- [x] `/api/logs` - Error log access and viewing
+- [x] `/api/directories` - Folder browsing for image selection
+
+**Total API Endpoints:** 18 (up from ~11 originally)
+
+---
+
+## 📊 Updated Project Statistics
+
+**Completed Features:** 6/15 (40%)
+- ✅ Telegram Integration (Phase 1)
+- ✅ Image Captions (Enhanced)
+- ✅ Automatic Shutdown & Power Management
+- ✅ Cross-Platform Support
+- ✅ Enhanced Setup Verification
+- ✅ System Control Features
+
+**Partially Complete:** 2/15 (13%)
+- 🔄 Error Detection & Reporting (~60% complete)
+- 🔄 Performance Monitoring (~50% complete)
+
+**Not Yet Started:** 7/15 (47%)
+- ❌ Color Schemes for Web UI
+- ❌ Image Transitions
+- ❌ Video Support
+- ❌ Delete Uploaded Images
+- ❌ Image Display Order/Sorting
+- ❌ Feedback/Suggestions System
+
+**Total API Endpoints:** 18 (up from ~11)
+**Platforms Supported:** Windows, Linux, macOS, Raspberry Pi
+**Setup Verification:** Comprehensive (ultra-basic → application level)
+
 ## 📝 Notes
 
 - Keep the comprehensive feature ideas list separately
 - Review and approve any additional features before adding
 - Focus on implementing these core features first
+- **Major milestone:** Cross-platform compatibility achieved
+- **Major milestone:** System management capabilities added

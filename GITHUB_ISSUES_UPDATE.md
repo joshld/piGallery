@@ -115,7 +115,7 @@
 
 ---
 
-## 🆕 New Feature Completed (Not in Issues)
+## 🆕 New Features Completed (Not in Issues)
 
 ### Automatic Shutdown & Power Management
 **Status:** COMPLETE
@@ -136,18 +136,122 @@
 
 ---
 
+### Cross-Platform Support (Windows, Linux, macOS)
+**Status:** COMPLETE
+
+**Features Implemented:**
+- ✅ **Windows compatibility** - Full support for Windows PCs
+- ✅ **Cross-platform setup** - Works on Windows, Linux, macOS, Raspberry Pi
+- ✅ **Enhanced setup verification** - `test_setup.py` with comprehensive error checking
+- ✅ **Platform-specific instructions** - Updated README with platform-specific setup guides
+- ✅ **Unicode-free error messages** - ASCII-only output for Windows terminal compatibility
+
+**Technical Details:**
+- Replaced bash `test_setup.sh` with Python `test_setup.py` for cross-platform compatibility
+- Added ultra-basic checks before any imports for maximum error resilience
+- Comprehensive dependency checking (8 packages instead of 5)
+- Platform-specific IP finding and hostname access instructions
+
+**Action:** This expands the project beyond Raspberry Pi only. Consider updating project description and tags.
+
+---
+
+### Enhanced Image Caption System
+**Status:** COMPLETE (Extension of Issue #7)
+
+**New Features Added:**
+- ✅ **Image caption editing** - Set/edit captions via web UI (`/api/image/caption`)
+- ✅ **Advanced metadata reading** - EXIF UserComment, ImageDescription, IPTC Caption-Abstract, XMP
+- ✅ **Multi-format support** - JPG, PNG, and other image formats
+- ✅ **Caption validation** - Write verification and error handling
+- ✅ **Cross-platform metadata** - Works on Windows, Linux, macOS
+- ✅ **Fallback mechanisms** - Multiple metadata fields for maximum compatibility
+
+**API Endpoints Added:**
+- `GET /api/image/caption` - Read current image caption
+- `POST /api/image/caption` - Set/edit image caption
+- `GET /api/image/preview` - Thumbnail with caption overlay
+- `GET /api/image/full` - Full resolution image
+
+**Action:** Issue #7 was marked complete, but these enhancements extend the functionality significantly.
+
+---
+
+### System Control Features
+**Status:** COMPLETE
+
+**Features Implemented:**
+- ✅ **System shutdown** - Remote shutdown via web UI (`/api/system/shutdown`)
+- ✅ **System restart** - Remote restart capability (`/api/system/restart`)
+- ✅ **Cancel operations** - Cancel pending shutdown/restart (`/api/system/cancel`)
+- ✅ **Countdown display** - Visual countdown timer before system operations
+- ✅ **Safety measures** - Confirmation dialogs and Telegram notifications
+
+**Security Considerations:**
+- Web UI controls require proper network security
+- Physical access may still be needed for power-on after shutdown
+- Consider implementing authentication for remote system control
+
+**Action:** These extend the remote control capabilities beyond just slideshow management.
+
+---
+
+### Enhanced Setup Verification & Error Handling
+**Status:** COMPLETE
+
+**Features Implemented:**
+- ✅ **Cross-platform setup script** - `test_setup.py` replaces bash `test_setup.sh`
+- ✅ **Ultra-basic environment checks** - Validates Python functionality before imports
+- ✅ **Comprehensive dependency checking** - All 8 required packages verified
+- ✅ **Port availability testing** - Checks if port 5000 is free
+- ✅ **File permission validation** - Ensures write access for config/uploads
+- ✅ **Network configuration** - IP and hostname access verification
+- ✅ **Detailed error messages** - Actionable troubleshooting for each failure type
+- ✅ **Unicode-safe output** - ASCII-only for Windows terminal compatibility
+
+**Error Handling Levels:**
+1. **Ultra-basic** - Core Python functionality (before imports)
+2. **Environment** - Python version, imports, basic functionality
+3. **Application** - Dependencies, files, ports, permissions
+4. **Network** - Connectivity and access verification
+
+**Improvements:**
+- **Before:** Basic bash script with limited error checking
+- **After:** Comprehensive Python script with multi-layer validation
+- **Compatibility:** Works on Windows, Linux, macOS (not just Linux/Unix)
+
+**Action:** This significantly improves the user experience for setup and troubleshooting.
+
+---
+
 ## 📊 Summary Statistics
 
 **Completed Issues:** 1 (Image Captions)
 **Partially Complete:** 3 (Error Detection, Telegram, Performance Monitoring)
-**New Features (not in issues):** 1 (Automatic Shutdown)
+**New Features (not in issues):** 5 (Shutdown, Cross-Platform, Enhanced Captions, System Control, Setup Verification)
 
 **Overall Progress:**
 - Telegram Integration: **Phase 1 Complete** (8/10 items)
-- Image Captions: **100% Complete** ✅
+- Image Captions: **100% Complete** ✅ (with major enhancements)
 - Error Detection: **~60% Complete** (core features done)
 - Performance Monitoring: **~50% Complete** (real-time metrics done)
 - Power Management: **100% Complete** ✅
+- **Cross-Platform Support: 100% Complete** ✅
+- **System Control Features: 100% Complete** ✅
+- **Setup Verification: 100% Complete** ✅
+
+**New API Endpoints Added:** 7 (total now 18)
+- `/api/image/caption` (GET/POST) - Caption editing
+- `/api/system/shutdown|restart|cancel` - System control
+- `/api/image/preview|full` - Image viewing
+- `/api/logs` - Error log access
+- `/api/directories` - Folder browsing
+
+**Project Scope Expansion:**
+- **Originally:** Raspberry Pi photo frame with web control
+- **Now:** Cross-platform slideshow application with advanced remote management
+- **Platforms:** Windows, Linux, macOS, Raspberry Pi
+- **Features:** 2x API endpoints, comprehensive error handling, system management
 
 ---
 
@@ -155,15 +259,20 @@
 
 Since the gh CLI doesn't have permission to update issues, you can manually update them by:
 
-1. **Close Issue #7:**
+1. **Close Issue #7 (Image Captions):**
    ```bash
    gh issue close 7 --comment "$(cat GITHUB_ISSUES_UPDATE.md | sed -n '/Issue #7/,/Action: Close/p')"
    ```
 
-2. **Update other issues:**
+2. **Update Issues #11, #14, #16:**
    - Visit each issue on GitHub
    - Copy the relevant section from this file
-   - Add as a comment
-   - Update the issue description checkboxes to match completed items
+   - Add as a comment with progress update
+   - Update checkboxes in issue descriptions
 
-Or grant the gh CLI more permissions and re-run the update commands.
+3. **Consider closing/creating issues for new features:**
+   - **Issue #8 (Shutdown Button):** May be closable due to automatic shutdown feature
+   - **Cross-platform support:** Consider adding as an enhancement or updating project description
+   - **Setup improvements:** Could be documented as a separate enhancement
+
+**Note:** The project has grown significantly beyond the original Raspberry Pi scope with cross-platform support, enhanced APIs, and comprehensive error handling.
