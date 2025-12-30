@@ -12,6 +12,7 @@ import threading
 import time
 import io
 import datetime
+import json
 import pygame
 from PIL import Image
 from PIL.ExifTags import TAGS
@@ -219,6 +220,20 @@ def get_logs(lines=200):
     
     return ["No logs available"]
 
+
+def _format_file_size(size_bytes):
+    """Format file size in human readable format"""
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.1f} GB"
+
+def _format_timestamp(timestamp):
+    """Format timestamp in human readable format"""
+    from datetime import datetime
+    dt = datetime.fromtimestamp(timestamp)
+    return dt.strftime('%Y-%m-%d %H:%M')
 
 def register_routes():
     """Register all Flask routes"""
@@ -579,45 +594,87 @@ def register_routes():
     
     @app.route('/api/image/preview')
     def api_image_preview():
-        """Get current image as thumbnail preview"""
+        """Get image as thumbnail preview (current image or specified path)"""
         if slideshow_instance is None:
             return jsonify({'error': 'Slideshow not initialized'}), 503
-        
-        if not slideshow_instance.current_img:
-            return jsonify({'error': 'No image loaded'}), 404
-        
+
+        # Check if a specific path was requested
+        requested_path = request.args.get('path')
+
         try:
             from PIL import Image
             from flask import send_file
             import io
-            
-            img_path = get_image_path()
-            if not img_path:
-                return jsonify({'error': 'Image file not found'}), 404
-            
-            # Create thumbnail (max 400x400, maintains aspect ratio)
+
+            if requested_path:
+                # Handle specific path request (for uploaded images modal)
+                if requested_path.startswith('uploaded/'):
+                    # This is an uploaded image
+                    upload_dir = get_upload_directory()
+                    if not upload_dir:
+                        return jsonify({'error': 'Upload directory not configured'}), 500
+
+                    filename = os.path.basename(requested_path)  # Security: prevent directory traversal
+                    img_path = os.path.join(upload_dir, filename)
+
+                    if not os.path.exists(img_path):
+                        return jsonify({'error': 'Image not found'}), 404
+
+                    # Verify it's within upload directory
+                    if not os.path.commonpath([upload_dir, os.path.abspath(img_path)]).startswith(upload_dir):
+                        return jsonify({'error': 'Invalid path'}), 403
+                else:
+                    # This might be a regular gallery image
+                    img_path = os.path.join(slideshow_instance.folder, requested_path)
+                    if not os.path.exists(img_path):
+                        return jsonify({'error': 'Image not found'}), 404
+            else:
+                # Default: current slideshow image
+                if not slideshow_instance.current_img:
+                    return jsonify({'error': 'No image loaded'}), 404
+
+                img_path = get_image_path()
+                if not img_path:
+                    return jsonify({'error': 'Image file not found'}), 404
+
+            # Create thumbnail (max 200x200 for modal, maintains aspect ratio)
             img = Image.open(img_path)
-            img.thumbnail((400, 400), Image.Resampling.LANCZOS)
-            
+            img.thumbnail((200, 200), Image.Resampling.LANCZOS)
+
             # Convert to bytes
             img_bytes = io.BytesIO()
             img.save(img_bytes, format='JPEG', quality=85)
             img_bytes.seek(0)
-            
+
             return send_file(img_bytes, mimetype='image/jpeg')
+
         except ImportError:
             # Fallback: serve original image if PIL not available
-            img_path = get_image_path()
-            if img_path:
-                if slideshow_instance.current_img.startswith("uploaded/"):
-                    upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
+            if requested_path:
+                if requested_path.startswith('uploaded/'):
+                    upload_dir = get_upload_directory()
                     if upload_dir:
-                        upload_dir = os.path.expanduser(upload_dir)
-                        actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
-                        return send_from_directory(upload_dir, actual_path)
-                else:
-                    return send_from_directory(slideshow_instance.folder, slideshow_instance.current_img)
-            return jsonify({'error': 'Image not found'}), 404
+                        filename = os.path.basename(requested_path)
+                        img_path = os.path.join(upload_dir, filename)
+                        if os.path.exists(img_path):
+                            return send_from_directory(upload_dir, filename)
+
+                # For gallery images, we can't serve without PIL
+                return jsonify({'error': 'PIL required for image processing'}), 500
+            else:
+                # Original fallback logic
+                img_path = get_image_path()
+                if img_path:
+                    if slideshow_instance.current_img.startswith("uploaded/"):
+                        upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
+                        if upload_dir:
+                            upload_dir = os.path.expanduser(upload_dir)
+                            actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
+                            return send_from_directory(upload_dir, actual_path)
+                    else:
+                        return send_from_directory(slideshow_instance.folder, slideshow_instance.current_img)
+                return jsonify({'error': 'Image not found'}), 404
+
         except Exception as e:
             print(f"[Web] Error generating preview: {e}")
             return jsonify({'error': str(e)}), 500
@@ -1063,7 +1120,276 @@ def register_routes():
             telegram_notifier.notify_upload(filename)
         
         return jsonify({'status': 'ok', 'filename': filename, 'upload_dir': upload_dir, 'caption_added': bool(caption)})
-    
+
+    def get_upload_directory():
+        """Get the upload directory path"""
+        if slideshow_instance is None:
+            return None
+
+        upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
+        if not upload_dir:
+            # Default: create 'uploaded' subdirectory in images directory
+            upload_dir = os.path.join(slideshow_instance.folder, 'uploaded')
+        else:
+            # Use configured upload directory
+            upload_dir = os.path.expanduser(upload_dir)
+
+        return upload_dir
+
+    @app.route('/api/uploaded-images', methods=['GET'])
+    def api_list_uploaded_images():
+        """List all uploaded images with metadata"""
+        if slideshow_instance is None:
+            return jsonify({'error': 'Slideshow not initialized'}), 503
+
+        upload_dir = get_upload_directory()
+        if not upload_dir or not os.path.exists(upload_dir):
+            return jsonify({'images': [], 'total': 0})
+
+        images = []
+        try:
+            for filename in os.listdir(upload_dir):
+                if filename.lower().endswith(('.jpg', '.jpeg', '.png')) and not filename.startswith('.'):
+                    filepath = os.path.join(upload_dir, filename)
+                    stat = os.stat(filepath)
+
+                    # Always read directly from image metadata (source of truth)
+                    image_caption = ''
+                    try:
+                        metadata_caption = get_image_caption(filepath)
+                        if metadata_caption:
+                            image_caption = metadata_caption
+                    except Exception as e:
+                        print(f"[Web] Could not read caption from {filename} metadata: {e}")
+
+                    images.append({
+                        'filename': filename,
+                        'path': f'uploaded/{filename}',  # Relative path for frontend
+                        'size': stat.st_size,
+                        'size_human': _format_file_size(stat.st_size),
+                        'upload_date': stat.st_mtime,
+                        'upload_date_human': _format_timestamp(stat.st_mtime),
+                        'caption': image_caption
+                    })
+
+            # Sort by upload date (newest first)
+            images.sort(key=lambda x: x['upload_date'], reverse=True)
+
+        except Exception as e:
+            print(f"[Web] Error listing uploaded images: {e}")
+            return jsonify({'error': f'Failed to list images: {str(e)}'}), 500
+
+        return jsonify({
+            'images': images,
+            'total': len(images),
+            'upload_directory': upload_dir
+        })
+
+    @app.route('/api/uploaded-images/delete', methods=['POST'])
+    def api_delete_uploaded_images():
+        """Delete selected uploaded images"""
+        if slideshow_instance is None:
+            return jsonify({'error': 'Slideshow not initialized'}), 503
+
+        try:
+            data = request.get_json()
+            if not data or 'images' not in data:
+                return jsonify({'error': 'No images specified for deletion'}), 400
+
+            images_to_delete = data['images']
+            if not isinstance(images_to_delete, list):
+                return jsonify({'error': 'Images must be provided as a list'}), 400
+
+            upload_dir = get_upload_directory()
+            if not upload_dir:
+                return jsonify({'error': 'Upload directory not configured'}), 500
+
+            deleted = []
+            failed = []
+
+            for image_path in images_to_delete:
+                try:
+                    # Security check: ensure the image is within the upload directory
+                    # Remove any path traversal attempts
+                    safe_path = os.path.basename(image_path)  # Only allow filename, no directory traversal
+                    full_path = os.path.join(upload_dir, safe_path)
+
+                    # Additional security: verify the resolved path is still within upload directory
+                    if not os.path.commonpath([upload_dir, os.path.abspath(full_path)]).startswith(upload_dir):
+                        failed.append({'path': image_path, 'error': 'Invalid path'})
+                        continue
+
+                    if not os.path.exists(full_path):
+                        failed.append({'path': image_path, 'error': 'File not found'})
+                        continue
+
+                    # Only allow deletion of image files
+                    if not full_path.lower().endswith(('.jpg', '.jpeg', '.png')):
+                        failed.append({'path': image_path, 'error': 'Not an image file'})
+                        continue
+
+                    os.remove(full_path)
+                    deleted.append(image_path)
+                    print(f"[Web] Deleted uploaded image: {safe_path}")
+
+                except Exception as e:
+                    failed.append({'path': image_path, 'error': str(e)})
+
+            # Notify Telegram of deletions
+            if telegram_notifier and deleted:
+                telegram_notifier.notify_system_alert(
+                    'image_cleanup',
+                    f'Deleted {len(deleted)} uploaded image(s)'
+                )
+
+            result = {
+                'deleted': deleted,
+                'failed': failed,
+                'total_deleted': len(deleted),
+                'total_failed': len(failed)
+            }
+
+            if failed:
+                result['warning'] = f'{len(failed)} image(s) could not be deleted'
+
+            return jsonify(result)
+
+        except Exception as e:
+            print(f"[Web] Error deleting uploaded images: {e}")
+            return jsonify({'error': f'Failed to delete images: {str(e)}'}), 500
+
+    @app.route('/api/uploaded-images/rename', methods=['POST'])
+    def api_rename_uploaded_image():
+        """Rename an uploaded image file"""
+        if slideshow_instance is None:
+            return jsonify({'error': 'Slideshow not initialized'}), 503
+
+        try:
+            data = request.get_json()
+            if not data or 'old_filename' not in data or 'new_filename' not in data:
+                return jsonify({'error': 'old_filename and new_filename required'}), 400
+
+            old_filename = data['old_filename']
+            new_filename = data['new_filename']
+
+            # Validate filenames
+            if not old_filename or not new_filename:
+                return jsonify({'error': 'Filenames cannot be empty'}), 400
+
+            # Prevent directory traversal
+            if '..' in old_filename or '..' in new_filename or '/' in old_filename or '/' in new_filename:
+                return jsonify({'error': 'Invalid filename'}), 400
+
+            # Only allow image extensions
+            allowed_ext = ['.jpg', '.jpeg', '.png']
+            if not any(new_filename.lower().endswith(ext) for ext in allowed_ext):
+                return jsonify({'error': 'New filename must have .jpg, .jpeg, or .png extension'}), 400
+
+            upload_dir = get_upload_directory()
+            if not upload_dir:
+                return jsonify({'error': 'Upload directory not configured'}), 500
+
+            old_path = os.path.join(upload_dir, old_filename)
+            new_path = os.path.join(upload_dir, new_filename)
+
+            # Check if old file exists
+            if not os.path.exists(old_path):
+                return jsonify({'error': 'Original file not found'}), 404
+
+            # Check if new file already exists
+            if os.path.exists(new_path):
+                return jsonify({'error': 'A file with that name already exists'}), 409
+
+            # Perform the rename
+            os.rename(old_path, new_path)
+
+            # Refresh images to update the cache
+            slideshow_instance.refresh_images()
+
+            print(f"[Web] Renamed uploaded image: {old_filename} -> {new_filename}")
+            return jsonify({'status': 'ok', 'old_filename': old_filename, 'new_filename': new_filename})
+
+        except Exception as e:
+            print(f"[Web] Error renaming uploaded image: {e}")
+            return jsonify({'error': f'Failed to rename image: {str(e)}'}), 500
+
+    @app.route('/api/uploaded-images/caption', methods=['POST'])
+    def api_update_uploaded_image_caption():
+        """Update caption for an uploaded image"""
+        if slideshow_instance is None:
+            return jsonify({'error': 'Slideshow not initialized'}), 503
+
+        try:
+            data = request.get_json()
+            if not data or 'path' not in data:
+                return jsonify({'error': 'path and caption required'}), 400
+
+            image_path = data['path']
+            caption = data.get('caption', '')
+
+            # Validate path (should be uploaded/filename format)
+            if not image_path.startswith('uploaded/'):
+                return jsonify({'error': 'Invalid image path'}), 400
+
+            filename = os.path.basename(image_path)
+            if not filename:
+                return jsonify({'error': 'Invalid filename'}), 400
+
+            upload_dir = get_upload_directory()
+            if not upload_dir:
+                return jsonify({'error': 'Upload directory not configured'}), 500
+
+            full_path = os.path.join(upload_dir, filename)
+
+            # Check if file exists
+            if not os.path.exists(full_path):
+                return jsonify({'error': 'Image file not found'}), 404
+
+            # Store caption ONLY in image metadata - JSON is temporary/cache only
+            success = set_image_caption(full_path, caption)
+
+            if success:
+                print(f"[Web] Successfully embedded caption in {filename} metadata: '{caption}'")
+                return jsonify({'status': 'ok', 'filename': filename, 'caption': caption})
+            else:
+                return jsonify({'error': 'Failed to save caption to image metadata'}), 500
+
+        except Exception as e:
+            print(f"[Web] Error updating caption: {e}")
+            return jsonify({'error': f'Failed to update caption: {str(e)}'}), 500
+
+    @app.route('/api/uploaded-images/cleanup-cache', methods=['POST'])
+    def api_cleanup_captions_cache():
+        """Clean up temporary captions cache when modal is closed"""
+        print("[Web] Cleanup cache endpoint called")
+        try:
+            upload_dir = get_upload_directory()
+            print(f"[Web] Upload directory: {upload_dir}")
+            if not upload_dir:
+                print("[Web] No upload directory configured")
+                return jsonify({'status': 'ok'})  # No upload dir = nothing to clean
+
+            captions_file = os.path.join(upload_dir, '.captions.json')
+            print(f"[Web] Checking for cache file: {captions_file}")
+            print(f"[Web] Cache file exists: {os.path.exists(captions_file)}")
+
+            if os.path.exists(captions_file):
+                try:
+                    os.remove(captions_file)
+                    print(f"[Web] Successfully removed captions cache: {captions_file}")
+                except Exception as e:
+                    print(f"[Web] Could not remove captions cache: {e}")
+                    return jsonify({'error': 'Could not remove cache file'}), 500
+            else:
+                print("[Web] No cache file found to remove")
+
+            return jsonify({'status': 'ok'})
+        except Exception as e:
+            print(f"[Web] Error cleaning up captions cache: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': 'Internal server error'}), 500
+
     @app.route('/api/settings', methods=['GET', 'POST'])
     def api_settings():
         """Get or update settings"""

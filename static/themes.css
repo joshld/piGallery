@@ -48,6 +48,15 @@ html[data-theme="light"] {
     --shadow-card: 0 10px 30px rgba(0,0,0,0.15);
     --shadow-button: 0 4px 15px rgba(0,0,0,0.08);
     --shadow-button-hover: 0 6px 20px rgba(0,0,0,0.15);
+
+    --btn-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --btn-success: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    --btn-danger: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    --btn-warning: linear-gradient(135deg, #ffe66d 0%, #ffd93d 100%);
+    --btn-info: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    --btn-secondary: linear-gradient(135deg, #9ca0b0 0%, #acb0be 100%);
+    --btn-save: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    --btn-save-saved: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 /* Dark Theme */
@@ -120,6 +129,15 @@ html[data-theme="dark"] {
     
     --border-divider: #4a5568;
     --border-setting: 1px solid #4a5568;
+
+    --btn-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --btn-success: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    --btn-danger: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    --btn-warning: linear-gradient(135deg, #ffe66d 0%, #ffd93d 100%);
+    --btn-info: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    --btn-secondary: linear-gradient(135deg, #5c6370 0%, #4a5568 100%);
+    --btn-save: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    --btn-save-saved: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 /* Nord Theme */

@@ -89,16 +89,26 @@
 - [ ] Export error logs
 - [ ] Clear error log option
 
-### 8. Delete Uploaded Images (via Modal Manager)
-- [ ] "Manage Uploaded Images" button near upload area
-- [ ] Modal popup showing grid of uploaded image thumbnails
-- [ ] Checkboxes for selecting images to delete
-- [ ] "Delete Selected" button (bulk delete)
-- [ ] Individual delete button per image
-- [ ] Protection for original gallery images (only uploaded folder)
-- [ ] Confirmation dialog before delete
-- [ ] Pagination if >20 images
-- [ ] Refresh image list after deletion
+### 8. Delete Uploaded Images (via Modal Manager) ✅ COMPLETED
+- [x] "Manage Uploaded Images" button near upload area
+- [x] Modal popup showing grid of uploaded image thumbnails
+- [x] Checkboxes for selecting images to delete
+- [x] "Delete Selected" button (bulk delete)
+- [x] Individual delete button per image
+- [x] Protection for original gallery images (only uploaded folder)
+- [x] Confirmation dialog before delete
+- [x] Pagination if >20 images (scrolling instead)
+- [x] Refresh image list after deletion
+- [x] **NEW:** Upload count badge on button
+- [x] **NEW:** Image preview on thumbnail click
+- [x] **NEW:** Select all/deselect all functionality
+- [x] **NEW:** File size and upload date display
+- [x] **NEW:** Responsive design for mobile
+- [x] **NEW:** Loading states and error handling
+- [x] **NEW:** Edit Mode for filename/caption editing
+- [x] **NEW:** Inline filename editing
+- [x] **NEW:** Caption editing with textarea
+- [x] **NEW:** Auto-save captions on change
 
 ### 9. Image Display Order/Sorting
 - [ ] Sort options in settings (dropdown/selector)
@@ -220,23 +230,23 @@
 
 ## 📊 Updated Project Statistics
 
-**Completed Features:** 6/15 (40%)
+**Completed Features:** 7/15 (47%)
 - ✅ Telegram Integration (Phase 1)
 - ✅ Image Captions (Enhanced)
 - ✅ Automatic Shutdown & Power Management
 - ✅ Cross-Platform Support
 - ✅ Enhanced Setup Verification
 - ✅ System Control Features
+- ✅ **Delete Uploaded Images (New!)**
 
 **Partially Complete:** 2/15 (13%)
 - 🔄 Error Detection & Reporting (~60% complete)
 - 🔄 Performance Monitoring (~50% complete)
 
-**Not Yet Started:** 7/15 (47%)
+**Not Yet Started:** 6/15 (40%)
 - ❌ Color Schemes for Web UI
 - ❌ Image Transitions
 - ❌ Video Support
-- ❌ Delete Uploaded Images
 - ❌ Image Display Order/Sorting
 - ❌ Feedback/Suggestions System
 

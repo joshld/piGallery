@@ -143,7 +143,16 @@
                 </div>
                 
                 <div id="uploadStatus" style="margin-top: 15px;"></div>
-                
+
+                <!-- Manage Uploaded Images Button -->
+                <div style="margin-top: 20px; text-align: center;">
+                    <button id="manage-images-btn" class="btn-secondary" onclick="openManageImagesModal()"
+                            style="padding: 10px 20px; font-size: 0.95em; display: inline-flex; align-items: center; gap: 8px;">
+                        📁 Manage Uploaded Images
+                        <span id="uploaded-count" style="background: var(--accent-primary); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.8em; min-width: 20px;">0</span>
+                    </button>
+                </div>
+
                 <div style="margin-top: 25px; padding-top: 25px; border-top: 1px solid var(--border-divider);">
                     <h3 style="font-size: 1.3em; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid var(--accent-primary);" class="text-accent">📁 Directories</h3>
                     <div class="settings-group">
@@ -475,6 +484,68 @@
                 <div style="display: flex; gap: 10px;">
                     <button class="btn-info" style="flex: 1;" onclick="executeRestart()">Restart</button>
                     <button class="btn-secondary" style="flex: 1;" onclick="closeRestartModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Uploaded Images Modal -->
+    <div id="manageImagesModal" class="modal">
+        <div class="modal-content" style="max-width: 900px; max-height: 80vh;">
+            <div class="modal-header">
+                <h2>📁 Manage Uploaded Images</h2>
+                <span class="close" onclick="closeManageImagesModal()">&times;</span>
+            </div>
+
+            <div style="padding: 20px;">
+                <!-- Loading state -->
+                <div id="images-loading" style="text-align: center; padding: 40px;">
+                    <div style="font-size: 1.2em; margin-bottom: 10px;">🔄 Loading images...</div>
+                    <div class="loading-spinner"></div>
+                </div>
+
+                <!-- Empty state -->
+                <div id="images-empty" style="display: none; text-align: center; padding: 40px; color: var(--text-secondary);">
+                    <div style="font-size: 3em; margin-bottom: 15px;">📭</div>
+                    <div style="font-size: 1.2em; margin-bottom: 10px;">No uploaded images found</div>
+                    <div style="font-size: 0.9em;">Upload some images first to see them here</div>
+                </div>
+
+                <!-- Images grid -->
+                <div id="images-grid" style="display: none;">
+                    <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                        <div id="images-count" style="font-weight: 500;"></div>
+                        <div style="display: flex; gap: 8px;">
+                            <button id="select-all-btn" class="btn-secondary" onclick="toggleSelectAll()"
+                                    style="padding: 6px 12px; font-size: 0.85em;">Select All</button>
+                            <button id="edit-mode-btn" class="btn-secondary" onclick="toggleEditMode()"
+                                    style="padding: 6px 12px; font-size: 0.85em;"></button>
+                        </div>
+                    </div>
+
+                    <div id="images-container" class="images-grid"
+                         style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; max-height: 400px; overflow-y: auto; padding: 10px; border: 1px solid var(--border-divider); border-radius: 8px; background: var(--bg-card);">
+                        <!-- Images will be populated here by JavaScript -->
+                    </div>
+
+                    <!-- Edit Mode Status -->
+                    <div id="edit-mode-notice" style="display: none; margin-top: 15px; padding: 10px; background: var(--bg-secondary); border-radius: 8px; border-left: 4px solid var(--accent-primary);">
+                        <strong>✏️ Edit Mode Active:</strong> Click filenames or captions to edit them. Click "Save Changes" when done.
+                    </div>
+                </div>
+
+                <!-- Action buttons -->
+                <div id="images-actions" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-divider);">
+                    <div style="display: flex; gap: 10px; justify-content: center;">
+                        <button id="delete-selected-btn" class="btn-danger" onclick="deleteSelectedImages()" disabled
+                                style="padding: 10px 20px; font-size: 0.95em;">
+                            🗑️ Delete Selected (<span id="selected-count">0</span>)
+                        </button>
+                        <button class="btn-secondary" onclick="closeManageImagesModal()"
+                                style="padding: 10px 20px; font-size: 0.95em;">
+                            Close
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
