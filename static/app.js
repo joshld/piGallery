@@ -215,9 +215,14 @@ function selectDirectory(path) {
 
 // Close modal when clicking outside
 window.onclick = function(event) {
-    const modal = document.getElementById('directoryModal');
-    if (event.target == modal) {
+    const directoryModal = document.getElementById('directoryModal');
+    if (event.target == directoryModal) {
         closeDirectoryBrowser();
+    }
+
+    const manageImagesModal = document.getElementById('manageImagesModal');
+    if (event.target == manageImagesModal) {
+        closeManageImagesModal();
     }
 }
 
@@ -846,6 +851,9 @@ async function uploadSelectedFiles() {
     // Show summary
     if (successCount > 0) {
         showAlert(`Successfully uploaded ${successCount} file(s)${failCount > 0 ? `, ${failCount} failed` : ''}`, failCount > 0 ? 'error' : 'success');
+
+        // Update uploaded count badge after successful uploads
+        fetchUploadedCount();
     } else {
         showAlert('Upload failed for all files', 'error');
     }
@@ -905,6 +913,11 @@ document.addEventListener('keydown', function(event) {
         }
         if (restartModal && restartModal.style.display === 'block') {
             closeRestartModal();
+        }
+        // Close manage images modal too
+        const manageImagesModal = document.getElementById('manageImagesModal');
+        if (manageImagesModal && manageImagesModal.style.display === 'block') {
+            closeManageImagesModal();
         }
     }
 });
@@ -1092,3 +1105,700 @@ async function cancelPowerAction() {
         showAlert('Error cancelling power action: ' + error.message, 'error');
     }
 }
+
+// ============================================================================
+// MANAGE UPLOADED IMAGES MODAL
+// ============================================================================
+
+let uploadedImages = [];
+let selectedImages = new Set();
+// UI text constants - single source of truth
+const UI_TEXT = {
+    EDIT_MODE: 'Edit Mode',
+    EXIT_EDIT: 'Exit Edit',
+    SAVE_CHANGES: 'Save Changes',
+    EDIT_MODE_ACTIVE: '✏️ Edit Mode Active:',
+    EDIT_MODE_DESCRIPTION: 'Click filenames or captions to edit them. Click "Save Changes" when done.',
+    EDIT_MODE_DESCRIPTION_UNSAVED: 'You have unsaved changes. Click "Save Changes" to apply them.'
+};
+
+let editMode = false;
+let originalCaptions = {}; // Store original captions when entering edit mode
+let modifiedCaptions = {}; // Store modified captions before saving
+
+async function openManageImagesModal() {
+    console.log('Opening manage images modal');
+    const modal = document.getElementById('manageImagesModal');
+    if (!modal) {
+        console.error('Modal element not found!');
+        return;
+    }
+    modal.style.display = 'block';
+    console.log('Modal displayed');
+
+    // Initialize UI elements
+    initializeModalContent();
+
+    // Show loading state
+    document.getElementById('images-loading').style.display = 'block';
+    document.getElementById('images-empty').style.display = 'none';
+    document.getElementById('images-grid').style.display = 'none';
+    document.getElementById('images-actions').style.display = 'none';
+    console.log('Loading state shown');
+
+    try {
+        await loadUploadedImages();
+        console.log('Modal opened successfully');
+    } catch (error) {
+        console.error('Error loading uploaded images:', error);
+        showAlert('Failed to load uploaded images', 'error');
+        closeManageImagesModal();
+    }
+}
+
+function closeManageImagesModal() {
+    // Check for unsaved caption changes
+    if (editMode && hasUnsavedCaptionChanges()) {
+        const confirmed = confirm('You have unsaved caption changes. Close without saving?');
+        if (!confirmed) {
+            return; // Don't close the modal
+        }
+        // Revert unsaved changes
+        revertUnsavedCaptionChanges();
+    }
+
+    const modal = document.getElementById('manageImagesModal');
+    modal.style.display = 'none';
+
+    // Reset state
+    selectedImages.clear();
+    editMode = false; // Reset edit mode when modal closes
+    originalCaptions = {};
+    modifiedCaptions = {};
+    updateDeleteButton();
+
+    // Clean up temporary captions cache since modal is closed
+    cleanupTemporaryCaptionsCache();
+}
+
+async function loadUploadedImages() {
+    console.log('Loading uploaded images...');
+    try {
+        const response = await fetch('/api/uploaded-images');
+        console.log('API response status:', response.status);
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('API response data:', data);
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        uploadedImages = data.images || [];
+        console.log('Loaded images:', uploadedImages.length, 'images');
+
+        // Update button count
+        updateUploadedCount(uploadedImages.length);
+
+        // Hide loading
+        document.getElementById('images-loading').style.display = 'none';
+
+        if (uploadedImages.length === 0) {
+            // Show empty state
+            document.getElementById('images-empty').style.display = 'block';
+        } else {
+            // Show images grid
+            document.getElementById('images-grid').style.display = 'block';
+            document.getElementById('images-actions').style.display = 'block';
+
+            renderImagesGrid();
+        }
+
+    } catch (error) {
+        console.error('Error loading images:', error);
+        document.getElementById('images-loading').innerHTML = `
+            <div style="color: var(--accent-secondary);">❌ Failed to load images</div>
+            <div style="font-size: 0.9em; margin-top: 5px;">${error.message}</div>
+        `;
+    }
+}
+
+async function fetchUploadedCount() {
+    try {
+        const response = await fetch('/api/uploaded-images');
+        if (response.ok) {
+            const data = await response.json();
+            updateUploadedCount(data.total || 0);
+        }
+    } catch (error) {
+        console.warn('Failed to fetch uploaded count:', error);
+    }
+}
+
+function updateUploadedCount(count) {
+    const countElement = document.getElementById('uploaded-count');
+    if (countElement) {
+        countElement.textContent = count;
+    }
+}
+
+function renderImagesGrid() {
+    console.log('Rendering images grid with', uploadedImages.length, 'images');
+    const container = document.getElementById('images-container');
+    const countElement = document.getElementById('images-count');
+
+    // Update count
+    countElement.textContent = `Found ${uploadedImages.length} uploaded image${uploadedImages.length !== 1 ? 's' : ''}`;
+
+    // Clear existing content
+    container.innerHTML = '';
+
+    // Create image items
+    uploadedImages.forEach((image, index) => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'image-item';
+        itemDiv.innerHTML = `
+            <div class="image-thumbnail">
+                <img src="/api/image/preview?path=${encodeURIComponent(image.path)}"
+                     alt="${image.filename}"
+                     loading="lazy"
+                     onclick="previewImage('${image.path}')">
+                <input type="checkbox"
+                       class="image-checkbox"
+                       data-path="${image.path}"
+                       onchange="toggleImageSelection('${image.path}')">
+                ${editMode ? `
+                <div class="edit-controls">
+                    <button onclick="editFilename('${image.filename}')" title="Edit filename">📝</button>
+                </div>` : ''}
+            </div>
+            <div class="image-info">
+                <div class="image-name ${editMode ? 'editable' : ''}"
+                     title="${image.filename}"
+                     onclick="${editMode ? `editFilenameInline(this, '${image.filename}')` : ''}">
+                    ${truncateText(image.filename, 20)}
+                </div>
+                <div class="image-date">${image.upload_date_human}</div>
+                <div class="image-size">${image.size_human}</div>
+                ${editMode ? `
+                <div class="caption-editor">
+                    <textarea placeholder="Add caption..." oninput="updateCaption('${image.path}', this.value)"
+                              onchange="updateCaption('${image.path}', this.value)"
+                              onblur="updateCaption('${image.path}', this.value)">${image.caption || ''}</textarea>
+                </div>` : `
+                <div class="caption-display">${image.caption || 'No caption'}</div>`}
+            </div>
+        `;
+
+        // Add click handler for checkbox selection
+        const checkbox = itemDiv.querySelector('.image-checkbox');
+        const thumbnail = itemDiv.querySelector('.image-thumbnail');
+
+        thumbnail.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+                checkbox.checked = !checkbox.checked;
+                toggleImageSelection(image.path);
+            }
+        });
+
+        container.appendChild(itemDiv);
+    });
+}
+
+function truncateText(text, maxLength) {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength - 3) + '...';
+}
+
+function toggleImageSelection(imagePath) {
+    if (selectedImages.has(imagePath)) {
+        selectedImages.delete(imagePath);
+    } else {
+        selectedImages.add(imagePath);
+    }
+    updateDeleteButton();
+}
+
+function initializeButtonStates() {
+    // Initialize edit mode button to correct initial state
+    const editBtn = document.getElementById('edit-mode-btn');
+    if (editBtn) {
+        editBtn.textContent = UI_TEXT.EDIT_MODE;
+        editBtn.className = 'btn-secondary';
+    }
+}
+
+function initializeModalContent() {
+    // Ensure notice visibility matches editMode state
+    const editModeNotice = document.getElementById('edit-mode-notice');
+    if (editModeNotice) {
+        editModeNotice.style.display = editMode ? 'block' : 'none';
+    }
+
+    // Initialize button states
+    initializeButtonStates();
+}
+
+function toggleSelectAll() {
+    const checkboxes = document.querySelectorAll('.image-checkbox');
+    const allSelected = selectedImages.size === uploadedImages.length;
+    const selectAllBtn = document.getElementById('select-all-btn');
+
+    if (allSelected) {
+        // Deselect all
+        selectedImages.clear();
+        checkboxes.forEach(checkbox => checkbox.checked = false);
+        selectAllBtn.className = 'btn-secondary'; // Back to neutral when not all selected
+    } else {
+        // Select all
+        selectedImages.clear();
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = true;
+            selectedImages.add(checkbox.dataset.path);
+        });
+        selectAllBtn.className = 'btn-success'; // Green when all selected (active state)
+    }
+
+    updateDeleteButton();
+}
+
+function toggleEditMode() {
+    // Check for unsaved changes before exiting edit mode
+    if (editMode && hasUnsavedCaptionChanges()) {
+        const confirmed = confirm('You have unsaved caption changes. Exit edit mode without saving?');
+        if (!confirmed) {
+            return; // Don't exit edit mode
+        }
+        // Revert unsaved changes
+        revertUnsavedCaptionChanges();
+    }
+
+    editMode = !editMode;
+    const editBtn = document.getElementById('edit-mode-btn');
+    const editNotice = document.getElementById('edit-mode-notice');
+
+    if (editMode) {
+        // Store original captions when entering edit mode
+        originalCaptions = {};
+        modifiedCaptions = {};
+        uploadedImages.forEach(img => {
+            originalCaptions[img.path] = img.caption || '';
+        });
+
+        editBtn.textContent = UI_TEXT.EXIT_EDIT;
+        editBtn.className = 'btn-success'; // Green when edit mode is active
+        editNotice.style.display = 'block';
+    } else {
+        editBtn.textContent = UI_TEXT.EDIT_MODE;
+        editBtn.className = 'btn-secondary'; // Gray when not active
+        editNotice.style.display = 'none';
+
+        // Clear tracking when exiting edit mode
+        originalCaptions = {};
+        modifiedCaptions = {};
+    }
+
+    // Re-render images with edit controls
+    renderImagesGrid();
+    updateEditModeActions();
+}
+
+function updateDeleteButton() {
+    const deleteBtn = document.getElementById('delete-selected-btn');
+    const selectedCount = document.getElementById('selected-count');
+    const selectAllBtn = document.getElementById('select-all-btn');
+
+    selectedCount.textContent = selectedImages.size;
+    deleteBtn.disabled = selectedImages.size === 0;
+
+    // Update select all button text and styling
+    if (uploadedImages.length > 0) {
+        const allSelected = selectedImages.size === uploadedImages.length;
+        selectAllBtn.textContent = allSelected ? 'Deselect All' : 'Select All';
+        selectAllBtn.className = allSelected ? 'btn-success' : 'btn-secondary';
+    }
+}
+
+async function deleteSelectedImages() {
+    if (selectedImages.size === 0) return;
+
+    const count = selectedImages.size;
+    const confirmed = confirm(`Are you sure you want to delete ${count} selected image${count !== 1 ? 's' : ''}?\n\nThis action cannot be undone.`);
+
+    if (!confirmed) return;
+
+    // Show loading state
+    const deleteBtn = document.getElementById('delete-selected-btn');
+    const originalText = deleteBtn.innerHTML;
+    deleteBtn.innerHTML = '🗑️ Deleting...';
+    deleteBtn.disabled = true;
+
+    try {
+        const response = await fetch('/api/uploaded-images/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ images: Array.from(selectedImages) })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        if (result.error) {
+            throw new Error(result.error);
+        }
+
+        // Show results
+        const deleted = result.total_deleted || 0;
+        const failed = result.total_failed || 0;
+
+        if (deleted > 0) {
+            showAlert(`Successfully deleted ${deleted} image${deleted !== 1 ? 's' : ''}`, 'success');
+
+            // Clear selections and reload
+            selectedImages.clear();
+
+            // Reload images list
+            await loadUploadedImages();
+
+            // Update uploaded count in main UI
+            updateUploadedCount(uploadedImages.length);
+        }
+
+        if (failed > 0) {
+            showAlert(`Failed to delete ${failed} image${failed !== 1 ? 's' : ''}. Check console for details.`, 'error');
+        }
+
+    } catch (error) {
+        console.error('Delete error:', error);
+        showAlert(`Failed to delete images: ${error.message}`, 'error');
+    } finally {
+        // Restore button
+        deleteBtn.innerHTML = originalText;
+        deleteBtn.disabled = false;
+    }
+}
+
+function previewImage(imagePath) {
+    // Could open a larger preview modal in the future
+    // For now, just log it
+    console.log('Preview image:', imagePath);
+}
+
+function editFilename(currentName) {
+    const newName = prompt('Enter new filename (without extension):', currentName.replace(/\.[^/.]+$/, ""));
+    if (newName && newName !== currentName.replace(/\.[^/.]+$/, "")) {
+        // Add original extension back
+        const extension = currentName.split('.').pop();
+        const fullNewName = newName + '.' + extension;
+
+        renameImage(currentName, fullNewName);
+    }
+}
+
+function editFilenameInline(element, currentName) {
+    if (!editMode) return;
+
+    const currentText = element.textContent.trim();
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentText;
+    input.className = 'filename-input';
+    input.style.width = '100%';
+    input.style.fontSize = '0.9em';
+    input.style.border = '2px solid var(--accent-primary)';
+    input.style.borderRadius = '4px';
+    input.style.padding = '2px 4px';
+
+    element.innerHTML = '';
+    element.appendChild(input);
+    input.focus();
+    input.select();
+
+    const saveEdit = () => {
+        const newName = input.value.trim();
+        if (newName && newName !== currentText) {
+            // Validate filename
+            if (/[<>:"/\\|?*]/.test(newName)) {
+                showAlert('Filename contains invalid characters', 'error');
+                element.textContent = currentText;
+                return;
+            }
+
+            // Add extension if not present
+            const finalName = newName.includes('.') ? newName : newName + '.' + currentName.split('.').pop();
+            renameImage(currentName, finalName);
+        } else {
+            element.textContent = currentText;
+        }
+    };
+
+    input.addEventListener('blur', saveEdit);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            saveEdit();
+        } else if (e.key === 'Escape') {
+            element.textContent = currentText;
+        }
+    });
+}
+
+async function renameImage(oldName, newName) {
+    try {
+        const response = await fetch('/api/uploaded-images/rename', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ old_filename: oldName, new_filename: newName })
+        });
+
+        if (response.ok) {
+            showAlert(`Renamed "${oldName}" to "${newName}"`, 'success');
+            // Refresh the image list
+            await loadUploadedImages();
+        } else {
+            const error = await response.json();
+            showAlert(`Failed to rename: ${error.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Rename error:', error);
+        showAlert('Failed to rename image', 'error');
+    }
+}
+
+async function updateCaption(imagePath, caption) {
+    // Don't trim during editing - preserve user's spaces for UI feedback
+    // Only trim when saving to remove trailing whitespace
+    const processedCaption = editMode ? caption : caption.trim();
+
+    if (editMode) {
+        // In edit mode, track the raw caption (preserving spaces)
+        modifiedCaptions[imagePath] = processedCaption;
+
+        // Don't update the UI in edit mode - let the user see their typing including spaces
+        // The textarea already shows what they typed, we don't need to "update" it
+
+        // Update save button state
+        updateEditModeActions();
+    } else {
+        // Outside edit mode, save immediately (fallback for any edge cases)
+        try {
+            const response = await fetch('/api/uploaded-images/caption', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: imagePath, caption: trimmedCaption })
+            });
+
+            if (response.ok) {
+                console.log(`Caption updated for ${imagePath}`);
+            } else {
+                console.error('Failed to update caption');
+            }
+        } catch (error) {
+            console.error('Caption update error:', error);
+        }
+    }
+}
+
+
+
+async function cleanupTemporaryCaptionsCache() {
+    try {
+        // Ask server to clean up the temporary cache
+        const response = await fetch('/api/uploaded-images/cleanup-cache', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            console.warn('Could not clean up captions cache:', response.status);
+        }
+    } catch (error) {
+        console.warn('Error cleaning up captions cache:', error);
+    }
+}
+
+function hasUnsavedCaptionChanges() {
+    for (const [path, modifiedCaption] of Object.entries(modifiedCaptions)) {
+        const originalCaption = originalCaptions[path] || '';
+        if (modifiedCaption !== originalCaption) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function revertUnsavedCaptionChanges() {
+    // Revert all modified captions back to originals
+    for (const [path, originalCaption] of Object.entries(originalCaptions)) {
+        if (modifiedCaptions[path] !== undefined) {
+            updateCaptionInUI(path, originalCaption);
+        }
+    }
+    modifiedCaptions = {};
+}
+
+function updateCaptionInUI(imagePath, caption) {
+    // Find the textarea for this image and update it
+    const textareas = document.querySelectorAll('.caption-editor textarea');
+    for (const textarea of textareas) {
+        // The textarea is inside a caption-editor div, need to find the right one
+        const imageItem = textarea.closest('.image-item');
+        if (imageItem) {
+            // Check if this is the right image by looking at the onchange/onblur handlers
+            const onchangeAttr = textarea.getAttribute('onchange');
+            if (onchangeAttr && onchangeAttr.includes(imagePath)) {
+                textarea.value = caption;
+                break;
+            }
+        }
+    }
+}
+
+async function saveCaptionChanges() {
+    const changes = [];
+    for (const [path, modifiedCaption] of Object.entries(modifiedCaptions)) {
+        const originalCaption = originalCaptions[path] || '';
+        const trimmedCaption = modifiedCaption.trim(); // Trim when saving
+        if (trimmedCaption !== originalCaption) {
+            changes.push({ path, caption: trimmedCaption });
+        }
+    }
+
+    if (changes.length === 0) {
+        showAlert('No changes to save', 'info');
+        return;
+    }
+
+    // Show saving state
+    const saveBtn = document.getElementById('save-changes-btn');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = '💾 Saving...';
+    }
+
+    try {
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const change of changes) {
+            try {
+                const response = await fetch('/api/uploaded-images/caption', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: change.path, caption: change.caption })
+                });
+
+                if (response.ok) {
+                    successCount++;
+                    // Update original captions to reflect the save (already trimmed)
+                    originalCaptions[change.path] = change.caption;
+                } else {
+                    failCount++;
+                    console.error(`Failed to save caption for ${change.path}`);
+                }
+            } catch (error) {
+                failCount++;
+                console.error(`Error saving caption for ${change.path}:`, error);
+            }
+        }
+
+        // Clear modified captions
+        modifiedCaptions = {};
+
+        if (successCount > 0) {
+            showAlert(`Successfully saved ${successCount} caption${successCount !== 1 ? 's' : ''}`, 'success');
+        }
+        if (failCount > 0) {
+            showAlert(`Failed to save ${failCount} caption${failCount !== 1 ? 's' : ''}`, 'error');
+        }
+
+        // Update UI
+        updateEditModeActions();
+
+    } catch (error) {
+        showAlert('Error saving captions: ' + error.message, 'error');
+    } finally {
+        // Restore button
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = UI_TEXT.SAVE_CHANGES;
+        }
+    }
+}
+
+function updateEditModeActions() {
+    const actionsDiv = document.getElementById('images-actions');
+    const saveBtn = document.getElementById('save-changes-btn');
+    const editNotice = document.getElementById('edit-mode-notice');
+
+    if (editMode) {
+        // Update notice text based on whether there are unsaved changes
+        if (editNotice) {
+            const descriptionEl = editNotice.querySelector('div:last-child');
+            if (descriptionEl) {
+                descriptionEl.textContent = hasUnsavedCaptionChanges() ?
+                    UI_TEXT.EDIT_MODE_DESCRIPTION_UNSAVED :
+                    UI_TEXT.EDIT_MODE_DESCRIPTION;
+            }
+        }
+
+        // Show save button if there are unsaved changes
+        if (hasUnsavedCaptionChanges()) {
+            if (!saveBtn) {
+                // Create save button
+                const newSaveBtn = document.createElement('button');
+                newSaveBtn.id = 'save-changes-btn';
+                newSaveBtn.className = 'btn-success';
+                newSaveBtn.onclick = saveCaptionChanges;
+                newSaveBtn.textContent = UI_TEXT.SAVE_CHANGES;
+                newSaveBtn.style.padding = '10px 20px';
+                newSaveBtn.style.fontSize = '0.95em';
+                newSaveBtn.style.marginRight = '10px';
+
+                // Insert before cancel button
+                const actionsDiv = document.getElementById('images-actions');
+                const buttonContainer = actionsDiv ? actionsDiv.querySelector('div[style*="display: flex"]') : null;
+                if (buttonContainer) {
+                    const cancelBtn = buttonContainer.querySelector('.btn-secondary');
+                    if (cancelBtn) {
+                        buttonContainer.insertBefore(newSaveBtn, cancelBtn);
+                    } else {
+                        // If no cancel button found, append to container
+                        buttonContainer.appendChild(newSaveBtn);
+                    }
+                }
+            }
+        } else {
+            // Remove save button if no changes
+            if (saveBtn) {
+                saveBtn.remove();
+            }
+        }
+    } else {
+        // Remove save button when not in edit mode
+        if (saveBtn) {
+            saveBtn.remove();
+        }
+    }
+}
+
+// Initialize uploaded images count on page load
+document.addEventListener('DOMContentLoaded', function() {
+    fetchUploadedCount(); // Get current count on page load
+
+    // Set up manage images button
+    const manageBtn = document.getElementById('manage-images-btn');
+    if (manageBtn) {
+        manageBtn.addEventListener('click', function() {
+            console.log('Manage images button clicked');
+        });
+    } else {
+        console.warn('Manage images button not found');
+    }
+});
