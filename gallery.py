@@ -903,34 +903,11 @@ class Slideshow:
 
                         elif sort_order in ['date_taken', 'date_created', 'date_modified']:
                             # Show date
-                            if sort_order == 'date_taken':
-                                # Try EXIF DateTimeOriginal first
-                                try:
-                                    img = Image.open(full_path)
-                                    exif_data = img._getexif()
-                                    date_obj = None
-                                    if exif_data:
-                                        for tag, value in exif_data.items():
-                                            tag_name = TAGS.get(tag, tag)
-                                            if tag_name == 'DateTimeOriginal' and value:
-                                                try:
-                                                    date_obj = datetime.datetime.strptime(str(value), '%Y:%m:%d %H:%M:%S')
-                                                    break
-                                                except (ValueError, TypeError):
-                                                    pass
-                                    img.close()
-                                    if date_obj is None:
-                                        date_obj = datetime.datetime.fromtimestamp(os.path.getctime(full_path))
-                                except Exception:
-                                    date_obj = datetime.datetime.fromtimestamp(os.path.getctime(full_path))
-                            elif sort_order == 'date_created':
-                                date_obj = datetime.datetime.fromtimestamp(os.path.getctime(full_path))
-                            elif sort_order == 'date_modified':
-                                date_obj = datetime.datetime.fromtimestamp(os.path.getmtime(full_path))
-
-                            date_str = date_obj.strftime('%Y-%m-%d %H:%M')
-                            text += f" [{date_str}]"
-                            print(f"[Slideshow] Image {self.current_img} has {sort_order} date: {date_str}")
+                            date_obj = self.get_image_date(self.current_img, sort_order)
+                            if date_obj:
+                                date_str = date_obj.strftime('%Y-%m-%d %H:%M')
+                                text += f" [{date_str}]"
+                                print(f"[Slideshow] Image {self.current_img} has {sort_order} date: {date_str}")
 
                 except Exception as e:
                     # If there's any error getting metadata, just show filename without it
@@ -1103,6 +1080,51 @@ class Slideshow:
         return [int(text) if text.isdigit() else text.lower()
                 for text in re.split(r'(\d+)', s)]
 
+    def get_image_date(self, img_path, date_type):
+        """Extract date from image metadata based on date_type"""
+        # Get full path
+        if img_path.startswith('uploaded/'):
+            upload_dir = self.config.get('upload_directory', '').strip()
+            if upload_dir:
+                full_path = os.path.join(os.path.expanduser(upload_dir), img_path[9:])
+            else:
+                full_path = os.path.join(self.folder, img_path[9:])
+        else:
+            full_path = os.path.join(self.folder, img_path)
+
+        if not os.path.exists(full_path):
+            return None
+
+        try:
+            if date_type == 'date_taken':
+                # Try EXIF DateTimeOriginal first
+                img = Image.open(full_path)
+                exif_data = img._getexif()
+                date_obj = None
+                if exif_data:
+                    for tag, value in exif_data.items():
+                        tag_name = TAGS.get(tag, tag)
+                        if tag_name == 'DateTimeOriginal' and value:
+                            try:
+                                date_obj = datetime.datetime.strptime(str(value), '%Y:%m:%d %H:%M:%S')
+                                break
+                            except (ValueError, TypeError):
+                                pass
+                img.close()
+                if date_obj is None:
+                    date_obj = datetime.datetime.fromtimestamp(os.path.getctime(full_path))
+            elif date_type == 'date_created':
+                date_obj = datetime.datetime.fromtimestamp(os.path.getctime(full_path))
+            elif date_type == 'date_modified':
+                date_obj = datetime.datetime.fromtimestamp(os.path.getmtime(full_path))
+            else:
+                return None
+
+            return date_obj
+        except Exception:
+            # Fallback to file creation time
+            return datetime.datetime.fromtimestamp(os.path.getctime(full_path))
+
     def sort_images(self, images):
         """Sort images based on configured sort_order"""
         sort_order = self.config.get('sort_order', 'random')
@@ -1153,40 +1175,12 @@ class Slideshow:
                     else:
                         full_path = os.path.join(self.folder, img_path)
 
-                    if os.path.exists(full_path):
-                        if sort_order == 'date_taken':
-                            # Try to get EXIF DateTimeOriginal
-                            try:
-                                img = Image.open(full_path)
-                                exif_data = img._getexif()
-                                if exif_data:
-                                    for tag, value in exif_data.items():
-                                        tag_name = TAGS.get(tag, tag)
-                                        if tag_name == 'DateTimeOriginal' and value:
-                                            # Parse EXIF datetime (format: '2023:01:15 12:30:45')
-                                            try:
-                                                sort_key = datetime.datetime.strptime(str(value), '%Y:%m:%d %H:%M:%S')
-                                                break
-                                            except (ValueError, TypeError):
-                                                pass
-                                img.close()
-                            except Exception:
-                                pass
-
-                            # Fallback to file creation time if no EXIF date
-                            if sort_key is None:
-                                sort_key = datetime.datetime.fromtimestamp(os.path.getctime(full_path))
-
-                        elif sort_order == 'date_created':
-                            sort_key = datetime.datetime.fromtimestamp(os.path.getctime(full_path))
-
-                        elif sort_order == 'date_modified':
-                            sort_key = datetime.datetime.fromtimestamp(os.path.getmtime(full_path))
-
-                        if sort_order in ['date_taken', 'date_created', 'date_modified']:
-                            print(f"[Slideshow] Sort key for {os.path.basename(img_path)}: {sort_key} ({sort_order})")
-                        else:
-                            print(f"[Slideshow] Sort order '{sort_order}' not recognized for date sorting")
+                    if sort_order in ['date_taken', 'date_created', 'date_modified']:
+                        sort_key = self.get_image_date(img_path, sort_order)
+                        print(f"[Slideshow] Sort key for {os.path.basename(img_path)}: {sort_key} ({sort_order})")
+                    elif sort_order == 'size':
+                        # Get file size
+                        sort_key = os.path.getsize(full_path)
 
                 # Default fallback
                 if sort_key is None:
@@ -1362,10 +1356,6 @@ class Slideshow:
             # Notify Telegram of image change
             if self.telegram and self.current_img:
                 self.telegram.notify_image_change(self.current_img, self.current_index + 1, self.total_images)
-        print(f"[Slideshow] Next image {self.current_index+1}/{self.total_images}: {self.current_img}")
-        # Notify Telegram of image change
-        if self.telegram and self.current_img:
-            self.telegram.notify_image_change(self.current_img, self.current_index + 1, self.total_images)
 
     def prev_image(self):
         if hasattr(self, '_all_images') and self._all_images:
