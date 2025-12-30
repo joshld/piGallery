@@ -171,11 +171,14 @@ header h1 {
 }
 
 .status-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 20px;
     margin-top: 15px;
+    justify-content: space-evenly;
+    position: relative; /* Enable layering for overlapping items */
 }
+
 
 .status-item {
     text-align: center;
@@ -862,13 +865,39 @@ select {
     line-height: 1.5;
 }
 
+@media (max-width: 1200px) and (min-width: 769px) {
+    .status-grid {
+        gap: 15px;
+        justify-content: space-evenly;
+        max-width: 800px; /* Approximate 3 items width */
+    }
+}
+
 @media (max-width: 768px) {
     header h1 {
         font-size: 1.8em;
     }
 
+    .status-bar {
+        padding: 15px;
+    }
+
     .status-grid {
-        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        justify-content: space-evenly;
+        max-width: 400px; /* Approximate 2 items width */
+    }
+
+    .status-value {
+        font-size: 1.1em;
+    }
+
+    .status-label {
+        font-size: 0.8em;
+    }
+
+    .status-item {
+        padding: 8px;
     }
 
     .controls {
