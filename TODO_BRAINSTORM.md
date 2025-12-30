@@ -50,17 +50,26 @@
 - [x] **NEW:** File permission validation
 - [x] **NEW:** Detailed troubleshooting guidance
 
-### 2b. Delete Uploaded Images ⭐ NEW
-- [ ] Identify uploaded vs original images
-- [ ] Delete button in web UI (uploaded images only)
-- [ ] Confirmation dialog before delete
-- [ ] Bulk delete option (select multiple)
+### 2b. Delete Uploaded Images ⭐ COMPLETED (Enhanced Implementation)
+- [x] Identify uploaded vs original images
+- [x] Delete button in web UI (uploaded images only)
+- [x] Confirmation dialog before delete
+- [x] Bulk delete option (select multiple)
+- [x] Delete protection for original images
+- [x] Warning if trying to delete non-uploaded images
+- [x] **NEW:** Modal popup with image grid
+- [x] **NEW:** Thumbnail previews
+- [x] **NEW:** File size and upload date display
+- [x] **NEW:** Select all/deselect all functionality
+- [x] **NEW:** Edit Mode for filename/caption editing
+- [x] **NEW:** Inline filename editing
+- [x] **NEW:** Caption editing with immediate feedback
+- [x] **NEW:** Auto-save captions to image metadata
+- [x] **NEW:** Improved UX (Close button, better feedback)
 - [ ] Move to trash instead of permanent delete
 - [ ] Trash/recycle bin viewer
 - [ ] Restore from trash option
 - [ ] Auto-cleanup trash after X days
-- [ ] Delete protection for original images
-- [ ] Warning if trying to delete non-uploaded images
 - [ ] Disk space freed indicator
 - [ ] Delete history/audit log
 
@@ -83,13 +92,14 @@
 - [x] **Security considerations** - Proper access control for system operations
 - [x] **Telegram integration** - Notifications for system operations
 
-### 3. Web UI Color Schemes
-- [ ] Light mode (current)
-- [ ] Dark mode
+### 3. Web UI Color Schemes ✅ PARTIALLY COMPLETE
+- [x] Light mode (current)
+- [x] Dark mode (multiple variants: Nord, Dracula, One Dark, etc.)
+- [x] **NEW:** Tokyo Night theme (dark blue/cyan/purple)
 - [ ] Auto mode (follow system preference)
-- [ ] Custom color scheme editor
-- [ ] Save theme preference
+- [x] Save theme preference
 - [ ] Smooth theme transition animation
+- [ ] Custom color scheme editor
 
 ### 4. Image Transitions
 - [ ] Fade in/out transition
@@ -391,6 +401,8 @@
 4. **Image captions** ✅ (full EXIF/IPTC/XMP support + editing)
 5. **Cross-platform setup** ✅ (Windows, Linux, macOS support)
 6. **Enhanced setup verification** ✅ (ultra-basic checks + comprehensive validation)
+7. **Delete uploaded images** ✅ (enhanced modal with edit mode)
+8. **Tokyo Night theme** ✅ (beautiful dark theme added)
 
 ## 🎯 Remaining Quick Wins (Still Available)
 
@@ -439,10 +451,12 @@
 - Image captions (enhanced with editing)
 - Shutdown button (expanded with auto-shutdown)
 - Error detection & logging (core features)
+- Delete uploaded images (enhanced modal)
 - Cross-platform support (Windows, Linux, macOS)
 - System control features (shutdown/restart/cancel)
 - Enhanced setup verification
 - Performance monitoring (real-time metrics)
+- Theme system (Tokyo Night + 20 themes)
 
 ### 🔄 IN PROGRESS (v1.1)
 - Dark mode for web UI
@@ -480,10 +494,12 @@
 - ✅ **System management capabilities** (shutdown, restart, monitoring)
 - ✅ **Enhanced error handling** (comprehensive setup verification)
 - ✅ **Advanced image captioning** (metadata reading + editing)
+- ✅ **Delete uploaded images** (enhanced modal with editing capabilities)
+- ✅ **Theme system** (Tokyo Night + 20 other themes)
 - ✅ **API expansion** (18 endpoints vs original ~11)
 - ✅ **Production readiness** (robust error handling, documentation)
 
-**Current Version:** v1.0 (feature complete for core functionality)
+**Current Version:** v1.0+ (feature complete for core functionality + enhanced delete modal + Tokyo Night theme)
 
 ## Next Steps
 

@@ -63,11 +63,12 @@
 - [x] Add shutdown button to web UI (manual shutdown)
 - [x] Confirmation dialog for manual shutdown
 
-### 4. Color Schemes for Web UI
-- [ ] Light mode (current)
-- [ ] Dark mode
-- [ ] Other color scheme options
-- [ ] Save theme preference
+### 4. Color Schemes for Web UI ✅ PARTIALLY COMPLETE
+- [x] Light mode (current)
+- [x] Dark mode
+- [x] **NEW:** Tokyo Night theme (dark blue/cyan/purple)
+- [x] Other color scheme options (Nord, Dracula, Gruvbox, etc.)
+- [x] Save theme preference
 
 ### 5. Image Transitions
 - [ ] Fade transition
@@ -109,6 +110,10 @@
 - [x] **NEW:** Inline filename editing
 - [x] **NEW:** Caption editing with textarea
 - [x] **NEW:** Auto-save captions on change
+- [x] **NEW:** Improved UX - "Close" button instead of "Cancel"
+- [x] **NEW:** Better modal close behavior (cleanup temp files)
+- [x] **NEW:** Enhanced feedback - Save button appears immediately
+- [x] **NEW:** Space input fixes in textareas
 
 ### 9. Image Display Order/Sorting
 - [ ] Sort options in settings (dropdown/selector)
@@ -230,14 +235,15 @@
 
 ## 📊 Updated Project Statistics
 
-**Completed Features:** 7/15 (47%)
+**Completed Features:** 8/15 (53%)
 - ✅ Telegram Integration (Phase 1)
 - ✅ Image Captions (Enhanced)
 - ✅ Automatic Shutdown & Power Management
+- ✅ Color Schemes (Partially - Tokyo Night added)
 - ✅ Cross-Platform Support
 - ✅ Enhanced Setup Verification
 - ✅ System Control Features
-- ✅ **Delete Uploaded Images (New!)**
+- ✅ **Delete Uploaded Images (Enhanced!)**
 
 **Partially Complete:** 2/15 (13%)
 - 🔄 Error Detection & Reporting (~60% complete)
