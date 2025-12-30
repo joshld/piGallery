@@ -1415,7 +1415,9 @@ def register_routes():
                 'upload_directory': slideshow_instance.config.get('upload_directory', ''),
                 'images_directory': slideshow_instance.folder,
                 'shutdown_on_display_off': slideshow_instance.config.get('shutdown_on_display_off', 'true'),
-                'shutdown_countdown_seconds': slideshow_instance.config.get('shutdown_countdown_seconds', '10')
+                'shutdown_countdown_seconds': slideshow_instance.config.get('shutdown_countdown_seconds', '10'),
+                'sort_order': slideshow_instance.config.get('sort_order', 'random'),
+                'sort_reverse': slideshow_instance.config.get('sort_reverse', 'false')
             })
         
         elif request.method == 'POST':
@@ -1539,6 +1541,59 @@ def register_routes():
                 slideshow_instance.config['shutdown_countdown_seconds'] = new_val
                 if telegram_notifier and old_val != new_val:
                     telegram_notifier.notify_settings_change('shutdown_countdown_seconds', old_val, new_val)
+
+            # Handle sorting settings
+            sort_settings_changed = False
+            if 'sort_order' in data:
+                old_val = slideshow_instance.config.get('sort_order', 'random')
+                new_val = data['sort_order']
+                slideshow_instance.config['sort_order'] = new_val
+                if old_val != new_val:
+                    sort_settings_changed = True
+                    print(f"[Web] Sort order changed: {old_val} -> {new_val}")
+            if 'sort_reverse' in data:
+                old_val = slideshow_instance.config.get('sort_reverse', 'false')
+                new_val = str(data['sort_reverse']).lower()
+                slideshow_instance.config['sort_reverse'] = new_val
+                if old_val != new_val:
+                    sort_settings_changed = True
+                    print(f"[Web] Sort reverse changed: {old_val} -> {new_val}")
+
+            # Re-sort existing images if sorting settings changed
+            if sort_settings_changed:
+                print(f"[Web] Sorting settings changed, rescanning and re-sorting all images")
+
+                # Clear current queue and history to force complete rescan
+                old_images = slideshow_instance.images + slideshow_instance.history
+                if slideshow_instance.current_img:
+                    old_images.append(slideshow_instance.current_img)
+
+                slideshow_instance.images = []
+                slideshow_instance.history = []
+                slideshow_instance.forward_stack = []
+                slideshow_instance.current_index = -1
+                slideshow_instance.current_img = None
+                # Clear circular navigation cache
+                if hasattr(slideshow_instance, '_all_images'):
+                    slideshow_instance._all_images = []
+
+                # Rescan directory to get all images with new sorting
+                slideshow_instance.refresh_images()
+
+                # If no new images were found (all were already in old_images), we need to sort the old ones
+                if not slideshow_instance.images and old_images:
+                    print(f"[Web] No new images found, sorting {len(old_images)} existing images")
+                    slideshow_instance.images = slideshow_instance.sort_images(list(set(old_images)))
+
+                # Reset slideshow position to start of newly sorted queue
+                slideshow_instance.current_index = -1
+                slideshow_instance.history = []
+                slideshow_instance.forward_stack = []
+
+                # Advance to first image in sorted queue and trigger immediate display
+                slideshow_instance.next_image()
+                slideshow_instance.force_redraw = True
+                print(f"[Web] Reset slideshow with {len(slideshow_instance.images)} sorted images and triggered display update")
             if 'images_directory' in data:
                 # Update images directory (requires restart to take full effect)
                 old_val = slideshow_instance.folder

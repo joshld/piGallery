@@ -14,6 +14,8 @@ from logging.handlers import RotatingFileHandler
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
+from PIL import Image
+from PIL.ExifTags import TAGS
 
 try:
     import psutil
@@ -52,7 +54,9 @@ DEFAULT_CONFIG = {
         "show_filename": "true",
         "show_caption": "true",
         "shutdown_on_display_off": "true",
-        "shutdown_countdown_seconds": "10"
+        "shutdown_countdown_seconds": "10",
+        "sort_order": "random",
+        "sort_reverse": "false"
     },
     "telegram": {
         "bot_token": "",
@@ -870,6 +874,68 @@ class Slideshow:
         show_filename = self.config.get('show_filename', 'true').lower() == 'true'
         if show_filename and self.current_img:
             text = f"{self.current_img} ({new_w}x{self.screen_h})"
+
+            # Add sort metadata if sorting by size or date
+            sort_order = self.config.get('sort_order', 'random')
+            if sort_order in ['size', 'date_taken', 'date_created', 'date_modified']:
+                try:
+                    # Get full path for the current image
+                    if self.current_img.startswith('uploaded/'):
+                        upload_dir = self.config.get('upload_directory', '').strip()
+                        if upload_dir:
+                            full_path = os.path.join(os.path.expanduser(upload_dir), self.current_img[9:])
+                        else:
+                            full_path = os.path.join(self.folder, self.current_img[9:])
+                    else:
+                        full_path = os.path.join(self.folder, self.current_img)
+
+                    if os.path.exists(full_path):
+                        if sort_order == 'size':
+                            # Show file size
+                            size_bytes = os.path.getsize(full_path)
+                            if size_bytes >= 1024 * 1024:
+                                size_str = f"{size_bytes / (1024 * 1024):.1f}MB"
+                            elif size_bytes >= 1024:
+                                size_str = f"{size_bytes / 1024:.1f}KB"
+                            else:
+                                size_str = f"{size_bytes}B"
+                            text += f" [{size_str}]"
+
+                        elif sort_order in ['date_taken', 'date_created', 'date_modified']:
+                            # Show date
+                            if sort_order == 'date_taken':
+                                # Try EXIF DateTimeOriginal first
+                                try:
+                                    img = Image.open(full_path)
+                                    exif_data = img._getexif()
+                                    date_obj = None
+                                    if exif_data:
+                                        for tag, value in exif_data.items():
+                                            tag_name = TAGS.get(tag, tag)
+                                            if tag_name == 'DateTimeOriginal' and value:
+                                                try:
+                                                    date_obj = datetime.datetime.strptime(str(value), '%Y:%m:%d %H:%M:%S')
+                                                    break
+                                                except (ValueError, TypeError):
+                                                    pass
+                                    img.close()
+                                    if date_obj is None:
+                                        date_obj = datetime.datetime.fromtimestamp(os.path.getctime(full_path))
+                                except Exception:
+                                    date_obj = datetime.datetime.fromtimestamp(os.path.getctime(full_path))
+                            elif sort_order == 'date_created':
+                                date_obj = datetime.datetime.fromtimestamp(os.path.getctime(full_path))
+                            elif sort_order == 'date_modified':
+                                date_obj = datetime.datetime.fromtimestamp(os.path.getmtime(full_path))
+
+                            date_str = date_obj.strftime('%Y-%m-%d %H:%M')
+                            text += f" [{date_str}]"
+                            print(f"[Slideshow] Image {self.current_img} has {sort_order} date: {date_str}")
+
+                except Exception as e:
+                    # If there's any error getting metadata, just show filename without it
+                    pass
+
             surf = self.fonts["filename"].render(text, True, self.text_color)
             rect = surf.get_rect(bottomright=(self.screen_w - 10, self.screen_h - 10))
             self.screen.blit(surf, rect)
@@ -1031,6 +1097,144 @@ class Slideshow:
                     # Draw text on top of background
                     self.screen.blit(caption_surf, (x_pos, y_pos))
 
+    def natural_sort_key(self, s):
+        """Generate a sort key for natural sorting (numbers as numbers, not strings)"""
+        import re
+        return [int(text) if text.isdigit() else text.lower()
+                for text in re.split(r'(\d+)', s)]
+
+    def sort_images(self, images):
+        """Sort images based on configured sort_order"""
+        sort_order = self.config.get('sort_order', 'random')
+        reverse_order = self.config.get('sort_reverse', 'false').lower() == 'true'
+        print(f"[Slideshow] sort_images called with sort_order='{sort_order}', reverse_order={reverse_order}")
+
+        if sort_order == 'random':
+            # Keep current random behavior
+            random.shuffle(images)
+            return images
+
+        # Create list of (image_path, sort_key) tuples
+        image_sort_data = []
+
+        for img_path in images:
+            sort_key = None
+
+            try:
+                if sort_order == 'filename':
+                    # Sort by filename (basename) with natural sorting
+                    filename = os.path.basename(img_path)
+                    sort_key = self.natural_sort_key(filename)
+
+                elif sort_order == 'size':
+                    # Sort by file size
+                    if img_path.startswith('uploaded/'):
+                        # Handle uploaded images
+                        upload_dir = self.config.get('upload_directory', '').strip()
+                        if upload_dir:
+                            full_path = os.path.join(os.path.expanduser(upload_dir), img_path[9:])  # Remove 'uploaded/' prefix
+                        else:
+                            full_path = os.path.join(self.folder, img_path[9:])
+                    else:
+                        full_path = os.path.join(self.folder, img_path)
+
+                    if os.path.exists(full_path):
+                        sort_key = os.path.getsize(full_path)
+
+                elif sort_order in ['date_taken', 'date_created', 'date_modified']:
+                    # Get file path for date operations
+                    if img_path.startswith('uploaded/'):
+                        # Handle uploaded images
+                        upload_dir = self.config.get('upload_directory', '').strip()
+                        if upload_dir:
+                            full_path = os.path.join(os.path.expanduser(upload_dir), img_path[9:])  # Remove 'uploaded/' prefix
+                        else:
+                            full_path = os.path.join(self.folder, img_path[9:])
+                    else:
+                        full_path = os.path.join(self.folder, img_path)
+
+                    if os.path.exists(full_path):
+                        if sort_order == 'date_taken':
+                            # Try to get EXIF DateTimeOriginal
+                            try:
+                                img = Image.open(full_path)
+                                exif_data = img._getexif()
+                                if exif_data:
+                                    for tag, value in exif_data.items():
+                                        tag_name = TAGS.get(tag, tag)
+                                        if tag_name == 'DateTimeOriginal' and value:
+                                            # Parse EXIF datetime (format: '2023:01:15 12:30:45')
+                                            try:
+                                                sort_key = datetime.datetime.strptime(str(value), '%Y:%m:%d %H:%M:%S')
+                                                break
+                                            except (ValueError, TypeError):
+                                                pass
+                                img.close()
+                            except Exception:
+                                pass
+
+                            # Fallback to file creation time if no EXIF date
+                            if sort_key is None:
+                                sort_key = datetime.datetime.fromtimestamp(os.path.getctime(full_path))
+
+                        elif sort_order == 'date_created':
+                            sort_key = datetime.datetime.fromtimestamp(os.path.getctime(full_path))
+
+                        elif sort_order == 'date_modified':
+                            sort_key = datetime.datetime.fromtimestamp(os.path.getmtime(full_path))
+
+                        if sort_order in ['date_taken', 'date_created', 'date_modified']:
+                            print(f"[Slideshow] Sort key for {os.path.basename(img_path)}: {sort_key} ({sort_order})")
+                        else:
+                            print(f"[Slideshow] Sort order '{sort_order}' not recognized for date sorting")
+
+                # Default fallback
+                if sort_key is None:
+                    sort_key = self.natural_sort_key(os.path.basename(img_path))
+
+            except Exception as e:
+                print(f"[Slideshow] Error getting sort key for {img_path}: {e}")
+                sort_key = os.path.basename(img_path).lower()
+
+            image_sort_data.append((img_path, sort_key))
+
+        # Sort the images
+        # Note: Since we pop() from the end of the list, we need to reverse the sort
+        # so that the "first" items are at the end and get popped first
+        print(f"[Slideshow] Before sort: image_sort_data[0] = {os.path.basename(image_sort_data[0][0])} ({image_sort_data[0][1]})")
+        print(f"[Slideshow] Before sort: image_sort_data[-1] = {os.path.basename(image_sort_data[-1][0])} ({image_sort_data[-1][1]})")
+        try:
+            if sort_order == 'size':
+                # For size, we want largest first by default (most interesting images)
+                # But since we pop from end, largest should be at end for "largest first"
+                image_sort_data.sort(key=lambda x: x[1] or 0, reverse=reverse_order)
+            else:
+                # For dates and filenames, chronological/alphabetical order
+                # Since we pop from end, we need to reverse the sort order
+                image_sort_data.sort(key=lambda x: x[1], reverse=not reverse_order)
+                print(f"[Slideshow] After sort with reverse={not reverse_order}: image_sort_data[0] = {os.path.basename(image_sort_data[0][0])} ({image_sort_data[0][1]})")
+                print(f"[Slideshow] After sort: image_sort_data[-1] = {os.path.basename(image_sort_data[-1][0])} ({image_sort_data[-1][1]})")
+        except Exception as e:
+            print(f"[Slideshow] Error sorting images: {e}")
+            # Fallback to filename sort with natural sorting
+            image_sort_data.sort(key=lambda x: self.natural_sort_key(os.path.basename(x[0])), reverse=reverse_order)
+
+        # Extract just the image paths in sorted order
+        sorted_images = [img_path for img_path, _ in image_sort_data]
+
+        order_desc = "ascending" if not reverse_order else "descending"
+        print(f"[Slideshow] Sorted {len(sorted_images)} images by {sort_order} ({order_desc})")
+
+        # Debug: Print first and last few sorted images with dates
+        print("[Slideshow] First 3 sorted images (latest dates):")
+        for i, (img_path, sort_key) in enumerate(image_sort_data[:3]):
+            print(f"[Slideshow]   {i+1}. {os.path.basename(img_path)} ({sort_key})")
+        print("[Slideshow] Last 3 sorted images (earliest dates):")
+        for i, (img_path, sort_key) in enumerate(image_sort_data[-3:]):
+            print(f"[Slideshow]   {len(image_sort_data)-3+i+1}. {os.path.basename(img_path)} ({sort_key})")
+
+        return sorted_images
+
     def refresh_images(self):
         # Check if directory exists
         if not os.path.exists(self.folder):
@@ -1092,47 +1296,127 @@ class Slideshow:
             return
             
         if new_images:
-            random.shuffle(new_images)
-            self.images.extend(new_images)
+            # Apply configured sorting instead of random shuffle
+            sorted_new_images = self.sort_images(new_images)
+            self.images.extend(sorted_new_images)
         self.total_images = len(self.images) + len(self.history)
         print(f"[Slideshow] Found {len(new_images)} new images, total queue={self.total_images}")
 
     def next_image(self):
-        if self.forward_stack:
-            self.current_img = self.forward_stack.pop()
-        elif self.current_index < len(self.history) - 1:
-            self.current_index += 1
-            self.current_img = self.history[self.current_index]
+        if hasattr(self, '_all_images') and self._all_images:
+            # Use circular navigation with full image set
+            if self.current_index < len(self._all_images) - 1:
+                self.current_index += 1
+            else:
+                # Wrap around to the beginning
+                self.current_index = 0
+
+            self.current_img = self._all_images[self.current_index]
+            # Update history for consistency
+            self.history = self._all_images[:self.current_index + 1]
+            self.forward_stack = []
+
+            print(f"[Slideshow] Next image {self.current_index+1}/{len(self._all_images)}: {self.current_img}")
+            # Notify Telegram of image change
+            if self.telegram and self.current_img:
+                self.telegram.notify_image_change(self.current_img, self.current_index + 1, len(self._all_images))
         else:
-            # Refresh images every time we reach the end
-            if not self.images:
+            # Check if we should build _all_images for circular navigation
+            if not self.images and not self.history:
+                # First time, refresh to get images
                 self.refresh_images()
 
-            if self.images:
-                self.current_img = self.images.pop()
-                self.history.append(self.current_img)
-                self.current_index = len(self.history) - 1
-            elif self.history:
-                # If no new images, loop through history
+            if self.images and not hasattr(self, '_all_images'):
+                # Build the complete image list for circular navigation
+                # self.images is already sorted with latest dates first
+                # Popping gives us earliest dates first (correct viewing order)
+                self._all_images = []
+                temp_queue = self.images[:]
+                while temp_queue:
+                    self._all_images.append(temp_queue.pop())
+                # _all_images now has earliest dates first (correct viewing order)
+                print(f"[Slideshow] Built _all_images with {len(self._all_images)} images")
+                print(f"[Slideshow] _all_images[0]: {os.path.basename(self._all_images[0])}")
+                print(f"[Slideshow] _all_images[-1]: {os.path.basename(self._all_images[-1])}")
+
+                # Start circular navigation
                 self.current_index = 0
+                self.current_img = self._all_images[self.current_index]
+                self.history = [self._all_images[0]]
+                self.forward_stack = []
+
+                print(f"[Slideshow] Next image {self.current_index+1}/{len(self._all_images)}: {self.current_img}")
+                # Notify Telegram of image change
+                if self.telegram and self.current_img:
+                    self.telegram.notify_image_change(self.current_img, self.current_index + 1, len(self._all_images))
+                return
+
+            # Fallback to old navigation logic
+            if self.forward_stack:
+                self.current_img = self.forward_stack.pop()
+            elif self.current_index < len(self.history) - 1:
+                self.current_index += 1
                 self.current_img = self.history[self.current_index]
             else:
-                # Nothing at all, do nothing
-                self.current_img = None
+                # Refresh images every time we reach the end
+                if not self.images:
+                    self.refresh_images()
+
+                if self.images:
+                    print(f"[Slideshow] Popping from images: images[-1] = {self.images[-1] if self.images else 'None'}")
+                    self.current_img = self.images.pop()
+                    print(f"[Slideshow] Popped: {self.current_img}")
+                    self.history.append(self.current_img)
+                    self.current_index = len(self.history) - 1
+                elif self.history:
+                    # If no new images, loop through history
+                    self.current_index = 0
+                    self.current_img = self.history[self.current_index]
+                else:
+                    # Nothing at all, do nothing
+                    self.current_img = None
+
+            print(f"[Slideshow] Next image {self.current_index+1}/{self.total_images}: {self.current_img}")
+            # Notify Telegram of image change
+            if self.telegram and self.current_img:
+                self.telegram.notify_image_change(self.current_img, self.current_index + 1, self.total_images)
         print(f"[Slideshow] Next image {self.current_index+1}/{self.total_images}: {self.current_img}")
         # Notify Telegram of image change
         if self.telegram and self.current_img:
             self.telegram.notify_image_change(self.current_img, self.current_index + 1, self.total_images)
 
     def prev_image(self):
-        if self.current_index > 0:
-            self.current_index -= 1
-            self.forward_stack.append(self.history[self.current_index])
-            self.current_img = self.history[self.current_index]
-            print(f"[Slideshow] Previous image {self.current_index+1}/{self.total_images}: {self.current_img}")
+        if hasattr(self, '_all_images') and self._all_images:
+            # Use circular navigation with full image set
+            if self.current_index > 0:
+                self.current_index -= 1
+            else:
+                # Wrap around to the end
+                self.current_index = len(self._all_images) - 1
+                print(f"[Slideshow] Previous wrapped to last image {self.current_index+1}/{len(self._all_images)}: {self._all_images[self.current_index]}")
+
+            self.current_img = self._all_images[self.current_index]
+            # Update history for consistency
+            self.history = self._all_images[:self.current_index + 1]
+            self.forward_stack = []
+
+            print(f"[Slideshow] Previous image {self.current_index+1}/{len(self._all_images)}: {self.current_img}")
             # Notify Telegram of image change
             if self.telegram and self.current_img:
-                self.telegram.notify_image_change(self.current_img, self.current_index + 1, self.total_images)
+                self.telegram.notify_image_change(self.current_img, self.current_index + 1, len(self._all_images))
+        else:
+            # Fallback to old navigation logic
+            print(f"[Slideshow] Using fallback prev navigation, current_index={self.current_index}")
+            if self.current_index > 0:
+                # Go back in history
+                self.current_index -= 1
+                self.forward_stack.append(self.history[self.current_index])
+                self.current_img = self.history[self.current_index]
+                print(f"[Slideshow] Previous image {self.current_index+1}/{self.total_images}: {self.current_img}")
+                # Notify Telegram of image change
+                if self.telegram and self.current_img:
+                    self.telegram.notify_image_change(self.current_img, self.current_index + 1, self.total_images)
+            # No wrap-around in fallback mode
 
     def is_display_on(self):
         # Check for manual override first
@@ -1187,7 +1471,8 @@ class Slideshow:
         
         clock = pygame.time.Clock()
         display_was_on = True
-        
+        manual_navigation = False  # Track if we just did manual navigation
+
         while True:
             display_should_be_on = self.is_display_on()
             
@@ -1206,13 +1491,16 @@ class Slideshow:
             elif display_should_be_on:
                 self.set_display_power(True)
 
-                # Only advance if not paused
-                if not self.paused:
+                # Only advance if not paused and not manually navigated
+                if not self.paused and not manual_navigation:
                     self.next_image()
                     self.draw_image()
                     pygame.display.flip()
                     # Reset countdown timer
                     self.image_display_start_time = time.time()
+
+                # Reset manual navigation flag
+                manual_navigation = False
                 
                 display_was_on = True
             else:
@@ -1264,6 +1552,7 @@ class Slideshow:
                                 if display_should_be_on:
                                     self.draw_image()
                                     pygame.display.flip()
+                                manual_navigation = True
                                 start_time = 0
                                 break
                 clock.tick(60)
