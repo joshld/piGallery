@@ -193,6 +193,27 @@
                 <h2>👁️ Display Options</h2>
                 <div class="settings-group">
                     <div class="setting-item">
+                        <label class="text-label" style="display: block; margin-bottom: 8px;">Image Sort Order</label>
+                        <select id="sort-order" onchange="updateSetting('sort_order', this.value)"
+                            style="padding: 8px 12px; border: 2px solid var(--input-border); border-radius: 8px; font-size: 1em; font-family: inherit; width: 100%; box-sizing: border-box; color: var(--input-text); background: var(--bg-input);">
+                            <option value="random">Random (Default)</option>
+                            <option value="filename">Filename (A-Z)</option>
+                            <option value="date_taken">Date Taken (EXIF)</option>
+                            <option value="date_created">Date Created (File)</option>
+                            <option value="date_modified">Date Modified (File)</option>
+                            <option value="size">File Size (Largest First)</option>
+                        </select>
+                        <small class="text-small">How to order images in the slideshow</small>
+
+                        <div class="setting-item-row">
+                            <span>Reverse Order</span>
+                            <div class="toggle-switch" id="toggle-sort-reverse" onclick="toggleSetting('sort_reverse', this)"></div>
+                        </div>
+                        <small class="text-small">Reverse the selected sort order</small>
+
+                    </div>
+
+                    <div class="setting-item">
                         <div class="setting-item-row">
                             <span>Show Time</span>
                             <div class="toggle-switch" id="toggle-time" onclick="toggleSetting('show_time', this)"></div>
@@ -377,33 +398,12 @@
                             <option value="tokyo-night">Tokyo Night</option>
                         </select>
                         <small class="text-small">Choose your preferred color scheme</small>
-                    </div>
-
-                    <div class="setting-item">
-                        <label class="text-label" style="display: block; margin-bottom: 8px;">Image Sort Order</label>
-                        <select id="sort-order" onchange="updateSetting('sort_order', this.value)"
-                                style="padding: 8px 12px; border: 2px solid var(--input-border); border-radius: 8px; font-size: 1em; font-family: inherit; width: 100%; box-sizing: border-box; color: var(--input-text); background: var(--bg-input);">
-                            <option value="random">Random (Default)</option>
-                            <option value="filename">Filename (A-Z)</option>
-                            <option value="date_taken">Date Taken (EXIF)</option>
-                            <option value="date_created">Date Created (File)</option>
-                            <option value="date_modified">Date Modified (File)</option>
-                            <option value="size">File Size (Largest First)</option>
-                        </select>
-                        <small class="text-small">How to order images in the slideshow</small>
-                    </div>
-
-                    <div class="setting-item">
-                        <div class="setting-item-row">
-                            <span>Reverse Order</span>
-                            <div class="toggle-switch" id="toggle-sort-reverse" onclick="toggleSetting('sort_reverse', this)"></div>
-                        </div>
-                        <small class="text-small">Reverse the selected sort order</small>
-                        <small class="text-small">Choose your preferred color scheme</small>
-                        <div id="theme-debug" style="margin-top: 8px; padding: 8px; background: var(--bg-secondary); border-radius: 4px; font-size: 0.85em; color: var(--text-secondary);">
+                        <div id="theme-debug"
+                            style="margin-top: 8px; padding: 8px; background: var(--bg-secondary); border-radius: 4px; font-size: 0.85em; color: var(--text-secondary);">
                             <strong>Debug:</strong> Current theme: <span id="current-theme-display">loading...</span>
-                </div>
+                        </div>
                     </div>
+
                 </div>
             </div>
 
