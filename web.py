@@ -41,6 +41,130 @@ def init_web(app_instance, slideshow_ref, telegram_ref, config_path, log_file, l
     register_routes()
 
 
+def get_image_caption(img_path):
+    """Read caption from image metadata (EXIF/IPTC/XMP)
+    Returns caption string or None if not found"""
+    try:
+        from PIL import Image
+        from PIL.ExifTags import TAGS
+        from PIL import IptcImagePlugin
+        
+        if not os.path.exists(img_path):
+            return None
+        
+        img = Image.open(img_path)
+        caption = None
+        
+        # Try EXIF UserComment (tag 37510) - this is the "Comments" field
+        # Use piexif for better UserComment reading support
+        try:
+            import piexif
+            with open(img_path, 'rb') as f:
+                exif_dict = piexif.load(f.read())
+            if 'Exif' in exif_dict and piexif.ExifIFD.UserComment in exif_dict['Exif']:
+                comment_data = exif_dict['Exif'][piexif.ExifIFD.UserComment]
+                if comment_data:
+                    if isinstance(comment_data, bytes):
+                        # UserComment format: encoding prefix (e.g., "ASCII\0\0\0" or "UNICODE\0\0\0\0") + text
+                        # Try to decode, skipping encoding prefix if present
+                        try:
+                            # Check for common encoding prefixes
+                            if comment_data.startswith(b'ASCII\x00\x00\x00'):
+                                caption = comment_data[8:].decode('ascii', errors='replace').strip()
+                            elif comment_data.startswith(b'UNICODE\x00\x00\x00\x00'):
+                                caption = comment_data[12:].decode('utf-16', errors='replace').strip()
+                            elif comment_data.startswith(b'JIS\x00\x00\x00\x00\x00'):
+                                caption = comment_data[8:].decode('shift_jis', errors='replace').strip()
+                            else:
+                                # Try UTF-8 directly
+                                caption = comment_data.decode('utf-8', errors='replace').strip()
+                            if caption:
+                                return caption
+                        except Exception:
+                            pass
+                    elif isinstance(comment_data, str):
+                        return comment_data.strip()
+        except ImportError:
+            # piexif not available, try PIL
+            pass
+        except Exception:
+            pass
+        
+        # Fallback: Try PIL's getexif() for UserComment
+        try:
+            exif = img.getexif()
+            if exif and 37510 in exif:
+                caption = exif[37510]
+                if caption:
+                    if isinstance(caption, str):
+                        return caption.strip()
+                    elif isinstance(caption, bytes):
+                        # Try to decode, handling encoding prefix
+                        if caption.startswith(b'ASCII\x00\x00\x00'):
+                            return caption[8:].decode('ascii', errors='replace').strip()
+                        else:
+                            return caption.decode('utf-8', errors='replace').strip()
+        except Exception:
+            pass
+        
+        # Try EXIF ImageDescription (tag 270) as fallback
+        try:
+            exif = img.getexif()
+            if exif:
+                # EXIF ImageDescription is tag 270
+                if 270 in exif:
+                    caption = exif[270]
+                    if caption and isinstance(caption, str) and caption.strip():
+                        return caption.strip()
+        except Exception:
+            pass
+        
+        # Try IPTC Caption-Abstract
+        try:
+            iptc = IptcImagePlugin.getiptcinfo(img)
+            if iptc:
+                # IPTC Caption-Abstract is tag (2, 120)
+                if (2, 120) in iptc:
+                    caption_data = iptc[(2, 120)]
+                    if caption_data:
+                        # IPTC data can be bytes, string, or list
+                        if isinstance(caption_data, bytes):
+                            caption = caption_data.decode('utf-8', errors='replace').strip()
+                        elif isinstance(caption_data, str):
+                            caption = caption_data.strip()
+                        elif isinstance(caption_data, (list, tuple)) and len(caption_data) > 0:
+                            # Take first element if it's a list
+                            first_item = caption_data[0]
+                            if isinstance(first_item, bytes):
+                                caption = first_item.decode('utf-8', errors='replace').strip()
+                            elif isinstance(first_item, str):
+                                caption = first_item.strip()
+                            else:
+                                caption = str(first_item).strip()
+                        else:
+                            caption = str(caption_data).strip()
+                        
+                        if caption and len(caption) > 0:
+                            return caption
+        except Exception as e:
+            # Silently fail IPTC reading - not all images have IPTC data
+            pass
+        
+        # Try XMP (if available via Pillow)
+        try:
+            # XMP data might be in the image info
+            if hasattr(img, 'info') and 'exif' in img.info:
+                # Some XMP data might be embedded in EXIF
+                pass
+        except Exception:
+            pass
+        
+        return None
+    except Exception as e:
+        print(f"[Caption] Error reading caption from {img_path}: {e}")
+        return None
+
+
 def get_logs(lines=200):
     """Get logs from journalctl (systemd) or log file (cross-platform)"""
     logs = []
@@ -93,6 +217,7 @@ def register_routes():
         # Get system stats
         system_stats = {}
         try:
+            from gallery import get_memory_info, get_cpu_usage, get_cpu_temperature, get_disk_usage
             memory = get_memory_info()
             if memory is not None:
                 system_stats['memory_free_mb'] = round(memory, 1)
@@ -217,129 +342,6 @@ def register_routes():
             img_path = os.path.join(slideshow_instance.folder, slideshow_instance.current_img)
         
         return img_path if os.path.exists(img_path) else None
-    
-    def get_image_caption(img_path):
-        """Read caption from image metadata (EXIF/IPTC/XMP)
-        Returns caption string or None if not found"""
-        try:
-            from PIL import Image
-            from PIL.ExifTags import TAGS
-            from PIL import IptcImagePlugin
-            
-            if not os.path.exists(img_path):
-                return None
-            
-            img = Image.open(img_path)
-            caption = None
-            
-            # Try EXIF UserComment (tag 37510) - this is the "Comments" field
-            # Use piexif for better UserComment reading support
-            try:
-                import piexif
-                with open(img_path, 'rb') as f:
-                    exif_dict = piexif.load(f.read())
-                if 'Exif' in exif_dict and piexif.ExifIFD.UserComment in exif_dict['Exif']:
-                    comment_data = exif_dict['Exif'][piexif.ExifIFD.UserComment]
-                    if comment_data:
-                        if isinstance(comment_data, bytes):
-                            # UserComment format: encoding prefix (e.g., "ASCII\0\0\0" or "UNICODE\0\0\0\0") + text
-                            # Try to decode, skipping encoding prefix if present
-                            try:
-                                # Check for common encoding prefixes
-                                if comment_data.startswith(b'ASCII\x00\x00\x00'):
-                                    caption = comment_data[8:].decode('ascii', errors='replace').strip()
-                                elif comment_data.startswith(b'UNICODE\x00\x00\x00\x00'):
-                                    caption = comment_data[12:].decode('utf-16', errors='replace').strip()
-                                elif comment_data.startswith(b'JIS\x00\x00\x00\x00\x00'):
-                                    caption = comment_data[8:].decode('shift_jis', errors='replace').strip()
-                                else:
-                                    # Try UTF-8 directly
-                                    caption = comment_data.decode('utf-8', errors='replace').strip()
-                                if caption:
-                                    return caption
-                            except Exception:
-                                pass
-                        elif isinstance(comment_data, str):
-                            return comment_data.strip()
-            except ImportError:
-                # piexif not available, try PIL
-                pass
-            except Exception:
-                pass
-            
-            # Fallback: Try PIL's getexif() for UserComment
-            try:
-                exif = img.getexif()
-                if exif and 37510 in exif:
-                    caption = exif[37510]
-                    if caption:
-                        if isinstance(caption, str):
-                            return caption.strip()
-                        elif isinstance(caption, bytes):
-                            # Try to decode, handling encoding prefix
-                            if caption.startswith(b'ASCII\x00\x00\x00'):
-                                return caption[8:].decode('ascii', errors='replace').strip()
-                            else:
-                                return caption.decode('utf-8', errors='replace').strip()
-            except Exception:
-                pass
-            
-            # Try EXIF ImageDescription (tag 270) as fallback
-            try:
-                exif = img.getexif()
-                if exif:
-                    # EXIF ImageDescription is tag 270
-                    if 270 in exif:
-                        caption = exif[270]
-                        if caption and isinstance(caption, str) and caption.strip():
-                            return caption.strip()
-            except Exception:
-                pass
-            
-            # Try IPTC Caption-Abstract
-            try:
-                iptc = IptcImagePlugin.getiptcinfo(img)
-                if iptc:
-                    # IPTC Caption-Abstract is tag (2, 120)
-                    if (2, 120) in iptc:
-                        caption_data = iptc[(2, 120)]
-                        if caption_data:
-                            # IPTC data can be bytes, string, or list
-                            if isinstance(caption_data, bytes):
-                                caption = caption_data.decode('utf-8', errors='replace').strip()
-                            elif isinstance(caption_data, str):
-                                caption = caption_data.strip()
-                            elif isinstance(caption_data, (list, tuple)) and len(caption_data) > 0:
-                                # Take first element if it's a list
-                                first_item = caption_data[0]
-                                if isinstance(first_item, bytes):
-                                    caption = first_item.decode('utf-8', errors='replace').strip()
-                                elif isinstance(first_item, str):
-                                    caption = first_item.strip()
-                                else:
-                                    caption = str(first_item).strip()
-                            else:
-                                caption = str(caption_data).strip()
-                            
-                            if caption and len(caption) > 0:
-                                return caption
-            except Exception as e:
-                # Silently fail IPTC reading - not all images have IPTC data
-                pass
-            
-            # Try XMP (if available via Pillow)
-            try:
-                # XMP data might be in the image info
-                if hasattr(img, 'info') and 'exif' in img.info:
-                    # Some XMP data might be embedded in EXIF
-                    pass
-            except Exception:
-                pass
-            
-            return None
-        except Exception as e:
-            print(f"[Caption] Error reading caption from {img_path}: {e}")
-            return None
     
     def set_image_caption(img_path, caption):
         """Write caption to image metadata (EXIF/IPTC)
@@ -1022,6 +1024,7 @@ def register_routes():
                 slideshow_instance.config['location_city_suburb'] = new_val
                 # Re-geocode the location
                 slideshow_instance.city_suburb = new_val
+                from gallery import get_coords_from_place
                 lat, lon = get_coords_from_place(new_val)
                 if lat and lon:
                     slideshow_instance.lat = lat

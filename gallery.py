@@ -1272,6 +1272,7 @@ class Slideshow:
 # ---------------- Web API Endpoints ----------------
 # Routes are now in web.py - import and initialize it
 import web
+from web import get_image_caption
 
 
 # ---------------- Main ----------------
