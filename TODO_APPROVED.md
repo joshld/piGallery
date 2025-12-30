@@ -234,13 +234,17 @@
 - [x] `/api/logs` - Error log access and viewing
 - [x] `/api/directories` - Folder browsing for image selection
 
-**Total API Endpoints:** 18 (up from ~11 originally)
+**Upload Management:**
+- [x] `/api/uploaded-images` (GET) - List uploaded images with metadata
+- [x] `/api/uploaded-images/delete` (DELETE) - Bulk image deletion
+
+**Total API Endpoints:** 20 (up from ~11 originally)
 
 ---
 
 ## 📊 Updated Project Statistics
 
-**Completed Features:** 8/15 (53%)
+**Completed Features:** 9/15 (60%)
 - ✅ Telegram Integration (Phase 1)
 - ✅ Image Captions (Enhanced)
 - ✅ Automatic Shutdown & Power Management
@@ -249,19 +253,19 @@
 - ✅ Enhanced Setup Verification
 - ✅ System Control Features
 - ✅ **Delete Uploaded Images (Enhanced!)**
+- ✅ **Image Display Order/Sorting**
 
 **Partially Complete:** 2/15 (13%)
 - 🔄 Error Detection & Reporting (~60% complete)
 - 🔄 Performance Monitoring (~50% complete)
 
-**Not Yet Started:** 6/15 (40%)
+**Not Yet Started:** 5/15 (33%)
 - ❌ Color Schemes for Web UI
 - ❌ Image Transitions
 - ❌ Video Support
-- ❌ Image Display Order/Sorting
 - ❌ Feedback/Suggestions System
 
-**Total API Endpoints:** 18 (up from ~11)
+**Total API Endpoints:** 20 (up from ~11)
 **Platforms Supported:** Windows, Linux, macOS, Raspberry Pi
 **Setup Verification:** Comprehensive (ultra-basic → application level)
 

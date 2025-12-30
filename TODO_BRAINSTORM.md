@@ -466,7 +466,7 @@
 
 ### 📋 NEXT (v1.5)
 - Video support
-- Image sorting/display order
+- [x] Image sorting/display order ✅ COMPLETED
 - Favorites system
 - Authentication/security
 - Performance optimizations

@@ -106,6 +106,10 @@ The web interface provides:
 #### Image Management
 - **View Image Details** - Full resolution and thumbnail views
 - **Edit Captions** - Set/edit image captions via metadata
+- **Edit Filenames** - Rename uploaded images directly from the web interface
+- **Delete Images** - Remove uploaded images with confirmation
+- **Batch Operations** - Select multiple images for deletion
+- **Image Sorting** - Sort by filename, date taken, date created, date modified, or file size
 - **Caption Display** - Toggle caption overlay on/off
 
 #### System Control
@@ -207,6 +211,9 @@ The web interface provides 18 REST API endpoints for integration:
 ### File Operations
 - `POST /api/upload` - Upload new image
   - Form data with 'file' field (JPG, JPEG, PNG)
+- `GET /api/uploaded-images` - List uploaded images with metadata
+- `DELETE /api/uploaded-images/delete` - Delete selected uploaded images
+  - Body: `{"images": ["path1", "path2", ...]}`
 - `GET /api/directories` - List available directories
 
 ### Usage Examples
@@ -235,17 +242,14 @@ curl -F "file=@image.jpg" http://localhost:5000/api/upload
 - ✅ **Image caption editing** (set/edit captions via web UI)
 - ✅ **System control** (remote shutdown/restart/cancel)
 - ✅ **Enhanced error handling** (comprehensive logging and debugging)
-- ✅ **Advanced image management** (thumbnails, full-size viewing)
+- ✅ **Advanced image management** (thumbnails, full-size viewing, filename editing)
 - ✅ **Performance monitoring** (real-time system health)
 - ✅ **Automatic shutdown** (power management with smart scheduling)
-- ✅ **Theme support** (multiple color schemes)
+- ✅ **Theme support** (multiple color schemes including dark/light modes)
 
 ## Future Enhancements
 
 **High Priority:**
-- Delete uploaded images via web UI
-- Image sorting and display order options
-- Dark mode theme implementation
 - Image transition effects (fade, slide)
 
 **Medium Priority:**

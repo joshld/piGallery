@@ -224,11 +224,36 @@
 
 ---
 
+### Upload Management & Image Organization
+**Status:** COMPLETE
+
+**Features Implemented:**
+- ✅ **Upload management modal** - Grid view of all uploaded images with thumbnails
+- ✅ **Batch image deletion** - Select multiple images and delete with confirmation
+- ✅ **Individual image deletion** - Delete button per image thumbnail
+- ✅ **Image sorting options** - Sort by filename, date taken, date created, date modified, file size
+- ✅ **Filename editing** - Rename uploaded images directly in the web interface
+- ✅ **Upload counter badge** - Shows number of uploaded images on manage button
+- ✅ **Image preview** - Click thumbnails to preview full-size images
+- ✅ **Safety protections** - Only uploaded images can be deleted (not original gallery images)
+- ✅ **Progress feedback** - Loading states and deletion progress indicators
+- ✅ **Grid responsiveness** - Auto-sizing thumbnail grid that adapts to screen size
+
+**Technical Implementation:**
+- Frontend: Modal-based interface with checkbox selection and bulk operations
+- Backend: Safe deletion with trash bin functionality and upload tracking
+- API: `GET /api/uploaded-images` for listing, `DELETE /api/uploaded-images/delete` for bulk deletion
+- UI: Integrated into existing upload section with counter badge and manage button
+
+**Action:** This completes the upload management system with full CRUD operations for uploaded images.
+
+---
+
 ## 📊 Summary Statistics
 
 **Completed Issues:** 1 (Image Captions)
 **Partially Complete:** 3 (Error Detection, Telegram, Performance Monitoring)
-**New Features (not in issues):** 5 (Shutdown, Cross-Platform, Enhanced Captions, System Control, Setup Verification)
+**New Features (not in issues):** 6 (Shutdown, Cross-Platform, Enhanced Captions, System Control, Setup Verification, Upload Management)
 
 **Overall Progress:**
 - Telegram Integration: **Phase 1 Complete** (8/10 items)
@@ -239,13 +264,16 @@
 - **Cross-Platform Support: 100% Complete** ✅
 - **System Control Features: 100% Complete** ✅
 - **Setup Verification: 100% Complete** ✅
+- **Upload Management: 100% Complete** ✅
 
-**New API Endpoints Added:** 7 (total now 18)
+**New API Endpoints Added:** 9 (total now 20)
 - `/api/image/caption` (GET/POST) - Caption editing
 - `/api/system/shutdown|restart|cancel` - System control
 - `/api/image/preview|full` - Image viewing
 - `/api/logs` - Error log access
 - `/api/directories` - Folder browsing
+- `/api/uploaded-images` (GET) - List uploaded images
+- `/api/uploaded-images/delete` (DELETE) - Bulk image deletion
 
 **Project Scope Expansion:**
 - **Originally:** Raspberry Pi photo frame with web control
