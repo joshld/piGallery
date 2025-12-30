@@ -1,6 +1,6 @@
 
 # piGallery
-Displays a slideshow of photos on a Raspberry Pi (or any computer) with a connected display.
+Displays a slideshow of photos on a Raspberry Pi, Windows PC, or any computer with a connected display.
 
 ## Features
 
@@ -29,11 +29,14 @@ pip install -r requirements.txt
 ```
 
 This will install the following required modules:
-- pygame
-- requests
-- geopy
-- flask
-- flask-cors
+- pygame (graphics and display)
+- requests (HTTP requests for weather)
+- geopy (location services)
+- flask (web server)
+- flask-cors (cross-origin resource sharing)
+- psutil (system monitoring)
+- Pillow (image processing)
+- piexif (EXIF metadata handling)
 
 ### 4. Prepare Your Images
 Place your images in the folder specified by the `images_directory` in `config.ini`. You can change this path as needed.
@@ -55,12 +58,18 @@ python gallery.py --delay 15
 
 Once the gallery is running, you can control it from any device on your network:
 
-**On the same network:**
-- Open a browser and go to: `http://raspberrypi.local:5000`
-- Or use the Pi's IP address: `http://192.168.1.xxx:5000`
+**Find your computer's IP address:**
+- **Windows:** Open Command Prompt and run `ipconfig` - look for IPv4 Address
+- **Linux/Raspberry Pi:** Run `hostname -I` in terminal
+- **macOS:** Run `ipconfig getifaddr en0` in terminal
 
-**From your phone/tablet/laptop:**
-- Simply open the URL above in any browser
+**Access URLs:**
+- **Local computer:** `http://localhost:5000`
+- **Same network:** `http://[YOUR_IP_ADDRESS]:5000`
+- **Raspberry Pi (if applicable):** `http://raspberrypi.local:5000`
+
+**From any device:**
+- Open the URL above in any browser (Chrome, Firefox, Safari, Edge)
 - No app installation needed!
 
 **Web Interface Features:**
@@ -178,21 +187,40 @@ python3 -m mypy gallery.py
 
 If you want to integrate with other systems, the following API endpoints are available:
 
+**Slideshow Control:**
 - `GET /api/status` - Get current slideshow status
 - `POST /api/next` - Skip to next image
 - `POST /api/prev` - Go to previous image
 - `POST /api/pause` - Toggle pause state
 - `POST /api/display` - Control display (body: `{"action": "on|off|auto"}`)
+
+**Image Management:**
+- `GET /api/image/preview` - Get current image thumbnail
+- `GET /api/image/full` - Get current image at full resolution
+- `GET /api/image/caption` - Get caption from current image metadata
+- `POST /api/image/caption` - Set caption in current image metadata
+
+**System Control:**
+- `POST /api/system/shutdown` - Shutdown the system
+- `POST /api/system/restart` - Restart the system
+- `POST /api/system/cancel` - Cancel pending shutdown/restart
+
+**Settings & Upload:**
 - `POST /api/upload` - Upload new image (multipart form data)
 - `GET /api/settings` - Get current settings
 - `POST /api/settings` - Update settings (body: settings JSON)
 
+**Utilities:**
+- `GET /api/logs` - Get system logs
+- `GET /api/directories` - List directories for folder selection
+
 ## Quick Reference
 
 ### Access URLs
-- **On Pi:** `http://localhost:5000`
-- **Same network:** `http://raspberrypi.local:5000`
-- **Direct IP:** `http://192.168.1.xxx:5000` (find with `hostname -I`)
+- **Local computer:** `http://localhost:5000`
+- **Windows network:** `http://[YOUR_IP]:5000` (find IP with `ipconfig`)
+- **Linux/Raspberry Pi:** `http://[YOUR_IP]:5000` (find IP with `hostname -I`)
+- **Raspberry Pi (mDNS):** `http://raspberrypi.local:5000`
 
 ### Web Interface Features
 - **Playback:** Previous, Next, Pause/Resume
@@ -226,9 +254,10 @@ Edit `config.ini`:
 
 ### Troubleshooting
 **Can't access web interface?**
-- Run verification: `./test_setup.sh`
-- Allow firewall: `sudo ufw allow 5000`
-- Find Pi IP: `hostname -I`
+- Run verification: `python test_setup.py`
+- **Windows:** Allow port 5000 in Windows Firewall (or disable firewall temporarily for testing)
+- **Linux/Raspberry Pi:** Allow firewall: `sudo ufw allow 5000`
+- Find your IP: `ipconfig` (Windows) or `hostname -I` (Linux/Pi)
 
 **Web loads but doesn't work?**
 - Check browser console (F12) for errors
@@ -310,9 +339,11 @@ If you need remote access during off-hours but still want some power savings:
 - **Benefit:** Full remote access 24/7 for uploads, settings, monitoring
 
 ### 10. Notes
-- The script is designed for fullscreen display and will hide the mouse cursor.
-- Weather and time information is displayed on the screen.
-- Some features (like display power control) are specific to Raspberry Pi and may not work on other platforms.
-- The web interface is accessible on port 5000 by default.
-- Images can be organized in subfolders - the script will recursively scan all directories.
+- **Cross-platform:** Works on Windows, macOS, Linux, and Raspberry Pi
+- **Fullscreen display:** Script hides mouse cursor for clean presentation
+- **Weather & time:** Displays current conditions and clock on screen
+- **Platform differences:** Some features (like display power control) work best on Raspberry Pi but are gracefully handled on other platforms
+- **Web interface:** Accessible on port 5000 by default
+- **Image organization:** Supports subfolders - recursively scans all directories
+- **File formats:** Supports JPG, JPEG, and PNG images
 
