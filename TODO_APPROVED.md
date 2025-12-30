@@ -115,17 +115,22 @@
 - [x] **NEW:** Enhanced feedback - Save button appears immediately
 - [x] **NEW:** Space input fixes in textareas
 
-### 9. Image Display Order/Sorting
-- [ ] Sort options in settings (dropdown/selector)
-- [ ] Random (current default)
-- [ ] Date taken (from EXIF metadata)
-- [ ] Date created (file creation date)
-- [ ] Date modified (file modified date)
-- [ ] Filename (alphabetical)
-- [ ] File size (smallest/largest first)
-- [ ] Reverse order option
-- [ ] Save sort preference to config
-- [ ] Apply sorting when refreshing images
+### 9. Image Display Order/Sorting ✅ COMPLETED
+- [x] Sort options in settings (dropdown/selector)
+- [x] Random (current default)
+- [x] Date taken (from EXIF metadata)
+- [x] Date created (file creation date)
+- [x] Date modified (file modified date)
+- [x] Filename (alphabetical)
+- [x] File size (smallest/largest first)
+- [x] Reverse order option
+- [x] Save sort preference to config
+- [x] Apply sorting when refreshing images
+- [x] **NEW:** Immediate sorting when settings change (re-sorts existing queue)
+- [x] **NEW:** EXIF DateTimeOriginal reading with fallback to file dates
+- [x] **NEW:** Support for uploaded images in separate directories
+- [x] **NEW:** Robust error handling for missing/corrupted EXIF data
+- [x] **NEW:** Intelligent default sort behavior (largest images first for size sorting)
 
 ### 10. Feedback/Suggestions System
 - [ ] "Send Feedback" button in web UI

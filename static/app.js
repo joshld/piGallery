@@ -433,6 +433,10 @@ async function loadSettings() {
         if (document.getElementById('shutdown-countdown')) {
             document.getElementById('shutdown-countdown').value = settings.shutdown_countdown_seconds || 10;
         }
+        if (document.getElementById('sort-order')) {
+            document.getElementById('sort-order').value = settings.sort_order || 'random';
+        }
+        updateToggle('toggle-sort-reverse', settings.sort_reverse === 'true');
     } catch (error) {
         console.error('Failed to load settings:', error);
     }
@@ -474,6 +478,8 @@ async function saveSettings() {
             images_directory: document.getElementById('images-directory')?.value || settings.images_directory,
             upload_directory: document.getElementById('upload-directory')?.value || settings.upload_directory,
             shutdown_countdown_seconds: parseInt(document.getElementById('shutdown-countdown')?.value || settings.shutdown_countdown_seconds || 10),
+            sort_order: document.getElementById('sort-order')?.value || settings.sort_order || 'random',
+            sort_reverse: settings.sort_reverse || 'false',
             save_to_config: true
         };
         
