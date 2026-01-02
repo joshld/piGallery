@@ -725,6 +725,7 @@ class Slideshow:
         
         # Web control state
         self.paused = False
+        self.pause_start_time = None
         self.manual_display_override = None  # None = auto, True = force on, False = force off
         self.control_lock = threading.Lock()
         self.force_redraw = False

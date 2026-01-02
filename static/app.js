@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(updateStatus, 3000); // Update every 3 seconds
     
     // Update countdown every second
-    countdownInterval = setInterval(updateCountdown, 1000);
+    countdownInterval = setInterval(updateCountdown, 500);
 
     // Drag and drop
     const uploadArea = document.getElementById('uploadArea');
@@ -282,14 +282,16 @@ function updateCountdown() {
     if (lastKnownTimeRemaining === 0 && lastUpdateTime === 0) {
         return;
     }
-    
+    if (isPaused) {
+        return;
+    }
     // Calculate time elapsed since last API update
     const now = Date.now();
     const elapsed = Math.floor((now - lastUpdateTime) / 1000);
     const remaining = Math.max(0, lastKnownTimeRemaining - elapsed);
     
     const countdownEl = document.getElementById('status-countdown');
-    if (countdownEl && countdownEl.textContent !== 'Paused') {
+    if (countdownEl) {// && countdownEl.textContent !== 'Paused') {
         if (remaining > 0) {
             countdownEl.textContent = `${remaining}s`;
             countdownEl.style.color = remaining <= 5 ? '#e74c3c' : '#2ecc71'; // Red when < 5s

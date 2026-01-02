@@ -278,6 +278,10 @@ def register_routes():
         
         # Calculate time remaining until next image
         elapsed = time.time() - slideshow_instance.image_display_start_time
+        # Subtract pause duration if currently paused
+        if slideshow_instance.paused and slideshow_instance.pause_start_time:
+            pause_duration = time.time() - slideshow_instance.pause_start_time
+            elapsed -= pause_duration
         time_remaining = max(0, slideshow_instance.display_time_seconds - int(elapsed))
         
         response = {
@@ -796,6 +800,10 @@ def register_routes():
             return jsonify({'error': 'Slideshow not initialized'}), 503
         
         slideshow_instance.paused = not slideshow_instance.paused
+        if slideshow_instance.paused:
+            slideshow_instance.pause_start_time = time.time()
+        else:
+            slideshow_instance.pause_start_time = None
         status = 'paused' if slideshow_instance.paused else 'playing'
         print(f"[Web] Slideshow {status}")
         
