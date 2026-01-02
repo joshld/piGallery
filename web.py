@@ -1358,6 +1358,12 @@ def register_routes():
 
             if success:
                 print(f"[Web] Successfully embedded caption in {filename} metadata: '{caption}'")
+
+                if slideshow_instance.current_img and slideshow_instance.current_img.endswith(filename):
+                    slideshow_instance._cached_caption = None
+                    slideshow_instance._cached_caption_image = None
+
+                slideshow_instance.force_redraw = True
                 return jsonify({'status': 'ok', 'filename': filename, 'caption': caption})
             else:
                 return jsonify({'error': 'Failed to save caption to image metadata'}), 500
