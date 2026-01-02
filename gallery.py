@@ -1343,11 +1343,52 @@ class Slideshow:
             self.images.extend(new_images)
             # Sort the entire queue according to configured order
             self.images = self.sort_images(self.images)
+            self.total_images = len(self.images)
             # Clear _all_images so it gets rebuilt with new images included
             if hasattr(self, '_all_images'):
                 self._all_images = []
-        self.total_images = len(self.images) + len(self.history)
         print(f"[Slideshow] Found {len(new_images)} new images, total queue={self.total_images}")
+
+    def rebuild_navigation_preserve_current(self):
+        """Rebuild _all_images from self.images while preserving current image position"""
+        if not self.images:
+            self._all_images = []
+            self.current_index = 0
+            self.current_img = None
+            self.history = []
+            self.forward_stack = []
+            return
+        
+        # Build new _all_images (same logic as next_image)
+        self._all_images = []
+        temp_queue = self.images[:]
+        while temp_queue:
+            self._all_images.append(temp_queue.pop())
+        
+        self.total_images = len(self._all_images)
+        
+        # Find where current image fits in new _all_images
+        if self.current_img and self.current_img in self._all_images:
+            # Current image still exists - preserve its position
+            self.current_index = self._all_images.index(self.current_img)
+            # Keep existing history but ensure it's consistent
+            self.history = [img for img in self.history if img in self._all_images]
+            if self.current_img not in self.history:
+                self.history.append(self.current_img)
+        else:
+            # Current image was deleted - move to nearest valid position
+            if self._all_images:
+                self.current_index = min(self.current_index, len(self._all_images) - 1)
+                self.current_img = self._all_images[self.current_index]
+                self.history = [self.current_img]
+            else:
+                self.current_index = 0
+                self.current_img = None
+                self.history = []
+        
+        self.forward_stack = []
+        
+        print(f"[Slideshow] Navigation rebuilt, current: {self.current_index+1}/{self.total_images}")
 
     def next_image(self):
         if hasattr(self, '_all_images') and self._all_images:

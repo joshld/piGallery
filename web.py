@@ -1114,7 +1114,7 @@ def register_routes():
         
         # Refresh images to include the new upload (refresh_images scans recursively)
         slideshow_instance.refresh_images()
-        slideshow_instance.next_image()
+        slideshow_instance.rebuild_navigation_preserve_current()
         slideshow_instance.force_redraw = True
         
         # Notify Telegram of upload
@@ -1246,7 +1246,7 @@ def register_routes():
 
             if deleted:  # Only refresh if images were actually deleted
                 slideshow_instance.refresh_images()
-                slideshow_instance.next_image()
+                slideshow_instance.rebuild_navigation_preserve_current()
                 slideshow_instance.force_redraw = True
 
             result = {
