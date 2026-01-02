@@ -870,7 +870,7 @@ async function uploadSelectedFiles() {
     }
     
     // Refresh status after upload
-    setTimeout(updateStatus, 1000);
+    updateStatus();
 }
 
 function showAlert(message, type) {
@@ -1493,6 +1493,8 @@ async function deleteSelectedImages() {
 
             // Update uploaded count in main UI
             updateUploadedCount(uploadedImages.length);
+
+            updateStatus();
         }
 
         if (failed > 0) {

@@ -1114,6 +1114,8 @@ def register_routes():
         
         # Refresh images to include the new upload (refresh_images scans recursively)
         slideshow_instance.refresh_images()
+        slideshow_instance.next_image()
+        slideshow_instance.force_redraw = True
         
         # Notify Telegram of upload
         if telegram_notifier:
@@ -1242,6 +1244,11 @@ def register_routes():
                     f'Deleted {len(deleted)} uploaded image(s)'
                 )
 
+            if deleted:  # Only refresh if images were actually deleted
+                slideshow_instance.refresh_images()
+                slideshow_instance.next_image()
+                slideshow_instance.force_redraw = True
+
             result = {
                 'deleted': deleted,
                 'failed': failed,
@@ -1305,6 +1312,7 @@ def register_routes():
 
             # Refresh images to update the cache
             slideshow_instance.refresh_images()
+            slideshow_instance.force_redraw = True
 
             print(f"[Web] Renamed uploaded image: {old_filename} -> {new_filename}")
             return jsonify({'status': 'ok', 'old_filename': old_filename, 'new_filename': new_filename})

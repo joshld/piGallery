@@ -1252,6 +1252,22 @@ class Slideshow:
         print(f"[Slideshow] Sorted {len(sorted_images)} images by {sort_order} ({order_desc})")
         return sorted_images
 
+    def _image_exists_in_tracked_dirs(self, img_path):
+        """Check if image exists in our 2 tracked directories"""
+        if img_path.startswith('uploaded/'):
+            # Check upload directory
+            upload_dir = self.config.get('upload_directory', '').strip()
+            if upload_dir:
+                full_path = os.path.join(os.path.expanduser(upload_dir), img_path[9:])  # Remove 'uploaded/' prefix
+            else:
+                # Default: uploaded/ is inside self.folder
+                full_path = os.path.join(self.folder, img_path)
+        else:
+            # Check main images directory
+            full_path = os.path.join(self.folder, img_path)
+        
+        return os.path.exists(full_path) and os.path.isfile(full_path)
+
     def refresh_images(self):
         # Check if directory exists
         if not os.path.exists(self.folder):
@@ -1312,10 +1328,24 @@ class Slideshow:
             print(f"[Error] Failed to scan images directory: {e}")
             return
             
-        if new_images:
-            # Apply configured sorting instead of random shuffle
-            sorted_new_images = self.sort_images(new_images)
-            self.images.extend(sorted_new_images)
+        # CLEAN QUEUES: Remove images no longer in our 2 tracked directories
+        original_count = len(self.images) + len(self.history)
+        self.images = [img for img in self.images if self._image_exists_in_tracked_dirs(img)]
+        self.history = [img for img in self.history if self._image_exists_in_tracked_dirs(img)]
+
+        if self.current_img and not self._image_exists_in_tracked_dirs(self.current_img):
+            self.current_img = None
+
+        cleaned_count = original_count - (len(self.images) + len(self.history))
+
+        if new_images or cleaned_count > 0:
+            # Add new images to the queue
+            self.images.extend(new_images)
+            # Sort the entire queue according to configured order
+            self.images = self.sort_images(self.images)
+            # Clear _all_images so it gets rebuilt with new images included
+            if hasattr(self, '_all_images'):
+                self._all_images = []
         self.total_images = len(self.images) + len(self.history)
         print(f"[Slideshow] Found {len(new_images)} new images, total queue={self.total_images}")
 
@@ -1352,6 +1382,8 @@ class Slideshow:
                 while temp_queue:
                     self._all_images.append(temp_queue.pop())
                 # _all_images now has earliest dates first (correct viewing order)
+
+                self.total_images = len(self._all_images)
 
                 # Start circular navigation
                 self.current_index = 0
