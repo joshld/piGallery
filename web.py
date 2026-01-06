@@ -608,88 +608,161 @@ def register_routes():
     def api_image_preview():
         """Get image as thumbnail preview (current image or specified path)"""
         if slideshow_instance is None:
+            print("[Web] Preview error: Slideshow not initialized")
             return jsonify({'error': 'Slideshow not initialized'}), 503
 
         # Check if a specific path was requested
         requested_path = request.args.get('path')
+        print(f"[Web] Preview requested for: {requested_path if requested_path else 'current image'}")
 
+        # PIL import flag
+        pil_available = False
         try:
             from PIL import Image
             from flask import send_file
             import io
+            pil_available = True
+            print("[Web] PIL is available for thumbnail generation")
+        except ImportError:
+            print("[Web] PIL not available, will serve original image")
+
+        try:
+            # Determine which image path to use
+            img_path = None
+            img_directory = None
+            img_filename = None
 
             if requested_path:
+                print(f"[Web] Handling specific path request: {requested_path}")
                 # Handle specific path request (for uploaded images modal)
                 if requested_path.startswith('uploaded/'):
                     # This is an uploaded image
                     upload_dir = get_upload_directory()
-                    if not upload_dir:
-                        return jsonify({'error': 'Upload directory not configured'}), 500
-
                     filename = os.path.basename(requested_path)  # Security: prevent directory traversal
+                    
+                    if not upload_dir:
+                        # Fallback: try default uploaded subdirectory in images folder
+                        upload_dir = os.path.join(slideshow_instance.folder, 'uploaded')
+                    
                     img_path = os.path.join(upload_dir, filename)
+                    img_directory = upload_dir
+                    img_filename = filename
+                    print(f"[Web] Uploaded image path: {img_path}")
 
                     if not os.path.exists(img_path):
+                        print(f"[Web] Error: Uploaded image not found at {img_path}")
                         return jsonify({'error': 'Image not found'}), 404
 
                     # Verify it's within upload directory
-                    if not os.path.commonpath([upload_dir, os.path.abspath(img_path)]).startswith(upload_dir):
+                    try:
+                        common_path = os.path.commonpath([upload_dir, os.path.abspath(img_path)])
+                        if not common_path.startswith(upload_dir):
+                            print(f"[Web] Error: Path traversal attempt detected")
+                            return jsonify({'error': 'Invalid path'}), 403
+                    except ValueError:
+                        print(f"[Web] Error: Invalid path - no common path")
                         return jsonify({'error': 'Invalid path'}), 403
                 else:
                     # This might be a regular gallery image
                     img_path = os.path.join(slideshow_instance.folder, requested_path)
+                    img_directory = slideshow_instance.folder
+                    img_filename = requested_path
+                    print(f"[Web] Gallery image path: {img_path}")
+                    
                     if not os.path.exists(img_path):
+                        print(f"[Web] Error: Gallery image not found at {img_path}")
                         return jsonify({'error': 'Image not found'}), 404
             else:
                 # Default: current slideshow image
+                print(f"[Web] Current slideshow image: {slideshow_instance.current_img}")
+                
                 if not slideshow_instance.current_img:
+                    print("[Web] Error: No image currently loaded in slideshow")
                     return jsonify({'error': 'No image loaded'}), 404
 
                 img_path = get_image_path()
+                print(f"[Web] Resolved image path: {img_path}")
+                
                 if not img_path:
+                    print("[Web] Error: Could not resolve image path")
                     return jsonify({'error': 'Image file not found'}), 404
-
-            # Create thumbnail (max 200x200 for modal, maintains aspect ratio)
-            img = Image.open(img_path)
-            img.thumbnail((200, 200), Image.Resampling.LANCZOS)
-
-            # Convert to bytes
-            img_bytes = io.BytesIO()
-            img.save(img_bytes, format='JPEG', quality=85)
-            img_bytes.seek(0)
-
-            return send_file(img_bytes, mimetype='image/jpeg')
-
-        except ImportError:
-            # Fallback: serve original image if PIL not available
-            if requested_path:
-                if requested_path.startswith('uploaded/'):
-                    upload_dir = get_upload_directory()
+                
+                if not os.path.exists(img_path):
+                    print(f"[Web] Error: Image file does not exist at {img_path}")
+                    return jsonify({'error': 'Image file not found on disk'}), 404
+                
+                # Determine directory and filename for fallback
+                if slideshow_instance.current_img.startswith("uploaded/"):
+                    upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
                     if upload_dir:
-                        filename = os.path.basename(requested_path)
-                        img_path = os.path.join(upload_dir, filename)
-                        if os.path.exists(img_path):
-                            return send_from_directory(upload_dir, filename)
-
-                # For gallery images, we can't serve without PIL
-                return jsonify({'error': 'PIL required for image processing'}), 500
-            else:
-                # Original fallback logic
-                img_path = get_image_path()
-                if img_path:
-                    if slideshow_instance.current_img.startswith("uploaded/"):
-                        upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
-                        if upload_dir:
-                            upload_dir = os.path.expanduser(upload_dir)
-                            actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
-                            return send_from_directory(upload_dir, actual_path)
+                        upload_dir = os.path.expanduser(upload_dir)
+                        img_directory = upload_dir
                     else:
-                        return send_from_directory(slideshow_instance.folder, slideshow_instance.current_img)
-                return jsonify({'error': 'Image not found'}), 404
+                        img_directory = os.path.join(slideshow_instance.folder, 'uploaded')
+                    img_filename = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
+                else:
+                    img_directory = slideshow_instance.folder
+                    img_filename = slideshow_instance.current_img
+
+            # Verify we have a valid path
+            if not img_path or not os.path.exists(img_path):
+                print(f"[Web] Error: Final validation failed - path does not exist: {img_path}")
+                return jsonify({'error': 'Image file not accessible'}), 404
+
+            print(f"[Web] Serving image from: {img_path}")
+            print(f"[Web] File exists: {os.path.exists(img_path)}, File size: {os.path.getsize(img_path)} bytes")
+
+            # Try to generate thumbnail if PIL is available
+            if pil_available:
+                try:
+                    print("[Web] Attempting to create thumbnail with PIL")
+                    img = Image.open(img_path)
+                    print(f"[Web] Opened image: {img.format} {img.size} {img.mode}")
+                    
+                    # Create thumbnail (max 320x180 for better quality in preview)
+                    img.thumbnail((320, 180), Image.Resampling.LANCZOS)
+                    print(f"[Web] Created thumbnail: {img.size}")
+
+                    # Convert to bytes
+                    img_bytes = io.BytesIO()
+                    
+                    # Save as JPEG if RGB, otherwise convert first
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        # Convert to RGB for JPEG
+                        rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+                        if img.mode == 'P':
+                            img = img.convert('RGBA')
+                        rgb_img.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                        rgb_img.save(img_bytes, format='JPEG', quality=85)
+                    else:
+                        img.save(img_bytes, format='JPEG', quality=85)
+                    
+                    img_bytes.seek(0)
+                    print("[Web] Thumbnail generated successfully, sending response")
+                    return send_file(img_bytes, mimetype='image/jpeg')
+                    
+                except Exception as pil_error:
+                    print(f"[Web] PIL error, falling back to original image: {pil_error}")
+                    # Fall through to serve original file
+
+            # Fallback: serve original image
+            print(f"[Web] Serving original image from directory: {img_directory}, filename: {img_filename}")
+            
+            if not img_directory or not img_filename:
+                print("[Web] Error: Cannot serve original - directory or filename not set")
+                return jsonify({'error': 'Cannot determine image location'}), 500
+            
+            if not os.path.exists(os.path.join(img_directory, img_filename)):
+                print(f"[Web] Error: Original image not found at {os.path.join(img_directory, img_filename)}")
+                return jsonify({'error': 'Image file not found'}), 404
+            
+            return send_from_directory(img_directory, img_filename)
 
         except Exception as e:
             print(f"[Web] Error generating preview: {e}")
-            return jsonify({'error': str(e)}), 500
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'Internal server error: {str(e)}'}), 500
     
     @app.route('/api/image/full')
     def api_image_full():
