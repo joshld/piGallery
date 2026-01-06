@@ -711,6 +711,10 @@ def register_routes():
                     upload_dir = os.path.expanduser(upload_dir)
                     actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
                     return send_from_directory(upload_dir, actual_path)
+                else:
+                    # Fallback: try default uploaded subdirectory in images folder
+                    actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
+                    return send_from_directory(os.path.join(slideshow_instance.folder, 'uploaded'), actual_path)
             else:
                 return send_from_directory(slideshow_instance.folder, slideshow_instance.current_img)
         except Exception as e:
