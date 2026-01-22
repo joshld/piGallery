@@ -45,6 +45,14 @@ def init_web(app_instance, slideshow_ref, telegram_ref, config_path, log_file, l
 def get_image_caption(img_path):
     """Read caption from image metadata (EXIF/IPTC/XMP)
     Returns caption string or None if not found"""
+
+    def sanitize_caption(text):
+        """Remove null characters and other problematic characters from caption text"""
+        if not text:
+            return text
+        # Remove null characters and other non-printable characters
+        return ''.join(c for c in text if c != '\0' and ord(c) >= 32)
+
     try:
         from PIL import Image
         from PIL.ExifTags import TAGS
@@ -66,17 +74,17 @@ def get_image_caption(img_path):
                     if 'Comment' in img.info:
                         caption = img.info['Comment']
                         if caption and isinstance(caption, str) and caption.strip():
-                            return caption.strip()
+                            return sanitize_caption(caption.strip())
                     # Also check for "Description" key (fallback)
                     if 'Description' in img.info:
                         caption = img.info['Description']
                         if caption and isinstance(caption, str) and caption.strip():
-                            return caption.strip()
+                            return sanitize_caption(caption.strip())
                     # Also check for "caption" key
                     if 'caption' in img.info:
                         caption = img.info['caption']
                         if caption and isinstance(caption, str) and caption.strip():
-                            return caption.strip()
+                            return sanitize_caption(caption.strip())
             except Exception:
                 pass
         
@@ -104,11 +112,11 @@ def get_image_caption(img_path):
                                 # Try UTF-8 directly
                                 caption = comment_data.decode('utf-8', errors='replace').strip()
                             if caption:
-                                return caption
+                                return sanitize_caption(caption)
                         except Exception:
                             pass
                     elif isinstance(comment_data, str):
-                        return comment_data.strip()
+                        return sanitize_caption(comment_data.strip())
         except ImportError:
             # piexif not available, try PIL
             pass
@@ -122,13 +130,13 @@ def get_image_caption(img_path):
                 caption = exif[37510]
                 if caption:
                     if isinstance(caption, str):
-                        return caption.strip()
+                        return sanitize_caption(caption.strip())
                     elif isinstance(caption, bytes):
                         # Try to decode, handling encoding prefix
                         if caption.startswith(b'ASCII\x00\x00\x00'):
-                            return caption[8:].decode('ascii', errors='replace').strip()
+                            return sanitize_caption(caption[8:].decode('ascii', errors='replace').strip())
                         else:
-                            return caption.decode('utf-8', errors='replace').strip()
+                            return sanitize_caption(caption.decode('utf-8', errors='replace').strip())
         except Exception:
             pass
         
@@ -140,7 +148,7 @@ def get_image_caption(img_path):
                 if 270 in exif:
                     caption = exif[270]
                     if caption and isinstance(caption, str) and caption.strip():
-                        return caption.strip()
+                        return sanitize_caption(caption.strip())
         except Exception:
             pass
         
@@ -170,7 +178,7 @@ def get_image_caption(img_path):
                             caption = str(caption_data).strip()
                         
                         if caption and len(caption) > 0:
-                            return caption
+                            return sanitize_caption(caption)
         except Exception as e:
             # Silently fail IPTC reading - not all images have IPTC data
             pass
