@@ -74,18 +74,28 @@ class BinCalendarRenderer:
         for fraction in (0.30, 0.70):
             pygame.draw.circle(screen, WHEEL, (int(x + w * fraction), int(y + h * 0.90)), wheel)
 
-    def metrics(self, screen_w, screen_h, count):
+    def metrics(self, screen_w, screen_h, count, scale=100):
+        try:
+            scale = float(scale) / 100.0
+        except (TypeError, ValueError):
+            scale = 1.0
+        if scale <= 0:
+            scale = 1.0
+        scale = min(2.0, max(0.5, scale))
         margin = max(14, int(min(screen_w, screen_h) * 0.028))
-        slot = min(150, max(72, int(min(screen_w, screen_h) * 0.14)))
-        avail = max(120, screen_w - margin * 2)
-        while count and slot > 64:
-            gap = max(8, slot // 8)
+        base = int(min(screen_w, screen_h) * 0.14 * scale)
+        slot = min(int(150 * scale), max(int(36 * scale), base))
+        avail = max(80, screen_w - margin * 2)
+        floor = max(28, int(36 * scale))
+        while count and slot > floor:
+            gap = max(4, int(slot / 8))
             tile_h = int(slot * 1.15)
             outer_w = slot * count + gap * (count - 1)
             if outer_w <= avail:
                 return margin, slot, gap, tile_h
             slot -= 4
-        return margin, 64, 8, int(64 * 1.15)
+        gap = max(4, floor // 8)
+        return margin, floor, gap, int(floor * 1.15)
 
     def place(self, screen_w, screen_h, card, position, margin):
         if position == 'center':
@@ -151,18 +161,35 @@ class BinCalendarRenderer:
         # squash them relative to the picture.
         logical_w = max(1, int(round(width / correction_h)))
         logical_h = max(1, int(round(height / correction_v)))
+        try:
+            icon_scale = float(view.get('icon_scale', 100)) / 100.0
+        except (TypeError, ValueError):
+            icon_scale = 1.0
+        if icon_scale <= 0:
+            icon_scale = 1.0
+        icon_scale = min(2.0, max(0.5, icon_scale))
+        # Same backing as the clock, date and weather: a black rectangle at alpha 100.
+        pad = max(4, int(round(8 * icon_scale)))
         rects = []
         for position in order:
             bins = grouped[position]
-            margin, slot, gap, tile_h = self.metrics(logical_w, logical_h, len(bins))
-            outer = pygame.Rect(0, 0, slot * len(bins) + gap * (len(bins) - 1), tile_h)
+            margin, slot, gap, tile_h = self.metrics(logical_w, logical_h, len(bins), view.get('icon_scale', 100))
+            content_w = slot * len(bins) + gap * (len(bins) - 1)
+            outer = pygame.Rect(0, 0, content_w + pad * 2, tile_h + pad * 2)
             outer = self.place(logical_w, logical_h, outer, position, margin)
             layer = self.group_surface(bins, slot, gap, tile_h)
-            scaled = (max(1, int(round(layer.get_width() * correction_h))),
-                      max(1, int(round(layer.get_height() * correction_v))))
-            if scaled != layer.get_size():
-                layer = pygame.transform.scale(layer, scaled)
-            dest = (int(round(outer.x * correction_h)), int(round(outer.y * correction_v)))
-            screen.blit(layer, dest)
-            rects.append(pygame.Rect(dest, layer.get_size()))
+            content_scaled = (max(1, int(round(layer.get_width() * correction_h))),
+                              max(1, int(round(layer.get_height() * correction_v))))
+            if content_scaled != layer.get_size():
+                layer = pygame.transform.scale(layer, content_scaled)
+            box = pygame.Rect(
+                (int(round(outer.x * correction_h)), int(round(outer.y * correction_v))),
+                (max(1, int(round(outer.width * correction_h))), max(1, int(round(outer.height * correction_v)))),
+            )
+            background = pygame.Surface(box.size)
+            background.set_alpha(100)
+            background.fill((0, 0, 0))
+            screen.blit(background, box.topleft)
+            screen.blit(layer, (int(round((outer.x + pad) * correction_h)), int(round((outer.y + pad) * correction_v))))
+            rects.append(box)
         return rects

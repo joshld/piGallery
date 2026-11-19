@@ -32,6 +32,7 @@ def settings(**changes):
     {'refresh_days': 0}, {'refresh_days': 15}, {'show_days_before': 15}, {'refresh_time': '25:00'},
     {'refresh_time': '6:00'}, {'red_position': 'beside-the-clock'},
     {'show_green': 'maybe'}, {'property_id': '12 OR 1=1'}, {'unknown_field': 10},
+    {'icon_scale': 10}, {'icon_scale': 250},
 ])
 def test_invalid_settings_rejected(values):
     with pytest.raises(ConfigError):

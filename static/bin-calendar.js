@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
     const fields = ['enabled', 'house_number', 'street_name', 'suburb', 'unit_number', 'property_id',
         'show_red', 'show_yellow', 'show_green', 'red_position', 'yellow_position', 'green_position',
-        'show_days_before', 'refresh_days', 'refresh_time'];
+        'icon_scale', 'show_days_before', 'refresh_days', 'refresh_time'];
     let dates = {};
     let showing = {};
     let timer = null;
@@ -25,9 +25,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return element;
     };
 
-    function announce(text, error = false) {
+    function announce(text, kind = '') {
         message.textContent = text;
-        message.className = error ? 'bin-message error' : 'bin-message';
+        message.className = 'bin-message' + (kind ? ' ' + kind : '');
     }
 
     async function api(path, values) {
@@ -66,6 +66,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderPreview() {
+        const scale = Number(form.elements.namedItem('icon_scale').value) || 100;
+        preview.style.setProperty('--bin-scale', String(scale / 100));
+        const readout = document.getElementById('bin-icon-scale-readout');
+        if (readout) readout.textContent = scale + '%';
         preview.replaceChildren();
         const groups = new Map();
         for (const bin of bins) {
@@ -124,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function poll() {
         clearTimeout(timer);
         try { remember(await api('')); }
-        catch (error) { announce(error.message, true); }
+        catch (error) { announce(error.message, 'error'); }
         timer = setTimeout(poll, 30000);
     }
 
@@ -135,21 +139,21 @@ document.addEventListener('DOMContentLoaded', () => {
         renderPreview();
     });
 
-    form.addEventListener('submit', async event => {
-        event.preventDefault();
-        if (!form.reportValidity()) return;
+    window.saveBinSettings = async function saveBinSettings() {
+        if (!form.reportValidity()) throw new Error('Check the bin settings.');
         const values = readForm();
         if (values.enabled && !values.property_id && !(values.house_number && values.street_name && values.suburb)) {
-            announce('Enter a street number, street and suburb, then look up the address.', true);
-            return;
+            throw new Error('Enter a street number, street and suburb, then look up the address.');
         }
-        try {
-            const data = await api('/config', values);
-            fillForm(data.config);
-            remember(data.status);
-            announce('Saved. The frame will use these icons.');
-            poll();
-        } catch (error) { announce(error.message, true); }
+        const data = await api('/config', values);
+        fillForm(data.config);
+        remember(data.status);
+        poll();
+    };
+
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (typeof saveSettingsSticky === 'function') await saveSettingsSticky();
     });
 
     document.getElementById('bin-lookup-address').addEventListener('click', async () => {
@@ -161,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = await api('/lookup', address);
             if (!data.properties.length) {
-                announce('No matching property. Check the street number, street and suburb.', true);
+                announce('No matching property. Check the street number, street and suburb.', 'error');
                 return;
             }
             announce('Choose the matching property, then save.');
@@ -174,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 results.append(button);
             }
-        } catch (error) { announce(error.message, true); }
+        } catch (error) { announce(error.message, 'error'); }
     });
 
     document.getElementById('bin-refresh-data').addEventListener('click', async () => {
@@ -182,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await api('/refresh', {});
             announce('Update queued. Saved dates stay on the frame until the new ones arrive.');
             poll();
-        } catch (error) { announce(error.message, true); }
+        } catch (error) { announce(error.message, 'error'); }
     });
 
     renderPreview();
@@ -191,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
         remember(data.status);
         poll();
     }).catch(error => {
-        announce(error.message, true);
+        announce(error.message, 'error');
         statusLine.textContent = 'The preview above still works. Dates load when this page is opened from the frame.';
     });
 });

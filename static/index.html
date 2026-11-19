@@ -475,7 +475,7 @@
         <div class="bin-panel-heading">
             <div>
                 <h2 id="bin-calendar-heading">Bin collection</h2>
-                <p>Icons on the photo frame, using your Brisbane City Council dates.</p>
+                <p>Icons on the photo frame, using your Brisbane City Council dates. Save them with Save Settings. The frame updates straight away.</p>
             </div>
             <button type="button" id="bin-refresh-data" class="btn-secondary" disabled>Refresh dates</button>
         </div>
@@ -501,6 +501,10 @@
             <fieldset>
                 <legend>Bins and where they sit</legend>
                 <p class="bin-hint">Icons that share a spot are shown together. Top left covers the clock, top right covers the weather, and the bottom can cover a caption.</p>
+                <label class="bin-size">Icon size
+                    <input id="bin-icon-scale" name="icon_scale" type="range" min="50" max="200" step="5" value="100">
+                    <output id="bin-icon-scale-readout" for="bin-icon-scale">100%</output>
+                </label>
                 <div class="bin-choice">
                     <label><input type="checkbox" name="show_red" checked> General waste</label>
                     <select name="red_position" aria-label="Red bin position">
@@ -559,9 +563,6 @@
                 </div>
                 <p class="bin-hint">1 day means daily, at this Brisbane time. The frame keeps the last dates if the update fails.</p>
             </fieldset>
-            <div class="bin-actions">
-                <button type="submit" class="btn-primary">Save bin settings</button>
-            </div>
         </form>
     </section>
 

@@ -76,10 +76,26 @@ def test_overlay_uses_photo_display_correction_and_stays_transparent():
     wide_rects = renderer.draw(stretched, view, 1.2, 1)
     assert plain_rects and wide_rects
     assert abs(wide_rects[0].width / plain_rects[0].width - 1.2) < 0.05
-    assert stretched.get_at(wide_rects[0].topleft)[:3] == (10, 20, 30)
+    corner = stretched.get_at(wide_rects[0].topleft)[:3]
+    assert corner != (10, 20, 30) and corner != (0, 0, 0)
+    assert all(channel < original for channel, original in zip(corner, (10, 20, 30)))
     assert any(stretched.get_at((x, y))[:3] != (10, 20, 30)
                for x in range(wide_rects[0].left, wide_rects[0].right, 3)
                for y in range(wide_rects[0].top, wide_rects[0].bottom, 3))
+
+
+def test_icon_scale_changes_the_drawn_size():
+    pygame.font.init()
+    now = dt.datetime(2026, 11, 19, 18, tzinfo=BRISBANE)
+    renderer = BinCalendarRenderer()
+    normal = pygame.Surface((1280, 720))
+    large = pygame.Surface((1280, 720))
+    normal_view = calendar_view(sample(), now, config(show_days_before=14, show_yellow=False, show_green=False), now)
+    large_view = calendar_view(sample(), now, config(show_days_before=14, show_yellow=False, show_green=False, icon_scale=200), now)
+    normal_rects = renderer.draw(normal, normal_view)
+    large_rects = renderer.draw(large, large_view)
+    assert normal_view['icon_scale'] == 100 and large_view['icon_scale'] == 200
+    assert abs(large_rects[0].width / normal_rects[0].width - 2) < 0.08
 
 
 def test_missing_dates_draw_nothing():
@@ -111,10 +127,11 @@ def test_web_configuration_schema_and_live_persistence(tmp_path):
     assert 'refresh_days' in response.json['schema']
     assert 'page_duration_seconds' not in response.json['schema']
     response = connection.post('/api/bin-calendar/config', json={
-        'enabled': True, 'property_id': '123', 'refresh_days': 2, 'red_position': 'top-left'})
+        'enabled': True, 'property_id': '123', 'refresh_days': 2, 'red_position': 'top-left', 'icon_scale': 150})
     assert response.status_code == 200
     assert calendar.settings.refresh_days == 2
     assert calendar.settings.red_position == 'top-left'
+    assert calendar.settings.icon_scale == 150
     assert slideshow.force_redraw
     assert BinCalendar(calendar.config_path).settings.refresh_days == 2
     assert 'bot_token = untouched' in calendar.config_path.read_text()

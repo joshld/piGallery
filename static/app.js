@@ -88,22 +88,20 @@ function setupStickySaveButton() {
     if (!stickyBtn || !controlsSection) return;
     
     // Use Intersection Observer for better performance
+    const targets = [controlsSection, document.getElementById('bin-calendar-panel')].filter(Boolean);
+    const showing = new Set();
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                // Controls section is visible
-                stickyBtn.classList.add('visible');
-            } else {
-                // Controls section is not visible
-                stickyBtn.classList.remove('visible');
-            }
+            if (entry.isIntersecting) showing.add(entry.target);
+            else showing.delete(entry.target);
         });
+        stickyBtn.classList.toggle('visible', showing.size > 0);
     }, {
-        threshold: 0.1, // Trigger when 10% of the section is visible
-        rootMargin: '-100px 0px' // Account for header offset
+        threshold: 0.05,
+        rootMargin: '-80px 0px'
     });
-    
-    observer.observe(controlsSection);
+
+    targets.forEach(target => observer.observe(target));
 }
 
 let lastImageName = '';
@@ -468,6 +466,7 @@ function toggleSetting(key, element) {
 
 async function saveSettings() {
     try {
+        if (typeof saveBinSettings === 'function') await saveBinSettings();
         // Collect all settings from form
         const allSettings = {
             ...settings,
@@ -493,13 +492,22 @@ async function saveSettings() {
             body: JSON.stringify(allSettings)
         });
         
-        if (response.ok) {
-            showAlert('Settings saved successfully!', 'success');
-        } else {
-            showAlert('Failed to save settings', 'error');
+        if (!response.ok) throw new Error('Failed to save settings');
+        showAlert('Settings saved successfully!', 'success');
+        const savedNote = document.getElementById('bin-calendar-message');
+        if (savedNote && typeof saveBinSettings === 'function') {
+            savedNote.textContent = 'Saved. The frame is using these settings now.';
+            savedNote.className = 'bin-message success';
         }
     } catch (error) {
-        showAlert('Error saving settings: ' + error.message, 'error');
+        const text = error.message || 'Failed to save settings';
+        showAlert(text, 'error');
+        const savedNote = document.getElementById('bin-calendar-message');
+        if (savedNote && typeof saveBinSettings === 'function') {
+            savedNote.textContent = text;
+            savedNote.className = 'bin-message error';
+        }
+        throw error;
     }
 }
 

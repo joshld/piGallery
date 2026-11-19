@@ -9,7 +9,10 @@ On the status page, open **Bin collection**:
 - The street address used for the council lookup. Pick the matching property, then save.
 - Which bins to show: general waste (red), recycling (yellow), and garden waste (green). Green is off until you turn it on.
 - Where each icon sits on the frame. Icons that share a spot are drawn together.
+- Icon size, from half to double the normal size.
 - How many days before collection the icons stay on the photos. The default is 2, so a Friday collection is on screen all of Wednesday, Thursday and Friday. Outside that window the photos are left clear.
+
+Bin choices are saved with the same **Save Settings** button as the rest of the page. The frame redraws the current photo straight away.
 - How often to ask the council for new dates. `1` day means daily, at the Brisbane time you choose.
 
 Dates are the next published collection for each bin. The frame keeps the last successful dates if the network is down. A manual refresh is available from the same panel.
