@@ -16,6 +16,8 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from PIL import Image
 from PIL.ExifTags import TAGS
+from bin_calendar import BinCalendar, BinConfig
+from bin_display import BinCalendarRenderer, BinPageCycle
 
 try:
     import psutil
@@ -33,6 +35,7 @@ import configparser
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.ini")
 DEFAULT_CONFIG = {
+    "bin_calendar": BinConfig.defaults(),
     "gallery": {
         "location_city_suburb": "Sydney, Australia",
         "images_directory": "/path/to/your/images/",
@@ -696,11 +699,14 @@ telegram_notifier = None
 
 # ---------------- Slideshow Class ----------------
 class Slideshow:
-    def __init__(self, folder, screen, display_time_seconds, config_dict, telegram_notifier=None):
+    def __init__(self, folder, screen, display_time_seconds, config_dict, telegram_notifier=None, bin_calendar=None):
         self.screen = screen
         self.screen_w, self.screen_h = screen.get_size()
         self.display_time_seconds = display_time_seconds
         self.config = config_dict
+        self.bin_calendar = bin_calendar
+        self.bin_page_cycle = BinPageCycle()
+        self.bin_renderer = BinCalendarRenderer()
         
         self.screen_w, self.screen_h = screen.get_size()
         print(f"[Display] Detected resolution: {self.screen_w}x{self.screen_h}")
@@ -782,7 +788,23 @@ class Slideshow:
     def draw_blank_screen(self):
         self.screen.fill((0, 0, 0))
 
+    def show_bin_calendar(self, show=True):
+        self.bin_page_cycle.request(show)
+
+    def update_bin_display(self, display_on):
+        if not self.bin_calendar:
+            return False
+        settings = self.bin_calendar.settings
+        changed = self.bin_page_cycle.tick(time.monotonic(), settings, self.bin_calendar.record is not None, display_on)
+        if changed and display_on:
+            self.draw_image()
+            pygame.display.flip()
+        return self.bin_page_cycle.active
+
     def draw_image(self):
+        if self.bin_calendar and self.bin_calendar.settings.enabled and self.bin_page_cycle.active:
+            self.bin_renderer.draw(self.screen, self.bin_calendar.snapshot(), self.bin_calendar.settings)
+            return
         # Skip if file is missing, but prevent infinite loops
         attempts = 0
         max_attempts = 10
@@ -1568,7 +1590,10 @@ class Slideshow:
                 self.set_display_power(True)
 
                 # Only advance if not paused and not manually navigated
-                if not self.paused and not manual_navigation:
+                if self.bin_page_cycle.active:
+                    self.draw_image()
+                    pygame.display.flip()
+                elif not self.paused and not manual_navigation:
                     self.next_image()
                     self.draw_image()
                     pygame.display.flip()
@@ -1604,7 +1629,15 @@ class Slideshow:
 
             # Wait for display_time_seconds, handling events (original structure)
             start_time = time.time()
+            previous_frame = time.monotonic()
             while time.time() - start_time < self.display_time_seconds:
+                frame_time = time.monotonic()
+                if self.update_bin_display(display_should_be_on):
+                    # Bin pages borrow screen time, not photos from the queue.
+                    elapsed = frame_time - previous_frame
+                    start_time += elapsed
+                    self.image_display_start_time += elapsed
+                previous_frame = frame_time
                 # Check for forced redraw during wait (for settings changes)
                 if self.force_redraw:
                     # Break out of delay loop to immediately process display state change
@@ -1620,10 +1653,14 @@ class Slideshow:
                             pygame.quit()
                             raise SystemExit
                         elif event.key == pygame.K_RIGHT:
+                            self.show_bin_calendar(False)
+                            self.update_bin_display(display_should_be_on)
                             start_time = 0
                             break
                         elif event.key == pygame.K_LEFT:
                             with self.control_lock:
+                                self.show_bin_calendar(False)
+                                self.update_bin_display(display_should_be_on)
                                 self.prev_image()
                                 if display_should_be_on:
                                     self.draw_image()
@@ -1747,7 +1784,12 @@ def main():
     telegram_notifier = TelegramNotifier(TELEGRAM_CONFIG)
 
     # Pass config values to Slideshow
-    slideshow = Slideshow(images_directory, screen, display_time_seconds, slideshow_config, telegram_notifier)
+    bin_notifier = None
+    if telegram_notifier and telegram_notifier.enabled:
+        bin_notifier = lambda message: telegram_notifier.notify_system_alert('bin_collection', message)
+    bin_calendar = BinCalendar(CONFIG_PATH, logger=logger, notifier=bin_notifier)
+    slideshow = Slideshow(images_directory, screen, display_time_seconds, slideshow_config, telegram_notifier, bin_calendar)
+    bin_calendar.start()
     
     # Set global reference for web API
     global slideshow_instance
@@ -1782,6 +1824,7 @@ def main():
     except KeyboardInterrupt:
         print("\n[Shutdown] Interrupted by user")
     finally:
+        bin_calendar.stop()
         # Send shutdown notification
         if telegram_notifier:
             telegram_notifier.notify_shutdown()

@@ -13,6 +13,7 @@ import time
 import io
 import datetime
 import json
+import tempfile
 from contextlib import ExitStack, closing
 import pygame
 from PIL import Image
@@ -41,6 +42,38 @@ def init_web(app_instance, slideshow_ref, telegram_ref, config_path, log_file, l
     LOG_FILE = log_file
     logger = logger_instance
     register_routes()
+    from bin_web import register_bin_routes
+    register_bin_routes(app, slideshow_instance)
+
+
+def save_gallery_config(data):
+    """Serialize gallery/bin saves so neither section overwrites the other."""
+    calendar = getattr(slideshow_instance, 'bin_calendar', None)
+    lock = calendar.lock if calendar is not None else threading.RLock()
+    with lock:
+        saved = configparser.ConfigParser(interpolation=None)
+        saved.read(CONFIG_PATH)
+        if 'gallery' not in saved:
+            saved['gallery'] = {}
+        keys = ('show_time', 'show_date', 'show_temperature', 'show_weather_code',
+                'show_filename', 'show_caption', 'display_off_time', 'display_on_time',
+                'location_city_suburb', 'display_correction_horizontal', 'display_correction_vertical',
+                'ui_text_alpha', 'weather_update_seconds', 'upload_directory', 'images_directory',
+                'shutdown_on_display_off', 'shutdown_countdown_seconds', 'sort_order', 'sort_reverse', 'delay_seconds')
+        for key in keys:
+            if key in data:
+                saved['gallery'][key] = str(data[key])
+        name = None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', dir=os.path.dirname(CONFIG_PATH) or '.', delete=False) as output:
+                name = output.name
+                saved.write(output)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(name, CONFIG_PATH)
+        finally:
+            if name and os.path.exists(name):
+                os.unlink(name)
 
 
 def get_image_caption(img_path):
@@ -877,6 +910,8 @@ def register_routes():
             return jsonify({'error': 'Slideshow not initialized'}), 503
         
         with slideshow_instance.control_lock:
+            if hasattr(slideshow_instance, 'show_bin_calendar'):
+                slideshow_instance.show_bin_calendar(False)
             slideshow_instance.next_image()
             slideshow_instance.force_redraw = True  # Force immediate redraw
             slideshow_instance.image_display_start_time = time.time()  # Reset countdown
@@ -890,6 +925,8 @@ def register_routes():
             return jsonify({'error': 'Slideshow not initialized'}), 503
         
         with slideshow_instance.control_lock:
+            if hasattr(slideshow_instance, 'show_bin_calendar'):
+                slideshow_instance.show_bin_calendar(False)
             slideshow_instance.prev_image()
             slideshow_instance.force_redraw = True  # Force immediate redraw
             slideshow_instance.image_display_start_time = time.time()  # Reset countdown
@@ -1756,28 +1793,7 @@ def register_routes():
             # Optionally save to config.ini
             save_to_config = data.get('save_to_config', False)
             if save_to_config:
-                config = configparser.ConfigParser()
-                if os.path.exists(CONFIG_PATH):
-                    config.read(CONFIG_PATH)
-                
-                if 'gallery' not in config:
-                    config['gallery'] = {}
-                
-                # Update config file
-                for key in ['show_time', 'show_date', 'show_temperature', 'show_weather_code',
-                           'show_filename', 'show_caption', 'display_off_time', 'display_on_time',
-                           'location_city_suburb', 'display_correction_horizontal', 'display_correction_vertical',
-                           'ui_text_alpha', 'weather_update_seconds', 'upload_directory', 'images_directory',
-                           'shutdown_on_display_off', 'shutdown_countdown_seconds', 'sort_order', 'sort_reverse']:
-                    if key in data:
-                        config['gallery'][key] = str(data[key])
-                
-                if 'delay_seconds' in data:
-                    config['gallery']['delay_seconds'] = str(data['delay_seconds'])
-                
-                with open(CONFIG_PATH, 'w') as f:
-                    config.write(f)
-                
+                save_gallery_config(data)
                 print("[Web] Settings saved to config.ini")
             
             print(f"[Web] Settings updated: {data}")
