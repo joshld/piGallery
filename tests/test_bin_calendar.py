@@ -6,8 +6,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from bin_calendar import (API_URL, BRISBANE, BinCalendar, BinConfig, ConfigError,
-                          CouncilClient, SCHEMA, calendar_view, next_refresh)
+from bin_calendar import (API_URL, BRISBANE, CHECK_SECONDS, MANUAL_COOLDOWN_SECONDS,
+                          RETRY_INITIAL_SECONDS, RETRY_MAX_SECONDS, BinCalendar, BinConfig,
+                          ConfigError, CouncilClient, SCHEMA, calendar_view, next_refresh)
 
 
 def moment(value='2026-11-19T12:00:00+10:00'):
@@ -28,14 +29,9 @@ def settings(**changes):
 
 
 @pytest.mark.parametrize('values', [
-    {'upcoming_weeks': 0}, {'upcoming_weeks': 7}, {'refresh_time': '25:00'},
-    {'refresh_time': '6:00'}, {'refresh_interval_hours': 0},
-    {'retry_initial_seconds': 10}, {'retry_initial_seconds': 8000, 'retry_max_seconds': 7000},
-    {'page_duration_seconds': 60, 'page_interval_seconds': 30},
-    {'display_update_seconds': True}, {'display_update_seconds': '1.5'},
-    {'show_green': 'maybe'}, {'property_id': '12 OR 1=1'},
-    {'cache_file': '../config.ini'}, {'cache_file': '/etc/file.json'},
-    {'cache_file': 'config.ini'}, {'unknown_field': 10},
+    {'refresh_days': 0}, {'refresh_days': 15}, {'show_days_before': 15}, {'refresh_time': '25:00'},
+    {'refresh_time': '6:00'}, {'red_position': 'beside-the-clock'},
+    {'show_green': 'maybe'}, {'property_id': '12 OR 1=1'}, {'unknown_field': 10},
 ])
 def test_invalid_settings_rejected(values):
     with pytest.raises(ConfigError):
@@ -48,6 +44,7 @@ def test_enable_requires_property_and_bins():
     with pytest.raises(ConfigError):
         settings(show_red=False, show_yellow=False, show_green=False)
     assert BinConfig().show_green is False
+    assert BinConfig().red_position == 'top-center'
     assert len(BinConfig.defaults()) == len(SCHEMA)
 
 
@@ -60,61 +57,64 @@ def test_daily_schedule_and_year_boundary(last, expected):
     assert next_refresh(moment(last), settings()) == moment(expected)
 
 
-def test_interval_schedule_uses_configured_frequency():
-    assert next_refresh(moment('2026-12-31T22:00:00+10:00'), settings(refresh_mode='interval', refresh_interval_hours=6)) == moment('2027-01-01T04:00:00+10:00')
+def test_every_two_days_waits_for_the_gap():
+    every_two = settings(refresh_days=2)
+    assert next_refresh(moment('2026-11-19T06:00:00+10:00'), every_two) == moment('2026-11-21T06:00:00+10:00')
+    assert next_refresh(moment('2026-12-31T22:00:00+10:00'), every_two) == moment('2027-01-02T06:00:00+10:00')
 
 
-def test_actual_dates_override_weekday_and_holiday_assumptions():
+def test_published_dates_are_used_as_printed():
     now = moment('2026-12-25T12:00:00+10:00')
-    row = record(next_red_bin='2026-12-26', next_yellow_bin='2027-01-02')
-    view = calendar_view(row, now, settings(), now)
-    assert view['next']['date'] == '2026-12-26'
-    assert view['next']['day'] == 'Saturday'
-    assert view['next']['relative'] == 'TOMORROW'
-    assert view['next']['confirmed']
-    following = next(event for event in view['events'] if event['date'] == '2027-01-02')
-    assert {item['colour']: item['confirmed'] for item in following['bins']} == {'red': False, 'yellow': True}
+    row = record(next_red_bin='2026-12-26', next_yellow_bin='2027-01-02', next_green_bin=None)
+    view = calendar_view(row, now, settings(show_green=True), now)
+    assert [(item['colour'], item['date'], item['when']) for item in view['bins']] == [
+        ('red', '2026-12-26', 'Tomorrow'),
+        ('yellow', '2027-01-02', '2 Jan'),
+    ]
 
 
 def test_brisbane_today_when_utc_is_previous_day():
     now = moment('2026-11-19T15:00:00+00:00')
     view = calendar_view(record(), now, settings(), now)
-    assert view['next']['relative'] == 'TODAY'
-    assert view['next']['days_remaining'] == 0
-    assert view['next']['highlight']
+    assert view['bins'][0]['when'] == 'Today'
+    assert view['bins'][0]['days_remaining'] == 0
     assert view['timezone'] == 'Australia/Brisbane'
 
 
-def test_no_green_subscription_and_absent_green_date():
+def test_hidden_bins_and_missing_green_date_are_omitted():
     view = calendar_view(record(), moment(), settings(), moment())
-    assert not any(item['colour'] == 'green' for event in view['events'] for item in event['bins'])
+    assert [item['colour'] for item in view['bins']] == ['red', 'yellow']
     view = calendar_view(record(next_green_bin=None), moment(), settings(show_green=True), moment())
-    assert not any(item['colour'] == 'green' for event in view['events'] for item in event['bins'])
+    assert [item['colour'] for item in view['bins']] == ['red', 'yellow']
 
 
-def test_following_week_contains_labelled_estimates_and_confirmed_dates():
-    view = calendar_view(record(), moment(), settings(), moment())
-    assert len(view['weeks']) == 2
-    assert view['weeks'][1]['label'] == 'FOLLOWING WEEK'
-    assert view['has_estimates']
-    assert any(not item['confirmed'] for event in view['weeks'][1]['events'] for item in event['bins'])
+def test_icons_stay_up_for_the_configured_days_before_collection():
+    early = moment('2026-11-17T08:00:00+10:00')
+    lead = moment('2026-11-18T00:30:00+10:00')
+    on_day = moment('2026-11-20T08:00:00+10:00')
+    after = moment('2026-11-21T08:00:00+10:00')
+    assert not calendar_view(record(), early, settings(), early)['bins'][0]['visible']
+    opened = calendar_view(record(), lead, settings(), lead)
+    assert opened['show_days_before'] == 2
+    assert {item['colour']: item['visible'] for item in opened['bins']} == {'red': True, 'yellow': False}
+    assert calendar_view(record(), on_day, settings(), on_day)['bins'][0]['visible']
+    assert not calendar_view(record(), after, settings(), after)['bins'][0]['visible']
+    longer = calendar_view(record(), early, settings(show_days_before=3), early)
+    assert longer['bins'][0]['visible']
 
 
-def test_published_only_mode_does_not_invent_future_dates():
-    view = calendar_view(record(), moment(), settings(show_estimates=False), moment())
-    assert not view['has_estimates']
-    assert all(item['confirmed'] for event in view['events'] for item in event['bins'])
-    assert [event['date'] for event in view['events']] == ['2026-11-20', '2026-11-27']
+def test_each_bin_keeps_its_own_screen_position():
+    view = calendar_view(record(), moment(), settings(show_green=True, red_position='bottom-left', green_position='top-right'), moment())
+    assert {item['colour']: item['position'] for item in view['bins']} == {
+        'red': 'bottom-left', 'yellow': 'top-center', 'green': 'top-right'}
 
 
-def test_highlights_configurable_and_old_cache_not_projected_forever():
-    now = moment('2026-11-20T05:00:00+10:00')
-    view = calendar_view(record(), now, settings(highlight_today=False), now)
-    assert not view['next']['highlight']
-    later = moment('2026-12-20T05:00:00+10:00')
-    old = calendar_view(record(), now, settings(), later, 'network unavailable')
-    assert old['offline'] and old['stale'] and old['ready']
-    assert old['next'] is None
+def test_no_record_has_no_icons_and_offline_keeps_saved_dates():
+    now = moment()
+    assert calendar_view(None, None, settings(), now)['bins'] == []
+    offline = calendar_view(record(), now, settings(), now, 'network unavailable')
+    assert offline['offline'] and offline['ready']
+    assert offline['bins'][0]['date'] == '2026-11-20'
 
 
 class Response:
@@ -198,10 +198,12 @@ def test_cache_survives_restart_and_api_failure(calendar):
 def test_initial_failure_schedules_backoff_instead_of_spinning(calendar):
     service, clock, client = calendar
     client.lookup.side_effect = OSError('offline')
-    for expected in (900, 1800, 3600, 7200, 7200):
+    delay = RETRY_INITIAL_SECONDS
+    for _ in range(5):
         assert not service.refresh_once()
-        assert (service._due() - clock()).total_seconds() == expected
+        assert (service._due() - clock()).total_seconds() == delay
         clock.return_value = service._due()
+        delay = min(RETRY_MAX_SECONDS, delay * 2)
 
 
 def test_scheduled_cache_load_avoids_unnecessary_fetch(calendar):
@@ -227,19 +229,20 @@ def test_manual_refresh_is_coalesced_and_rate_limited(calendar):
     assert not service.request_refresh()
     service.refresh_once()
     assert not service.request_refresh()
-    clock.return_value += dt.timedelta(seconds=service.settings.manual_refresh_cooldown_seconds)
+    clock.return_value += dt.timedelta(seconds=MANUAL_COOLDOWN_SECONDS)
     assert service.request_refresh()
 
 
 def test_config_persists_without_changing_existing_sections(calendar):
     service, _, _ = calendar
-    service.configure({'page_duration_seconds': 20, 'show_green': False})
+    service.configure({'refresh_days': 3, 'red_position': 'bottom-left', 'show_green': False})
     parser = configparser.ConfigParser()
     parser.read(service.config_path)
     assert parser['telegram']['bot_token'] == 'keep-private'
     assert parser['gallery']['delay_seconds'] == '30'
     restarted = BinCalendar(service.config_path)
-    assert restarted.settings.page_duration_seconds == 20
+    assert restarted.settings.refresh_days == 3
+    assert restarted.settings.red_position == 'bottom-left'
     before = service.config_path.read_bytes()
     with pytest.raises(ConfigError):
         service.configure({'refresh_time': '99:99'})
@@ -263,48 +266,38 @@ def test_corrupt_cache_does_not_stop_the_service(calendar):
     assert restarted._due() == clock()
 
 
-def test_invalid_config_disables_only_the_feature(tmp_path):
-    path = tmp_path / 'config.ini'
-    path.write_text('[bin_calendar]\nenabled=true\npage_duration_seconds=broken\n', encoding='utf-8')
-    service = BinCalendar(path)
+def test_invalid_config_hides_bins_and_old_extra_keys_are_ignored(tmp_path):
+    broken = tmp_path / 'broken.ini'
+    broken.write_text('[bin_calendar]\nenabled=true\nrefresh_days=nope\n', encoding='utf-8')
+    service = BinCalendar(broken)
     assert not service.settings.enabled
     assert service.config_error
 
-
-def test_reminders_opt_in_published_dates_only_and_once_daily(calendar):
-    service, clock, _ = calendar
-    service.notifier = Mock()
-    clock.return_value = moment('2026-11-19T18:00:00+10:00')
-    service.refresh_once()
-    service.notify_if_due()
-    service.notifier.assert_not_called()
-    service.configure({'notify_tomorrow': True})
-    service.notify_if_due()
-    service.notify_if_due()
-    service.notifier.assert_called_once()
-    assert 'General waste' in service.notifier.call_args[0][0]
-    assert 'Garden waste' not in service.notifier.call_args[0][0]
-    state = json.loads(service.cache_path.read_text())
-    assert state['last_notification'] == '2026-11-19'
+    legacy = tmp_path / 'legacy.ini'
+    legacy.write_text(
+        '[bin_calendar]\nenabled=true\nproperty_id=123\npage_duration_seconds=broken\n'
+        'notify_today=true\nshow_estimates=true\n',
+        encoding='utf-8')
+    legacy_service = BinCalendar(legacy)
+    assert legacy_service.settings.enabled
+    assert legacy_service.settings.refresh_days == 1
+    assert legacy_service.settings.red_position == 'top-center'
+    legacy_service.configure({'refresh_days': 2})
+    saved = configparser.ConfigParser()
+    saved.read(legacy)
+    assert 'page_duration_seconds' not in saved['bin_calendar']
+    assert 'notify_today' not in saved['bin_calendar']
 
 
-def test_no_notification_busy_loop_without_data(calendar):
-    service, clock, _ = calendar
-    service.notifier = Mock()
-    service.configure({'notify_today': True})
-    assert service._notification_due(clock()) is None
-
-
-def test_worker_failure_uses_configured_clock_check_without_spinning(calendar):
+def test_worker_waits_instead_of_spinning(calendar):
     service, _, client = calendar
     client.lookup.side_effect = OSError('offline')
-    service.configure({'scheduler_check_seconds': 17})
     wait_times = []
 
     def wait(timeout):
         wait_times.append(timeout)
         service.stopping.set()
 
-    service.wake = SimpleNamespace(clear=lambda: None, wait=wait)
+    service.wake = SimpleNamespace(clear=lambda: None, wait=wait, set=lambda: None)
     service._run()
-    assert wait_times == [17]
+    assert wait_times == [CHECK_SECONDS]

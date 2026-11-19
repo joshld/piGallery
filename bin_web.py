@@ -58,22 +58,7 @@ def register_bin_routes(app, slideshow):
     def bin_calendar_refresh():
         try:
             if not calendar().request_refresh():
-                return jsonify(error='A refresh is already queued or the configured cooldown is still active'), 429
+                return jsonify(error='A refresh was just requested. Wait a minute, then try again.'), 429
             return jsonify(status='queued'), 202
-        except ConfigError as error:
-            return jsonify(error=str(error)), 400
-
-    @app.route('/api/bin-calendar/display', methods=['POST'])
-    def bin_calendar_display():
-        try:
-            controller = calendar()
-            if not controller.settings.enabled:
-                raise ConfigError('Configure and enable the bin calendar first')
-            values = request.get_json(silent=True) or {}
-            show = values.get('show', True)
-            if not isinstance(show, bool):
-                raise ConfigError('Show must be true or false')
-            slideshow.show_bin_calendar(show)
-            return jsonify(status='queued', show=show)
         except ConfigError as error:
             return jsonify(error=str(error)), 400

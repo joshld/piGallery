@@ -1,13 +1,12 @@
-"""Brisbane Council bin dates, validated settings and an offline-safe cache.
+"""Brisbane Council bin dates, a short settings list, and an offline-safe cache.
 
-The official dataset publishes one next date per colour, not a full calendar.
-Every generated recurrence is explicitly marked as an estimate.
+The council dataset publishes the next date for each bin colour. This module
+stores that record and does not invent later collection days.
 """
 import configparser
 import datetime as dt
 import json
 import logging
-import math
 import os
 from pathlib import Path
 import re
@@ -27,6 +26,19 @@ except (ImportError, KeyError):
 API_URL = 'https://data.brisbane.qld.gov.au/api/explore/v2.1/catalog/datasets/bin-collection-calendar/records'
 BIN_FIELDS = {'red': 'next_red_bin', 'yellow': 'next_yellow_bin', 'green': 'next_green_bin'}
 BIN_NAMES = {'red': 'General waste', 'yellow': 'Recycling', 'green': 'Garden waste'}
+BIN_LABELS = {'red': 'GENERAL', 'yellow': 'RECYCLING', 'green': 'GREEN'}
+MONTHS = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
+POSITIONS = (
+    'top-left', 'top-center', 'top-right',
+    'middle-left', 'center', 'middle-right',
+    'bottom-left', 'bottom-center', 'bottom-right',
+)
+REQUEST_TIMEOUT_SECONDS = 15
+RETRY_INITIAL_SECONDS = 900
+RETRY_MAX_SECONDS = 7200
+MANUAL_COOLDOWN_SECONDS = 60
+CHECK_SECONDS = 60
+CACHE_FILE = Path('.cache') / 'bin-calendar.json'
 
 
 def spec(label, default, kind='str', group='Display', minimum=None, maximum=None, choices=None, help_text=''):
@@ -35,42 +47,21 @@ def spec(label, default, kind='str', group='Display', minimum=None, maximum=None
 
 
 SCHEMA = {
-    'enabled': spec('Enable bin calendar', False, 'bool', 'Address and bins'),
-    'house_number': spec('Street number', '', group='Address and bins'),
-    'street_name': spec('Street name', '', group='Address and bins', help_text='For example, EXAMPLE STREET or EXAMPLE ST.'),
-    'suburb': spec('Suburb', '', group='Address and bins'),
-    'unit_number': spec('Unit number (if applicable)', '', group='Address and bins'),
-    'property_id': spec('Council property ID', '', group='Address and bins', help_text='Set by address lookup; optional when an exact address is configured.'),
-    'show_red': spec('Show general waste (red)', True, 'bool', 'Address and bins'),
-    'show_yellow': spec('Show recycling (yellow)', True, 'bool', 'Address and bins'),
-    'show_green': spec('Show garden waste (green)', False, 'bool', 'Address and bins', help_text='Enable only if you have a green-waste service.'),
-    'refresh_mode': spec('Automatic refresh mode', 'daily', group='Refresh and cache', choices=['daily', 'interval']),
-    'refresh_time': spec('Daily refresh time (Brisbane)', '06:00', 'time', 'Refresh and cache'),
-    'refresh_interval_hours': spec('Interval-mode refresh frequency (hours)', 24, 'int', 'Refresh and cache', 1, 168),
-    'retry_initial_seconds': spec('Initial retry delay (seconds)', 900, 'int', 'Refresh and cache', 60, 86400),
-    'retry_max_seconds': spec('Maximum retry delay (seconds)', 7200, 'int', 'Refresh and cache', 60, 172800),
-    'request_timeout_seconds': spec('API request timeout (seconds)', 15, 'int', 'Refresh and cache', 3, 60),
-    'manual_refresh_cooldown_seconds': spec('Manual refresh cooldown (seconds)', 60, 'int', 'Refresh and cache', 30, 3600),
-    'scheduler_check_seconds': spec('Scheduler clock-check frequency (seconds)', 60, 'int', 'Refresh and cache', 1, 3600),
-    'stale_after_hours': spec('Mark cached data as old after (hours)', 48, 'int', 'Refresh and cache', 1, 720),
-    'forecast_max_cache_age_days': spec('Stop estimates when cache is older than (days)', 14, 'int', 'Refresh and cache', 1, 90),
-    'cache_file': spec('Local cache file', '.cache/bin-calendar.json', group='Refresh and cache'),
-    'display_update_seconds': spec('Screen update frequency (seconds)', 30, 'int', 'Display', 1, 3600),
-    'web_poll_seconds': spec('Web status update frequency (seconds)', 30, 'int', 'Display', 10, 3600),
-    'page_interval_seconds': spec('Time between calendar pages (seconds)', 300, 'int', 'Display', 30, 86400),
-    'page_duration_seconds': spec('Calendar page duration (seconds)', 15, 'int', 'Display', 5, 120),
-    'upcoming_weeks': spec('Upcoming weeks to show', 2, 'int', 'Display', 1, 6),
-    'show_estimates': spec('Show clearly labelled regular-service estimates', True, 'bool', 'Display'),
-    'red_interval_days': spec('General-waste recurrence for estimates (days)', 7, 'int', 'Display', 1, 31),
-    'yellow_interval_days': spec('Recycling recurrence for estimates (days)', 14, 'int', 'Display', 1, 31),
-    'green_interval_days': spec('Garden-waste recurrence for estimates (days)', 14, 'int', 'Display', 1, 31),
-    'show_address': spec('Show street address on the connected screen', False, 'bool', 'Display'),
-    'highlight_today': spec('Highlight collection today', True, 'bool', 'Highlights and reminders'),
-    'highlight_tomorrow': spec('Highlight collection tomorrow', True, 'bool', 'Highlights and reminders'),
-    'highlight_days_before': spec('Highlight collections within this many days', 2, 'int', 'Highlights and reminders', 0, 7),
-    'notify_today': spec('Telegram reminder on collection day', False, 'bool', 'Highlights and reminders'),
-    'notify_tomorrow': spec('Telegram reminder the day before', False, 'bool', 'Highlights and reminders'),
-    'notification_time': spec('Reminder time (Brisbane)', '18:00', 'time', 'Highlights and reminders'),
+    'enabled': spec('Show bins on the photo frame', False, 'bool', 'Bins'),
+    'house_number': spec('Street number', '', group='Address'),
+    'street_name': spec('Street name', '', group='Address', help_text='For example, EXAMPLE STREET or EXAMPLE ST.'),
+    'suburb': spec('Suburb', '', group='Address'),
+    'unit_number': spec('Unit number (if applicable)', '', group='Address'),
+    'property_id': spec('Council property ID', '', group='Address', help_text='Filled in by address lookup.'),
+    'show_red': spec('General waste (red)', True, 'bool', 'Bins'),
+    'show_yellow': spec('Recycling (yellow)', True, 'bool', 'Bins'),
+    'show_green': spec('Garden waste (green)', False, 'bool', 'Bins', help_text='Turn on only if this property has a green bin.'),
+    'red_position': spec('Where to show the red bin', 'top-center', choices=list(POSITIONS), group='Bins'),
+    'yellow_position': spec('Where to show the yellow bin', 'top-center', choices=list(POSITIONS), group='Bins'),
+    'green_position': spec('Where to show the green bin', 'top-center', choices=list(POSITIONS), group='Bins'),
+    'show_days_before': spec('Days on screen before collection', 2, 'int', 'Bins', 0, 14, help_text='Icons stay up for this many days before collection, and on collection day.'),
+    'refresh_days': spec('Update every (days)', 1, 'int', 'Updates', 1, 14, help_text='1 means daily.'),
+    'refresh_time': spec('Update at (Brisbane time)', '06:00', 'time', 'Updates'),
 }
 for _order, _field in enumerate(SCHEMA.values()):
     _field['order'] = _order
@@ -112,17 +103,10 @@ class BinConfig:
             except (TypeError, ValueError):
                 raise ConfigError('Invalid value for ' + field['label'])
             self.values[key] = value
-        if self.retry_max_seconds < self.retry_initial_seconds:
-            raise ConfigError('Maximum retry delay must be at least the initial retry delay')
-        if self.page_duration_seconds >= self.page_interval_seconds:
-            raise ConfigError('Calendar page duration must be shorter than the time between pages')
         if self.property_id and not re.fullmatch(r'[0-9]{1,16}', self.property_id):
             raise ConfigError('Council property ID must contain digits only')
-        cache = Path(self.cache_file)
-        if cache.is_absolute() or '..' in cache.parts or not cache.parts or cache.parts[0] != '.cache' or cache.suffix != '.json':
-            raise ConfigError('Cache file must be a JSON file inside the application .cache directory')
         if self.enabled and not (self.show_red or self.show_yellow or self.show_green):
-            raise ConfigError('Enable at least one bin colour')
+            raise ConfigError('Turn on at least one bin')
         if self.enabled and not self.has_address:
             raise ConfigError('Look up a property or enter its street number, street and suburb first')
 
@@ -154,11 +138,14 @@ def now_brisbane():
 
 
 def next_refresh(last_success, settings):
-    if settings.refresh_mode == 'interval':
-        return last_success + dt.timedelta(hours=settings.refresh_interval_hours)
+    """Next council check. Daily uses the next clock time. Longer gaps wait that many days."""
     hour, minute = map(int, settings.refresh_time.split(':'))
-    candidate = last_success.astimezone(BRISBANE).replace(hour=hour, minute=minute, second=0, microsecond=0)
-    return candidate if candidate > last_success else candidate + dt.timedelta(days=1)
+    local = last_success.astimezone(BRISBANE)
+    slot = local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    step = dt.timedelta(days=settings.refresh_days)
+    if settings.refresh_days == 1 and slot > last_success:
+        return slot
+    return slot + step
 
 
 def quote(value):
@@ -182,6 +169,15 @@ def address_label(record):
     if record.get('unit_number'):
         number = str(record['unit_number']) + '/' + number
     return ' '.join([number, str(record.get('street_name') or '')]).strip() + ', ' + str(record.get('suburb') or '')
+
+
+def date_label(day, today):
+    remaining = (day - today).days
+    if remaining == 0:
+        return 'Today'
+    if remaining == 1:
+        return 'Tomorrow'
+    return '%d %s' % (day.day, MONTHS[day.month - 1])
 
 
 def validate_record(record):
@@ -213,7 +209,7 @@ class CouncilClient:
 
     def lookup(self, settings):
         if settings.property_id:
-            return self.query('property_id=' + quote(settings.property_id), settings.request_timeout_seconds)
+            return self.query('property_id=' + quote(settings.property_id), REQUEST_TIMEOUT_SECONDS)
         match = re.fullmatch(r'\s*(\d+)\s*([A-Za-z]?)\s*', settings.house_number)
         if not match or not settings.street_name or not settings.suburb:
             raise ConfigError('Enter a street number, street and suburb; use the separate unit field')
@@ -224,65 +220,46 @@ class CouncilClient:
             terms.append('house_number_suffix=' + quote(suffix.upper()))
         if settings.unit_number:
             terms.append('unit_number=' + quote(settings.unit_number.upper()))
-        return self.query(' AND '.join(terms), settings.request_timeout_seconds)
+        return self.query(' AND '.join(terms), REQUEST_TIMEOUT_SECONDS)
 
 
 def calendar_view(record, fetched_at, settings, now, error=None):
     now = now.astimezone(BRISBANE)
     today = now.date()
-    age_hours = max(0, (now - fetched_at).total_seconds() / 3600) if fetched_at else None
-    stale = fetched_at is not None and age_hours >= settings.stale_after_hours
-    horizon = today + dt.timedelta(weeks=settings.upcoming_weeks)
-    dates = {}
+    bins = []
     for colour, field in BIN_FIELDS.items():
         if not record or not settings.values['show_' + colour] or not record.get(field):
             continue
-        published = dt.date.fromisoformat(record[field])
-        if today <= published < horizon:
-            dates.setdefault(published, []).append({'colour': colour, 'name': BIN_NAMES[colour], 'confirmed': True})
-        allow_estimates = settings.show_estimates and age_hours is not None and age_hours <= settings.forecast_max_cache_age_days * 24
-        if allow_estimates:
-            interval = dt.timedelta(days=settings.values[colour + '_interval_days'])
-            candidate = published + interval
-            if candidate < today:
-                candidate += interval * max(0, math.ceil((today - candidate).days / interval.days))
-            while candidate < horizon:
-                dates.setdefault(candidate, []).append({'colour': colour, 'name': BIN_NAMES[colour], 'confirmed': False})
-                candidate += interval
-    events = []
-    for day, bins in sorted(dates.items()):
+        day = dt.date.fromisoformat(record[field])
         remaining = (day - today).days
-        confirmed = all(item['confirmed'] for item in bins)
-        events.append({'date': day.isoformat(), 'day': day.strftime('%A'),
-                       'label': day.strftime('%a %d %b %Y'), 'days_remaining': remaining,
-                       'relative': 'TODAY' if remaining == 0 else 'TOMORROW' if remaining == 1 else 'IN %d DAYS' % remaining,
-                       'highlight': (remaining == 0 and settings.highlight_today) or
-                                    (remaining == 1 and settings.highlight_tomorrow) or
-                                    (1 < remaining <= settings.highlight_days_before),
-                       'confirmed': confirmed, 'bins': bins})
-    # Each row is a rolling collection week, starting today, including a
-    # following-week row even when published next dates do not cover it yet.
-    weeks = []
-    for index in range(settings.upcoming_weeks):
-        start = today + dt.timedelta(weeks=index)
-        finish = start + dt.timedelta(days=6)
-        weeks.append({'label': 'COMING WEEK' if index == 0 else 'FOLLOWING WEEK' if index == 1 else 'WEEK %d' % (index + 1),
-                      'start': start.isoformat(), 'end': finish.isoformat(),
-                      'events': [event for event in events if start.isoformat() <= event['date'] <= finish.isoformat()]})
-    return {'enabled': settings.enabled, 'ready': bool(record), 'next': events[0] if events else None,
-            'weeks': weeks, 'events': events, 'stale': stale, 'offline': bool(error), 'error': error,
-            'fetched_at': fetched_at.isoformat() if fetched_at else None,
-            'age_hours': round(age_hours, 1) if age_hours is not None else None,
-            'location': address_label(record) if record and settings.show_address else str((record or {}).get('suburb') or ''),
-            'has_estimates': any(not item['confirmed'] for event in events for item in event['bins']),
-            'timezone': 'Australia/Brisbane', 'source': 'Brisbane City Council · CC BY 4.0'}
+        bins.append({
+            'colour': colour,
+            'name': BIN_NAMES[colour],
+            'label': BIN_LABELS[colour],
+            'date': day.isoformat(),
+            'when': date_label(day, today),
+            'days_remaining': remaining,
+            'visible': 0 <= remaining <= settings.show_days_before,
+            'position': settings.values[colour + '_position'],
+        })
+    return {
+        'enabled': settings.enabled,
+        'ready': bool(record),
+        'show_days_before': settings.show_days_before,
+        'bins': bins,
+        'offline': bool(error),
+        'error': error,
+        'fetched_at': fetched_at.isoformat() if fetched_at else None,
+        'address': address_label(record) if record else '',
+        'timezone': 'Australia/Brisbane',
+        'source': 'Brisbane City Council',
+    }
 
 
 class BinCalendar:
-    def __init__(self, config_path, logger=None, notifier=None, client=None, clock=None):
+    def __init__(self, config_path, logger=None, client=None, clock=None):
         self.config_path = Path(config_path)
         self.logger = logger or logging.getLogger(__name__)
-        self.notifier = notifier
         self.client = client or CouncilClient()
         self.clock = clock or now_brisbane
         self.lock = threading.RLock()
@@ -298,21 +275,24 @@ class BinCalendar:
         self.manual_requested = False
         self.retry_at = None
         self.failures = 0
-        self.last_notification = None
+        self.revision = 0
         parser = configparser.ConfigParser(interpolation=None)
         parser.read(self.config_path)
+        raw = dict(parser['bin_calendar']) if parser.has_section('bin_calendar') else {}
+        # Older builds saved a long list of extra keys. Keep the address and
+        # bin choices, and ignore everything this screen no longer uses.
+        known = {key: value for key, value in raw.items() if key in SCHEMA}
         try:
-            self.settings = BinConfig(dict(parser['bin_calendar']) if parser.has_section('bin_calendar') else {})
+            self.settings = BinConfig(known)
         except ConfigError as error:
             self.settings = BinConfig()
             self.config_error = str(error)
-            self.logger.error('[Bins] Invalid configuration; calendar disabled: %s', error)
+            self.logger.error('[Bins] Invalid configuration; bins hidden: %s', error)
         self._load_cache()
 
     @property
     def cache_path(self):
-        path = Path(self.settings.cache_file).expanduser()
-        return path if path.is_absolute() else self.config_path.parent / path
+        return self.config_path.parent / CACHE_FILE
 
     def _load_cache(self):
         try:
@@ -324,7 +304,6 @@ class BinCalendar:
             if fetched.tzinfo is None:
                 raise ValueError('Cache timestamp must include a timezone')
             self.record, self.fetched_at = record, fetched
-            self.last_notification = cache.get('last_notification')
         except FileNotFoundError:
             pass
         except (OSError, ValueError, KeyError, TypeError):
@@ -336,7 +315,7 @@ class BinCalendar:
         path = self.cache_path
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {'version': 1, 'identity': list(self.settings.identity), 'record': self.record,
-                   'fetched_at': self.fetched_at.isoformat(), 'last_notification': self.last_notification}
+                   'fetched_at': self.fetched_at.isoformat()}
         name = None
         try:
             with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=str(path.parent), delete=False) as output:
@@ -364,7 +343,6 @@ class BinCalendar:
             parser.read(self.config_path)
             parser['bin_calendar'] = {key: str(value).lower() if isinstance(value, bool) else str(value)
                                       for key, value in settings.to_dict().items()}
-            # Preserve all other sections, including existing Telegram secrets.
             name = None
             try:
                 with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=str(self.config_path.parent), delete=False) as output:
@@ -381,8 +359,9 @@ class BinCalendar:
             self.config_error = None
             self.retry_at = None
             self.failures = 0
+            self.revision += 1
             if changed_property:
-                self.record = self.fetched_at = self.last_notification = None
+                self.record = self.fetched_at = None
                 self.error = None
                 self._load_cache()
             self.wake.set()
@@ -399,8 +378,8 @@ class BinCalendar:
         with self.lock:
             now = self.clock()
             if not self.settings.enabled:
-                raise ConfigError('Enable and configure the calendar first')
-            if self.manual_requested or self.refreshing or (self.last_attempt and (now - self.last_attempt).total_seconds() < self.settings.manual_refresh_cooldown_seconds):
+                raise ConfigError('Turn on bin collection and save an address first')
+            if self.manual_requested or self.refreshing or (self.last_attempt and (now - self.last_attempt).total_seconds() < MANUAL_COOLDOWN_SECONDS):
                 return False
             self.manual_requested = True
             self.wake.set()
@@ -455,47 +434,16 @@ class BinCalendar:
         except Exception as error:
             with self.lock:
                 self.failures += 1
-                delay = min(settings.retry_max_seconds, settings.retry_initial_seconds * 2 ** min(self.failures - 1, 20))
+                delay = min(RETRY_MAX_SECONDS, RETRY_INITIAL_SECONDS * 2 ** min(self.failures - 1, 20))
                 self.retry_at = self.clock() + dt.timedelta(seconds=delay)
                 self.error = 'Council data unavailable; retaining last successful dates'
             self.logger.warning('[Bins] Refresh failed (%s); cached dates retained, retry in %ss', type(error).__name__, delay)
             return False
         finally:
             with self.lock:
-                self.refreshing = False
-
-    def _notification_due(self, now):
-        if not (self.settings.notify_today or self.settings.notify_tomorrow) or not self.notifier or not self.record or self.error:
-            return None
-        hour, minute = map(int, self.settings.notification_time.split(':'))
-        target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        if self.last_notification == now.date().isoformat():
-            target += dt.timedelta(days=1)
-        return target
-
-    def notify_if_due(self):
-        with self.lock:
-            now = self.clock()
-            due = self._notification_due(now)
-            if due is None or due > now or not self.record or self.error:
-                return
-            view = calendar_view(self.record, self.fetched_at, self.settings, now)
-            lines = []
-            for event in view['events']:
-                enabled = (event['days_remaining'] == 0 and self.settings.notify_today) or (event['days_remaining'] == 1 and self.settings.notify_tomorrow)
-                bins = [item['name'] for item in event['bins'] if item['confirmed']]
-                if enabled and bins:
-                    lines.append(event['relative'] + ': ' + ', '.join(bins) + ' — ' + event['label'])
-            self.last_notification = now.date().isoformat()
-            try:
-                self._save_cache()
-            except OSError:
-                self.logger.warning('[Bins] Could not persist reminder state')
-        if lines:
-            try:
-                self.notifier('\n'.join(lines))
-            except Exception as error:
-                self.logger.warning('[Bins] Reminder delivery failed (%s)', type(error).__name__)
+                if self.refreshing:
+                    self.refreshing = False
+                    self.revision += 1
 
     def _run(self):
         while not self.stopping.is_set():
@@ -505,15 +453,10 @@ class BinCalendar:
                 due = self._due() if enabled else None
             if enabled and due <= self.clock():
                 self.refresh_once()
-            if enabled:
-                self.notify_if_due()
             with self.lock:
                 now = self.clock()
-                times = [self._due()] if self.settings.enabled else []
-                reminder = self._notification_due(now) if self.settings.enabled else None
-                if reminder is not None:
-                    times.append(reminder)
-                wait = min(self.settings.scheduler_check_seconds, max(0, (min(times) - now).total_seconds())) if times else None
+                due = self._due() if self.settings.enabled else None
+                wait = None if due is None else min(CHECK_SECONDS, max(0, (due - now).total_seconds()))
             self.wake.wait(wait)
 
     def start(self):
@@ -525,4 +468,4 @@ class BinCalendar:
         self.stopping.set()
         self.wake.set()
         if self.thread:
-            self.thread.join(timeout=self.settings.request_timeout_seconds)
+            self.thread.join(timeout=REQUEST_TIMEOUT_SECONDS)

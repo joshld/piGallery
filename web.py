@@ -910,8 +910,6 @@ def register_routes():
             return jsonify({'error': 'Slideshow not initialized'}), 503
         
         with slideshow_instance.control_lock:
-            if hasattr(slideshow_instance, 'show_bin_calendar'):
-                slideshow_instance.show_bin_calendar(False)
             slideshow_instance.next_image()
             slideshow_instance.force_redraw = True  # Force immediate redraw
             slideshow_instance.image_display_start_time = time.time()  # Reset countdown
@@ -925,8 +923,6 @@ def register_routes():
             return jsonify({'error': 'Slideshow not initialized'}), 503
         
         with slideshow_instance.control_lock:
-            if hasattr(slideshow_instance, 'show_bin_calendar'):
-                slideshow_instance.show_bin_calendar(False)
             slideshow_instance.prev_image()
             slideshow_instance.force_redraw = True  # Force immediate redraw
             slideshow_instance.image_display_start_time = time.time()  # Reset countdown

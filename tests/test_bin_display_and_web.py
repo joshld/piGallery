@@ -5,114 +5,104 @@ from unittest.mock import Mock
 
 from flask import Flask
 import pygame
-import pytest
 
 from bin_calendar import BRISBANE, BinCalendar, BinConfig, calendar_view
-from bin_display import BinCalendarRenderer, BinPageCycle
+from bin_display import BinCalendarRenderer
 from bin_web import register_bin_routes
 
 
 def sample():
     return dict(property_id='123', house_number='24', house_number_suffix=None,
                 unit_number=None, street_name='EXAMPLE ST', suburb='MOOROOKA',
-                collection_day='FRIDAY', next_red_bin='2026-11-20',
-                next_yellow_bin='2026-11-27', next_green_bin='2026-11-20')
+                collection_day='FRIDAY', next_red_bin='2026-11-24',
+                next_yellow_bin='2026-11-24', next_green_bin='2026-12-01')
 
 
 def config(**kwargs):
     return BinConfig(dict(enabled=True, property_id='123', **kwargs))
 
 
-def test_rotation_preserves_photo_time_and_is_configurable():
-    cycle = BinPageCycle()
-    settings = config(page_interval_seconds=60, page_duration_seconds=10, display_update_seconds=3)
-    assert not cycle.tick(0, settings, True)
-    assert not cycle.tick(59, settings, True)
-    assert cycle.tick(60, settings, True) and cycle.active
-    assert not cycle.tick(62, settings, True)
-    assert cycle.tick(63, settings, True)
-    assert cycle.tick(70, settings, True) and not cycle.active
-    assert not cycle.tick(119, settings, True)
-    assert cycle.tick(120, settings, True) and cycle.active
-
-
-def test_manual_page_and_display_off_do_not_replace_photos():
-    cycle = BinPageCycle()
-    cycle.request(True)
-    assert cycle.tick(0, config(), False) and cycle.active
-    cycle.request(False)
-    assert cycle.tick(1, config(), True) and not cycle.active
-    cycle.request(True)
-    cycle.tick(2, config(), True)
-    assert cycle.tick(3, config(), True, display_on=False)
-    assert not cycle.active
-
-
-def test_disabled_or_unconfigured_calendar_does_not_rotate():
-    cycle = BinPageCycle()
-    cycle.tick(0, BinConfig(), False)
-    cycle.tick(10000, BinConfig(), False)
-    assert not cycle.active
-    cycle.tick(0, config(), False)
-    cycle.tick(10000, config(), False)
-    assert not cycle.active
-
-
-@pytest.mark.parametrize('size', [(1920, 1080), (1280, 720), (800, 480), (480, 800)])
-@pytest.mark.parametrize('weeks', [2, 6])
-def test_renderer_adapts_to_resolution_and_week_count(size, weeks):
+def test_overlay_keeps_the_photo_and_places_each_group():
     pygame.font.init()
-    screen = pygame.Surface(size)
+    screen = pygame.Surface((1280, 720))
+    screen.fill((10, 20, 30))
     now = dt.datetime(2026, 11, 19, 18, tzinfo=BRISBANE)
-    settings = config(upcoming_weeks=weeks)
-    renderer = BinCalendarRenderer()
+    settings = config(show_green=True, show_days_before=14, red_position='bottom-center', yellow_position='bottom-center', green_position='top-right')
     view = calendar_view(sample(), now, settings, now)
-    renderer.draw(screen, view, settings, now)
-    assert screen.get_size() == size
-    assert len(renderer.fonts) <= 32
-    assert screen.get_at((0, 0))[:3] == (13, 23, 38)
+    rects = BinCalendarRenderer().draw(screen, view)
+    assert screen.get_at((0, 0))[:3] == (10, 20, 30)
+    assert len(rects) == 2
+    bottom = max(rects, key=lambda rect: rect.centery)
+    top = min(rects, key=lambda rect: rect.centery)
+    assert bottom.centery > 500 and bottom.width > top.width
+    assert top.centerx > 800 and top.centery < 280
+    assert {item['when'] for item in view['bins']} >= {'24 Nov', '1 Dec'}
 
 
-def test_renderer_handles_missing_and_offline_data():
+def test_overlay_fits_small_and_portrait_screens():
+    pygame.font.init()
+    now = dt.datetime(2026, 11, 19, 18, tzinfo=BRISBANE)
+    view = calendar_view(sample(), now, config(show_green=True, show_days_before=14), now)
+    renderer = BinCalendarRenderer()
+    for size in ((1920, 1080), (800, 480), (480, 800)):
+        screen = pygame.Surface(size)
+        rects = renderer.draw(screen, view)
+        bounds = screen.get_rect()
+        assert rects and all(bounds.contains(rect) for rect in rects)
+        assert len(renderer.fonts) <= 32
+
+
+def test_overlay_stays_off_until_the_lead_up():
+    pygame.font.init()
+    screen = pygame.Surface((1280, 720))
+    screen.fill((10, 20, 30))
+    now = dt.datetime(2026, 11, 19, 18, tzinfo=BRISBANE)
+    view = calendar_view(sample(), now, config(), now)
+    assert all(not item['visible'] for item in view['bins'])
+    assert BinCalendarRenderer().draw(screen, view) == []
+    assert screen.get_at((640, 40))[:3] == (10, 20, 30)
+
+
+def test_missing_dates_draw_nothing():
     pygame.font.init()
     screen = pygame.Surface((800, 480))
-    now = dt.datetime(2026, 11, 19, 18, tzinfo=BRISBANE)
-    renderer = BinCalendarRenderer()
-    renderer.draw(screen, calendar_view(None, None, BinConfig(), now), BinConfig(), now)
-    view = calendar_view(sample(), now - dt.timedelta(days=3), config(), now, 'offline')
-    renderer.draw(screen, view, config(), now)
+    screen.fill((10, 20, 30))
+    assert BinCalendarRenderer().draw(screen, {'bins': []}) == []
+    assert screen.get_at((400, 240))[:3] == (10, 20, 30)
 
 
-@pytest.fixture
-def api(tmp_path):
+def api_client(tmp_path):
     path = tmp_path / 'config.ini'
     path.write_text('[gallery]\ndelay_seconds=30\n[telegram]\nbot_token=untouched\n', encoding='utf-8')
     now = dt.datetime(2026, 11, 19, 18, tzinfo=BRISBANE)
     client = SimpleNamespace(lookup=Mock(return_value=[sample()]))
     calendar = BinCalendar(path, client=client, clock=lambda: now)
-    slideshow = SimpleNamespace(bin_calendar=calendar, show_bin_calendar=Mock(), force_redraw=False)
+    slideshow = SimpleNamespace(bin_calendar=calendar, force_redraw=False)
     app = Flask(__name__)
     app.testing = True
     register_bin_routes(app, slideshow)
-    with app.test_client() as connection:
-        yield connection, calendar, slideshow, client
+    return app.test_client(), calendar, slideshow, client
 
 
-def test_web_configuration_schema_and_live_persistence(api):
-    connection, calendar, slideshow, _ = api
+def test_web_configuration_schema_and_live_persistence(tmp_path):
+    connection, calendar, slideshow, _ = api_client(tmp_path)
     response = connection.get('/api/bin-calendar/config')
     assert response.status_code == 200
     assert response.json['config']['show_green'] is False
-    assert 'refresh_time' in response.json['schema']
-    response = connection.post('/api/bin-calendar/config', json={'enabled': True, 'property_id': '123', 'upcoming_weeks': 3})
+    assert 'refresh_days' in response.json['schema']
+    assert 'page_duration_seconds' not in response.json['schema']
+    response = connection.post('/api/bin-calendar/config', json={
+        'enabled': True, 'property_id': '123', 'refresh_days': 2, 'red_position': 'top-left'})
     assert response.status_code == 200
-    assert calendar.settings.upcoming_weeks == 3 and slideshow.force_redraw
-    assert BinCalendar(calendar.config_path).settings.upcoming_weeks == 3
+    assert calendar.settings.refresh_days == 2
+    assert calendar.settings.red_position == 'top-left'
+    assert slideshow.force_redraw
+    assert BinCalendar(calendar.config_path).settings.refresh_days == 2
     assert 'bot_token = untouched' in calendar.config_path.read_text()
 
 
-def test_invalid_web_values_do_not_change_config(api):
-    connection, calendar, _, _ = api
+def test_invalid_web_values_do_not_change_config(tmp_path):
+    connection, calendar, _, _ = api_client(tmp_path)
     before = calendar.config_path.read_bytes()
     response = connection.post('/api/bin-calendar/config', json={'refresh_time': '25:00'})
     assert response.status_code == 400
@@ -120,8 +110,8 @@ def test_invalid_web_values_do_not_change_config(api):
     assert connection.post('/api/bin-calendar/config', json=['not an object']).status_code == 400
 
 
-def test_web_lookup_returns_candidates_without_enabling_or_saving(api):
-    connection, calendar, _, client = api
+def test_web_lookup_returns_candidates_without_enabling_or_saving(tmp_path):
+    connection, calendar, _, client = api_client(tmp_path)
     response = connection.post('/api/bin-calendar/lookup', json={'house_number': '24', 'street_name': 'Example Street', 'suburb': 'Moorooka'})
     assert response.status_code == 200
     assert response.json['properties'][0]['property_id'] == '123'
@@ -129,8 +119,8 @@ def test_web_lookup_returns_candidates_without_enabling_or_saving(api):
     client.lookup.assert_called_once()
 
 
-def test_web_refresh_rate_limit_and_no_get_side_effects(api):
-    connection, calendar, _, client = api
+def test_web_refresh_rate_limit_and_no_get_side_effects(tmp_path):
+    connection, calendar, _, client = api_client(tmp_path)
     connection.post('/api/bin-calendar/config', json={'enabled': True, 'property_id': '123'})
     for _ in range(3):
         assert connection.get('/api/bin-calendar').status_code == 200
@@ -140,35 +130,27 @@ def test_web_refresh_rate_limit_and_no_get_side_effects(api):
     assert calendar.manual_requested
 
 
-def test_web_manual_page_uses_existing_slideshow(api):
-    connection, _, slideshow, _ = api
-    assert connection.post('/api/bin-calendar/display', json={'show': True}).status_code == 400
-    connection.post('/api/bin-calendar/config', json={'enabled': True, 'property_id': '123'})
-    assert connection.post('/api/bin-calendar/display', json={'show': True}).status_code == 200
-    slideshow.show_bin_calendar.assert_called_once_with(True)
-    assert connection.post('/api/bin-calendar/display', json={'show': 'false'}).status_code == 400
-
-
-def test_lookup_errors_do_not_expose_private_request_urls(api):
-    connection, _, _, client = api
+def test_lookup_errors_do_not_expose_private_request_urls(tmp_path):
+    connection, _, _, client = api_client(tmp_path)
     client.lookup.side_effect = RuntimeError('https://secret.example/?private-address')
     response = connection.post('/api/bin-calendar/lookup', json={'house_number': '24'})
     assert response.status_code == 502
     assert 'private-address' not in json.dumps(response.json)
 
 
-def test_gallery_and_calendar_saves_preserve_each_others_settings(api, monkeypatch):
+def test_gallery_and_calendar_saves_preserve_each_others_settings(tmp_path, monkeypatch):
     import configparser
     import web
-    _, calendar, slideshow, _ = api
+    connection, calendar, slideshow, _ = api_client(tmp_path)
     monkeypatch.setattr(web, 'slideshow_instance', slideshow)
     monkeypatch.setattr(web, 'CONFIG_PATH', str(calendar.config_path))
-    calendar.configure({'page_duration_seconds': 20})
+    calendar.configure({'refresh_days': 3})
     web.save_gallery_config({'delay_seconds': 42})
-    calendar.configure({'upcoming_weeks': 4})
+    connection.post('/api/bin-calendar/config', json={'green_position': 'top-right'})
     saved = configparser.ConfigParser()
     saved.read(calendar.config_path)
     assert saved['gallery']['delay_seconds'] == '42'
     assert saved['telegram']['bot_token'] == 'untouched'
-    assert saved['bin_calendar']['page_duration_seconds'] == '20'
-    assert saved['bin_calendar']['upcoming_weeks'] == '4'
+    assert saved['bin_calendar']['refresh_days'] == '3'
+    assert saved['bin_calendar']['green_position'] == 'top-right'
+    assert 'page_duration_seconds' not in saved['bin_calendar']

@@ -473,28 +473,96 @@
 
     <section class="bin-calendar-panel" id="bin-calendar-panel" aria-labelledby="bin-calendar-heading">
         <div class="bin-panel-heading">
-            <div><h2 id="bin-calendar-heading">Bin Calendar</h2><p>Brisbane City Council · Australia/Brisbane</p></div>
-            <div class="bin-actions">
-                <button type="button" id="bin-show-page" class="btn-primary">Show on Pi</button>
-                <button type="button" id="bin-hide-page" class="btn-secondary">Return to photos</button>
-                <button type="button" id="bin-refresh-data" class="btn-secondary">Refresh data</button>
+            <div>
+                <h2 id="bin-calendar-heading">Bin collection</h2>
+                <p>Icons on the photo frame, using your Brisbane City Council dates.</p>
             </div>
+            <button type="button" id="bin-refresh-data" class="btn-secondary" disabled>Refresh dates</button>
         </div>
         <div id="bin-calendar-message" role="status" aria-live="polite"></div>
-        <div id="bin-calendar-summary" class="bin-calendar-summary">Loading bin calendar...</div>
-        <details class="bin-config-details">
-            <summary>Calendar settings and address</summary>
-            <p>Settings are saved on this Pi and applied live. They also survive a service restart. The address is kept out of the public source repository.</p>
-            <form id="bin-calendar-config-form">
-                <div id="bin-calendar-settings"></div>
+        <p id="bin-calendar-status" class="bin-status-line">Loading bin settings...</p>
+        <div id="bin-screen-preview" class="bin-screen" aria-label="Where the bin icons sit on the frame"></div>
+        <form id="bin-calendar-config-form">
+            <label class="bin-enable"><input type="checkbox" name="enabled" id="bin-enabled"> Show bins on the photo frame</label>
+            <fieldset>
+                <legend>Address</legend>
+                <div class="bin-form-grid">
+                    <label>Street number <input name="house_number" autocomplete="address-line2"></label>
+                    <label>Street <input name="street_name" placeholder="Example Street"></label>
+                    <label>Suburb <input name="suburb"></label>
+                    <label>Unit <input name="unit_number" placeholder="If you have one"></label>
+                </div>
+                <input type="hidden" name="property_id" value="">
                 <div class="bin-actions">
                     <button type="button" id="bin-lookup-address" class="btn-secondary">Look up address</button>
-                    <button type="submit" class="btn-primary">Save calendar settings</button>
                 </div>
                 <div id="bin-address-results" aria-live="polite"></div>
-            </form>
-        </details>
-        <p class="bin-data-note">Council publishes the next date for each bin. Later dates marked “expected” follow the configured regular pattern; new Council dates take priority. Green waste is optional. Reminders use the existing Telegram bot only when explicitly enabled.</p>
+            </fieldset>
+            <fieldset>
+                <legend>Bins and where they sit</legend>
+                <p class="bin-hint">Icons that share a spot are shown together. Top left covers the clock, top right covers the weather, and the bottom can cover a caption.</p>
+                <div class="bin-choice">
+                    <label><input type="checkbox" name="show_red" checked> General waste</label>
+                    <select name="red_position" aria-label="Red bin position">
+                        <option value="top-left">Top left</option>
+                        <option value="top-center" selected>Top centre</option>
+                        <option value="top-right">Top right</option>
+                        <option value="middle-left">Middle left</option>
+                        <option value="center">Centre</option>
+                        <option value="middle-right">Middle right</option>
+                        <option value="bottom-left">Bottom left</option>
+                        <option value="bottom-center">Bottom centre</option>
+                        <option value="bottom-right">Bottom right</option>
+                    </select>
+                </div>
+                <div class="bin-choice">
+                    <label><input type="checkbox" name="show_yellow" checked> Recycling</label>
+                    <select name="yellow_position" aria-label="Yellow bin position">
+                        <option value="top-left">Top left</option>
+                        <option value="top-center" selected>Top centre</option>
+                        <option value="top-right">Top right</option>
+                        <option value="middle-left">Middle left</option>
+                        <option value="center">Centre</option>
+                        <option value="middle-right">Middle right</option>
+                        <option value="bottom-left">Bottom left</option>
+                        <option value="bottom-center">Bottom centre</option>
+                        <option value="bottom-right">Bottom right</option>
+                    </select>
+                </div>
+                <div class="bin-choice">
+                    <label><input type="checkbox" name="show_green"> Garden waste</label>
+                    <select name="green_position" aria-label="Green bin position">
+                        <option value="top-left">Top left</option>
+                        <option value="top-center" selected>Top centre</option>
+                        <option value="top-right">Top right</option>
+                        <option value="middle-left">Middle left</option>
+                        <option value="center">Centre</option>
+                        <option value="middle-right">Middle right</option>
+                        <option value="bottom-left">Bottom left</option>
+                        <option value="bottom-center">Bottom centre</option>
+                        <option value="bottom-right">Bottom right</option>
+                    </select>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>When they stay on screen</legend>
+                <div class="bin-update-row">
+                    <label>For <input name="show_days_before" type="number" min="0" max="14" step="1" value="2" required> days before collection</label>
+                </div>
+                <p class="bin-hint">They stay on the photos the whole time, from that many days before until the end of collection day. 2 means Wednesday and Thursday when collection is Friday, and Friday itself.</p>
+            </fieldset>
+            <fieldset>
+                <legend>How often to update</legend>
+                <div class="bin-update-row">
+                    <label>Every <input name="refresh_days" type="number" min="1" max="14" step="1" value="1" required> days</label>
+                    <label>at <input name="refresh_time" type="time" value="06:00" required></label>
+                </div>
+                <p class="bin-hint">1 day means daily, at this Brisbane time. The frame keeps the last dates if the update fails.</p>
+            </fieldset>
+            <div class="bin-actions">
+                <button type="submit" class="btn-primary">Save bin settings</button>
+            </div>
+        </form>
     </section>
 
     <!-- Shutdown Confirmation Modal -->
