@@ -20,6 +20,10 @@ from PIL import Image
 from PIL.ExifTags import TAGS
 from PIL import IptcImagePlugin
 from werkzeug.utils import secure_filename
+from image_work import DECODE_LOCK, PreviewCache, shrink_image
+
+preview_cache = PreviewCache()
+
 
 # These will be set by gallery.py before routes are registered
 app = None
@@ -41,6 +45,7 @@ def init_web(app_instance, slideshow_ref, telegram_ref, config_path, log_file, l
     CONFIG_PATH = config_path
     LOG_FILE = log_file
     logger = logger_instance
+    preview_cache.clear()
     register_routes()
     from bin_web import register_bin_routes
     register_bin_routes(app, slideshow_instance)
@@ -240,7 +245,7 @@ def rotated_image_response(img_path, rotation):
     from image_rotation import apply_pil
     payload = io.BytesIO()
     try:
-        with ExitStack() as images:
+        with DECODE_LOCK, ExitStack() as images:
             img = images.enter_context(closing(Image.open(img_path)))
             turned = apply_pil(img, rotation)
             if turned is not img:
@@ -265,8 +270,11 @@ def create_image_preview(img_path, rotation=0):
     from image_rotation import apply_pil
     img_bytes = io.BytesIO()
     try:
-        with ExitStack() as images:
+        with DECODE_LOCK, ExitStack() as images:
             img = images.enter_context(closing(Image.open(img_path)))
+            # Shrink before rotation so a thumbnail never needs a second
+            # original-resolution pixel buffer. Quarter turns swap the bounds.
+            shrink_image(img, (180, 320) if rotation in (90, 270) else (320, 180))
             turned = apply_pil(img, rotation)
             if turned is not img:
                 img = images.enter_context(closing(turned))
@@ -815,7 +823,7 @@ def register_routes():
                     from image_rotation import get_rotation
                     rotation_key = requested_path or slideshow_instance.current_img
                     rotation = get_rotation(CONFIG_PATH, rotation_key)
-                    img_bytes = create_image_preview(img_path, rotation) if rotation else create_image_preview(img_path)
+                    img_bytes = preview_cache.get(img_path, rotation, lambda: create_image_preview(img_path, rotation) if rotation else create_image_preview(img_path))
                     print("[Web] Thumbnail generated successfully, sending response")
                     try:
                         # The response owns this buffer and closes it after use.
@@ -1349,6 +1357,11 @@ def register_routes():
 
         images = []
         try:
+            if request.args.get('count_only') == 'true':
+                with os.scandir(upload_dir) as entries:
+                    count = sum(1 for entry in entries if not entry.name.startswith('.')
+                                and entry.name.lower().endswith(('.jpg', '.jpeg', '.png')) and entry.is_file())
+                return jsonify(total=count)
             for filename in os.listdir(upload_dir):
                 if filename.lower().endswith(('.jpg', '.jpeg', '.png')) and not filename.startswith('.'):
                     filepath = os.path.join(upload_dir, filename)

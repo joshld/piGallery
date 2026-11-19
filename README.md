@@ -384,6 +384,8 @@ git commit -m "Add Telegram status updates for #14"
 - **[PROJECT_BOARD_MOCKUP.md](PROJECT_BOARD_MOCKUP.md)** - See how the board looks
 
 ### 11. Notes
+- **Image memory and speed:** JPEG decoding requests a screen-sized/thumbnail-sized draft before rotation. Other formats shrink before rotation but may still need an original-size decode. Large display/preview/full-image decodes share a single lock. The display retains only the current scaled photo; web thumbnails use an LRU cache limited to 4 MiB and 128 entries. File timestamps, sizes and rotations invalidate cached results. Full-resolution downloads remain full resolution.
+- **Uploads badge:** Uses `/api/uploaded-images?count_only=true`, which skips caption metadata; the full management listing still reads captions from the original files.
 - **Cross-platform:** Works on Windows, macOS, Linux, and Raspberry Pi
 - **Fullscreen display:** Script hides mouse cursor for clean presentation
 - **Weather & time:** Displays current conditions and clock on screen

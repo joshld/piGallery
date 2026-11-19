@@ -19,6 +19,7 @@ from PIL.ExifTags import TAGS
 from bin_calendar import BinCalendar, BinConfig, now_brisbane
 from bin_display import BinCalendarRenderer
 from image_rotation import get_rotation
+from image_work import DisplayImageCache
 
 try:
     import psutil
@@ -536,6 +537,15 @@ def get_cpu_usage():
 
 def get_disk_usage(path='/'):
     """Get disk usage - lightweight on Linux, psutil on Windows/Mac"""
+    if hasattr(os, 'statvfs'):
+        try:
+            stats = os.statvfs(path)
+            total = stats.f_blocks * stats.f_frsize
+            used = total - stats.f_bfree * stats.f_frsize
+            return {'total': total, 'used': used, 'available': stats.f_bavail * stats.f_frsize,
+                    'percent_used': used / total * 100 if total else 0}
+        except OSError:
+            pass
     # Try lightweight df command on Linux first
     try:
         result = subprocess.run(['df', '-B', '1', path], 
@@ -707,6 +717,7 @@ class Slideshow:
         self.config = config_dict
         self.bin_calendar = bin_calendar
         self.bin_renderer = BinCalendarRenderer()
+        self.display_image_cache = DisplayImageCache()
         self._bin_revision = None
         self._bin_day = None
         
@@ -877,11 +888,7 @@ class Slideshow:
                 img_path = os.path.join(self.folder, self.current_img)
 
             try:
-                img = pygame.image.load(img_path)
                 rotation = get_rotation(CONFIG_PATH, self.current_img)
-                if rotation:
-                    # pygame.transform.rotate turns counter-clockwise.
-                    img = pygame.transform.rotate(img, -rotation)
                 # Get display correction factors for displays with hardware stretching
                 # This compensates for displays where resolution doesn't match physical aspect ratio
                 try:
@@ -894,11 +901,14 @@ class Slideshow:
                 except (ValueError, TypeError):
                     correction_v = 1.0
 
-                img_scaled, x_off, y_off, new_w = scale_image(img, self.screen_w, self.screen_h, correction_h, correction_v)
+                if correction_h <= 0 or correction_v <= 0:
+                    correction_h, correction_v = 1.0, 1.0
+                img_scaled, x_off, y_off, new_w = self.display_image_cache.get(
+                    img_path, rotation, (self.screen_w, self.screen_h), correction_h, correction_v, scale_image)
                 
                 self.screen.blit(img_scaled, (x_off, y_off))
                 print(f"[Slideshow] Drawing {self.current_img} scaled to {new_w}x{img_scaled.get_height()}")
-            except pygame.error as e:
+            except (pygame.error, OSError, ValueError) as e:
                 error_msg = f"Failed to load image {self.current_img}: {e}"
                 print(f"[Error] {error_msg}")
                 if self.telegram:

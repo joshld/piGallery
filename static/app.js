@@ -300,7 +300,10 @@ function updateCountdown() {
     }
 }
 
+let statusUpdateInFlight = false;
 async function updateStatus() {
+    if (statusUpdateInFlight) return;
+    statusUpdateInFlight = true;
     try {
         const response = await fetch('/api/status');
         const data = await response.json();
@@ -376,6 +379,8 @@ async function updateStatus() {
         document.getElementById('pauseBtn').textContent = isPaused ? '▶️ Resume' : '⏸️ Pause';
     } catch (error) {
         console.error('Failed to update status:', error);
+    } finally {
+        statusUpdateInFlight = false;
     }
 }
 
@@ -559,7 +564,9 @@ async function rotateImage(direction) {
             previewImg.style.display = 'block';
         }
         const fullImg = document.getElementById('full-image');
-        if (fullImg && fullImg.src) fullImg.src = `/api/image/full?t=${stamp}`;
+        if (fullImg && document.getElementById('imageModal')?.style.display === 'block') {
+            fullImg.src = `/api/image/full?t=${stamp}`;
+        }
         showAlert(direction === 'cw' ? 'Rotated clockwise' : 'Rotated counter-clockwise', 'success');
     } catch (error) {
         showAlert('Error: ' + error.message, 'error');
@@ -1273,7 +1280,7 @@ async function loadUploadedImages() {
 
 async function fetchUploadedCount() {
     try {
-        const response = await fetch('/api/uploaded-images');
+        const response = await fetch('/api/uploaded-images?count_only=true');
         if (response.ok) {
             const data = await response.json();
             updateUploadedCount(data.total || 0);

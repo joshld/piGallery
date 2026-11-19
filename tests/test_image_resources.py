@@ -42,6 +42,18 @@ def make_image(path, mode='RGB', caption=None):
         img.save(path, **kwargs)
 
 
+def test_uploaded_badge_count_skips_metadata(client, tmp_path, monkeypatch):
+    connection, _ = client
+    directory = tmp_path / 'uploaded'
+    directory.mkdir()
+    make_image(directory / 'one.jpg')
+    make_image(directory / '.hidden.jpg')
+    (directory / 'folder.png').mkdir()
+    monkeypatch.setattr(web, 'get_image_caption', Mock(side_effect=AssertionError('count must not read metadata')))
+    response = connection.get('/api/uploaded-images?count_only=true')
+    assert response.json == {'total': 1}
+
+
 @pytest.fixture
 def opened_images(monkeypatch):
     """Keep readers alive so garbage collection cannot hide missing closes."""
