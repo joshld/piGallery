@@ -472,21 +472,17 @@ def get_cpu_temperature():
 
 
 def get_memory_info():
-    """Get memory info - lightweight on Linux, psutil on Windows/Mac"""
+    """Return available memory in MiB, including reclaimable Linux caches."""
     # Try lightweight /proc/meminfo on Linux first
     try:
         with open('/proc/meminfo', 'r') as f:
-            meminfo = f.read()
-            # Parse MemAvailable (preferred) or MemFree
-            for line in meminfo.split('\n'):
-                if line.startswith('MemAvailable:'):
-                    # Format: "MemAvailable:    123456 kB"
-                    kb = int(line.split()[1])
-                    return kb / 1024  # Convert to MB
-                elif line.startswith('MemFree:'):
-                    kb = int(line.split()[1])
-                    return kb / 1024
-    except (FileNotFoundError, ValueError, IndexError):
+            meminfo = dict(line.split(':', 1) for line in f if ':' in line)
+        # MemFree normally appears first in /proc/meminfo. Read all fields
+        # before selecting the preferred metric, including a valid zero.
+        for field in ('MemAvailable', 'MemFree'):
+            if field in meminfo:
+                return int(meminfo[field].split()[0]) / 1024
+    except (OSError, ValueError, IndexError):
         pass
     
     # Fallback to psutil (works on Windows, Mac, and Linux)
@@ -580,7 +576,7 @@ def get_disk_usage(path='/'):
 def monitor_system_resources(telegram_notifier, check_interval=120):
     """Monitor system resources using lightweight native OS commands"""
     # Alert thresholds
-    MEMORY_THRESHOLD_MB = 100  # Alert if less than 100 MB free
+    MEMORY_THRESHOLD_MB = 100  # Alert if less than 100 MiB available
     CPU_THRESHOLD_PERCENT = 80  # Alert if CPU > 80% for sustained period
     TEMP_THRESHOLD_C = 80  # Alert if temperature > 80°C
     
@@ -601,13 +597,13 @@ def monitor_system_resources(telegram_notifier, check_interval=120):
             now = time.time()
             
             # Check memory (lightweight /proc/meminfo)
-            free_mb = get_memory_info()
-            if free_mb is not None and free_mb < MEMORY_THRESHOLD_MB:
+            available_mb = get_memory_info()
+            if available_mb is not None and available_mb < MEMORY_THRESHOLD_MB:
                 if now - last_alert_time['memory'] > alert_cooldown:
                     telegram_notifier.notify_system_alert(
                         'memory',
-                        f"Low memory: {free_mb:.1f} MB free (threshold: {MEMORY_THRESHOLD_MB} MB)",
-                        f"{free_mb:.1f} MB free"
+                        f"Low available memory: {available_mb:.1f} MB available (threshold: {MEMORY_THRESHOLD_MB} MB)",
+                        f"{available_mb:.1f} MB available"
                     )
                     last_alert_time['memory'] = now
             
@@ -1110,8 +1106,8 @@ class Slideshow:
         try:
             if date_type == 'date_taken':
                 # Try EXIF DateTimeOriginal first
-                img = Image.open(full_path)
-                exif_data = img._getexif()
+                with Image.open(full_path) as img:
+                    exif_data = img._getexif()
                 date_obj = None
                 if exif_data:
                     for tag, value in exif_data.items():
@@ -1122,7 +1118,6 @@ class Slideshow:
                                 break
                             except (ValueError, TypeError):
                                 pass
-                img.close()
                 if date_obj is None:
                     date_obj = datetime.datetime.fromtimestamp(os.path.getctime(full_path))
             elif date_type == 'date_created':

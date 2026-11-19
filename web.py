@@ -13,6 +13,7 @@ import time
 import io
 import datetime
 import json
+from contextlib import ExitStack, closing
 import pygame
 from PIL import Image
 from PIL.ExifTags import TAGS
@@ -53,6 +54,7 @@ def get_image_caption(img_path):
         # Remove null characters and other non-printable characters
         return ''.join(c for c in text if c != '\0' and ord(c) >= 32)
 
+    img = None
     try:
         from PIL import Image
         from PIL.ExifTags import TAGS
@@ -92,8 +94,7 @@ def get_image_caption(img_path):
         # Use piexif for better UserComment reading support
         try:
             import piexif
-            with open(img_path, 'rb') as f:
-                exif_dict = piexif.load(f.read())
+            exif_dict = piexif.load(img_path)
             if 'Exif' in exif_dict and piexif.ExifIFD.UserComment in exif_dict['Exif']:
                 comment_data = exif_dict['Exif'][piexif.ExifIFD.UserComment]
                 if comment_data:
@@ -196,6 +197,32 @@ def get_image_caption(img_path):
     except Exception as e:
         print(f"[Caption] Error reading caption from {img_path}: {e}")
         return None
+    finally:
+        if img is not None:
+            img.close()
+
+
+def create_image_preview(img_path):
+    """Return a JPEG buffer, releasing all decoded images before returning."""
+    img_bytes = io.BytesIO()
+    try:
+        with ExitStack() as images:
+            img = images.enter_context(closing(Image.open(img_path)))
+            img.thumbnail((320, 180), Image.Resampling.LANCZOS)
+            if img.mode in ('RGBA', 'LA', 'P'):
+                if img.mode == 'P':
+                    img = images.enter_context(closing(img.convert('RGBA')))
+                rgb_img = images.enter_context(closing(Image.new('RGB', img.size, (255, 255, 255))))
+                alpha = images.enter_context(closing(img.getchannel('A')))
+                rgb_img.paste(img, mask=alpha)
+                rgb_img.save(img_bytes, format='JPEG', quality=85)
+            else:
+                img.save(img_bytes, format='JPEG', quality=85)
+        img_bytes.seek(0)
+        return img_bytes
+    except Exception:
+        img_bytes.close()
+        raise
 
 
 def get_logs(lines=200):
@@ -267,6 +294,8 @@ def register_routes():
             from gallery import get_memory_info, get_cpu_usage, get_cpu_temperature, get_disk_usage
             memory = get_memory_info()
             if memory is not None:
+                system_stats['memory_available_mb'] = round(memory, 1)
+                # Keep the original field for existing web/API clients.
                 system_stats['memory_free_mb'] = round(memory, 1)
             
             cpu = get_cpu_usage()
@@ -401,6 +430,7 @@ def register_routes():
         JPEG files: Uses piexif library for EXIF UserComment
         PNG files: Uses PIL's text chunk support (tEXt)
         Other formats: Attempts PIL's info dict"""
+        images = ExitStack()
         try:
             from PIL import Image
             from PIL.ExifTags import TAGS
@@ -411,8 +441,11 @@ def register_routes():
                 return False
             
             # Open image to determine format
-            img = Image.open(img_path)
+            img = images.enter_context(closing(Image.open(img_path)))
             img_format = img.format or 'JPEG'
+            if img_format in ('JPEG', 'JPG'):
+                # Metadata insertion replaces the file; release the reader first.
+                img.close()
             
             # Handle PNG files using text chunks
             if img_format == 'PNG':
@@ -448,11 +481,11 @@ def register_routes():
                     
                     # Convert palette images to RGB for better compatibility
                     if img.mode == 'P':
-                        img = img.convert('RGBA')
+                        img = images.enter_context(closing(img.convert('RGBA')))
                     elif img.mode not in ('RGB', 'RGBA', 'L', 'LA'):
                         # Convert unsupported modes to RGB
                         if img.mode in ('1', 'I', 'F'):
-                            img = img.convert('RGB')
+                            img = images.enter_context(closing(img.convert('RGB')))
                     
                     # Save with PngInfo (this properly writes text chunks)
                     # Note: We need to preserve other PNG settings like compression
@@ -473,7 +506,7 @@ def register_routes():
                         shutil.move(temp_path, img_path)
                         
                         # Verify the caption was written
-                        verify_img = Image.open(img_path)
+                        verify_img = images.enter_context(closing(Image.open(img_path)))
                         written_caption = verify_img.info.get('Comment', '')
                         written_description = verify_img.info.get('Description', '')
                         has_comment = 'Comment' in verify_img.info
@@ -528,8 +561,7 @@ def register_routes():
                     
                     # Read current EXIF data (or create new if none exists)
                     try:
-                        with open(img_path, 'rb') as f:
-                            exif_dict = piexif.load(f.read())
+                        exif_dict = piexif.load(img_path)
                     except Exception:
                         # No existing EXIF, create new dict
                         exif_dict = {'0th': {}, 'Exif': {}, 'GPS': {}, '1st': {}, 'thumbnail': None}
@@ -603,6 +635,8 @@ def register_routes():
         except Exception as e:
             print(f"[Caption] Error setting caption for {img_path}: {e}")
             return False
+        finally:
+            images.close()
     
     @app.route('/api/image/preview')
     def api_image_preview():
@@ -716,30 +750,14 @@ def register_routes():
             if pil_available:
                 try:
                     print("[Web] Attempting to create thumbnail with PIL")
-                    img = Image.open(img_path)
-                    print(f"[Web] Opened image: {img.format} {img.size} {img.mode}")
-                    
-                    # Create thumbnail (max 320x180 for better quality in preview)
-                    img.thumbnail((320, 180), Image.Resampling.LANCZOS)
-                    print(f"[Web] Created thumbnail: {img.size}")
-
-                    # Convert to bytes
-                    img_bytes = io.BytesIO()
-                    
-                    # Save as JPEG if RGB, otherwise convert first
-                    if img.mode in ('RGBA', 'LA', 'P'):
-                        # Convert to RGB for JPEG
-                        rgb_img = Image.new('RGB', img.size, (255, 255, 255))
-                        if img.mode == 'P':
-                            img = img.convert('RGBA')
-                        rgb_img.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
-                        rgb_img.save(img_bytes, format='JPEG', quality=85)
-                    else:
-                        img.save(img_bytes, format='JPEG', quality=85)
-                    
-                    img_bytes.seek(0)
+                    img_bytes = create_image_preview(img_path)
                     print("[Web] Thumbnail generated successfully, sending response")
-                    return send_file(img_bytes, mimetype='image/jpeg')
+                    try:
+                        # The response owns this buffer and closes it after use.
+                        return send_file(img_bytes, mimetype='image/jpeg')
+                    except Exception:
+                        img_bytes.close()
+                        raise
                     
                 except Exception as pil_error:
                     print(f"[Web] PIL error, falling back to original image: {pil_error}")

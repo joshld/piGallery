@@ -339,8 +339,10 @@ async function updateStatus() {
             const diskFreeEl = document.getElementById('status-disk-free');
             const diskUsedEl = document.getElementById('status-disk-used');
             
-            if (memoryEl && sys.memory_free_mb !== undefined) {
-                memoryEl.textContent = `${sys.memory_free_mb} MB`;
+            const availableMemory = sys.memory_available_mb !== undefined
+                ? sys.memory_available_mb : sys.memory_free_mb;
+            if (memoryEl && availableMemory !== undefined) {
+                memoryEl.textContent = `${availableMemory} MB`;
             }
             if (cpuEl && sys.cpu_percent !== undefined) {
                 cpuEl.textContent = `${sys.cpu_percent}%`;
