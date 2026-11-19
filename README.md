@@ -344,7 +344,46 @@ If you need remote access during off-hours but still want some power savings:
 - **Savings:** ~$10-15/year (less but still worthwhile)
 - **Benefit:** Full remote access 24/7 for uploads, settings, monitoring
 
-### 10. Notes
+### 10. Feature Tracking & Contributing
+
+piGallery uses **GitHub Issues** for tracking features, bugs, and improvements. All TODO items have been converted to interactive GitHub Issues with checklists that you can check off as you complete tasks.
+
+#### View Planned Features
+- **Browse all issues:** https://github.com/joshld/piGallery/issues
+- **Visual project board:** https://github.com/joshld/piGallery/projects (Kanban-style tracking)
+- **View by priority:** Look for ⭐ emoji in issue titles
+- **Track progress:** Each issue shows completion percentage
+
+#### Key Feature Issues
+- **#14** - ⭐ Telegram Integration (commands, remote control)
+- **#7** - Image Captions from Metadata
+- **#8** - Shutdown Button in Web UI
+- **#15** - Color Schemes (Dark Mode)
+- **#9** - Image Transitions
+- **#10** - Video Support
+- **#11** - Error Detection & Reporting
+- **#12** - Delete Uploaded Images
+- **#16** - Performance Monitoring
+
+#### Using GitHub Issues
+```bash
+# List all features/issues
+gh issue list
+
+# View specific feature details
+gh issue view 14
+
+# Check off tasks as you complete them (on GitHub web UI)
+# Reference issues in commits
+git commit -m "Add Telegram status updates for #14"
+```
+
+#### Documentation
+- **[GITHUB_TODO_GUIDE.md](GITHUB_TODO_GUIDE.md)** - Complete guide on using GitHub Issues
+- **[GITHUB_PROJECT_BOARD_GUIDE.md](GITHUB_PROJECT_BOARD_GUIDE.md)** - Visual Kanban board setup
+- **[PROJECT_BOARD_MOCKUP.md](PROJECT_BOARD_MOCKUP.md)** - See how the board looks
+
+### 11. Notes
 - **Cross-platform:** Works on Windows, macOS, Linux, and Raspberry Pi
 - **Fullscreen display:** Script hides mouse cursor for clean presentation
 - **Weather & time:** Displays current conditions and clock on screen

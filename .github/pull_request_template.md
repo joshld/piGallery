@@ -33,7 +33,25 @@ Please describe the tests that you ran to verify your changes. Provide instructi
 Add screenshots to help explain your changes.
 
 ## Related Issues
+<!-- Link to related GitHub Issues. Examples:
+- Closes #14
+- Fixes #7
+- Part of #14 (for partial implementation)
+- Related to #15
+-->
+
 Closes #(issue)
+
+## Task Progress (if applicable)
+<!-- If this PR implements part of a larger feature issue, 
+     list which tasks from the issue are completed:
+
+From Issue #14 - Telegram Integration:
+- [x] Setup Telegram bot via BotFather
+- [x] Send status updates to group/channel
+- [ ] Startup/shutdown notifications (in progress)
+- [ ] Error notifications
+-->
 
 ## Additional Notes
 Add any other context about the pull request here.

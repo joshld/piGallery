@@ -13,6 +13,7 @@ import time
 import io
 import datetime
 import json
+from contextlib import ExitStack, closing
 import pygame
 from PIL import Image
 from PIL.ExifTags import TAGS
@@ -53,6 +54,7 @@ def get_image_caption(img_path):
         # Remove null characters and other non-printable characters
         return ''.join(c for c in text if c != '\0' and ord(c) >= 32)
 
+    img = None
     try:
         from PIL import Image
         from PIL.ExifTags import TAGS
@@ -92,8 +94,7 @@ def get_image_caption(img_path):
         # Use piexif for better UserComment reading support
         try:
             import piexif
-            with open(img_path, 'rb') as f:
-                exif_dict = piexif.load(f.read())
+            exif_dict = piexif.load(img_path)
             if 'Exif' in exif_dict and piexif.ExifIFD.UserComment in exif_dict['Exif']:
                 comment_data = exif_dict['Exif'][piexif.ExifIFD.UserComment]
                 if comment_data:
@@ -196,6 +197,32 @@ def get_image_caption(img_path):
     except Exception as e:
         print(f"[Caption] Error reading caption from {img_path}: {e}")
         return None
+    finally:
+        if img is not None:
+            img.close()
+
+
+def create_image_preview(img_path):
+    """Return a JPEG buffer, releasing all decoded images before returning."""
+    img_bytes = io.BytesIO()
+    try:
+        with ExitStack() as images:
+            img = images.enter_context(closing(Image.open(img_path)))
+            img.thumbnail((320, 180), Image.Resampling.LANCZOS)
+            if img.mode in ('RGBA', 'LA', 'P'):
+                if img.mode == 'P':
+                    img = images.enter_context(closing(img.convert('RGBA')))
+                rgb_img = images.enter_context(closing(Image.new('RGB', img.size, (255, 255, 255))))
+                alpha = images.enter_context(closing(img.getchannel('A')))
+                rgb_img.paste(img, mask=alpha)
+                rgb_img.save(img_bytes, format='JPEG', quality=85)
+            else:
+                img.save(img_bytes, format='JPEG', quality=85)
+        img_bytes.seek(0)
+        return img_bytes
+    except Exception:
+        img_bytes.close()
+        raise
 
 
 def get_logs(lines=200):
@@ -267,6 +294,8 @@ def register_routes():
             from gallery import get_memory_info, get_cpu_usage, get_cpu_temperature, get_disk_usage
             memory = get_memory_info()
             if memory is not None:
+                system_stats['memory_available_mb'] = round(memory, 1)
+                # Keep the original field for existing web/API clients.
                 system_stats['memory_free_mb'] = round(memory, 1)
             
             cpu = get_cpu_usage()
@@ -401,6 +430,7 @@ def register_routes():
         JPEG files: Uses piexif library for EXIF UserComment
         PNG files: Uses PIL's text chunk support (tEXt)
         Other formats: Attempts PIL's info dict"""
+        images = ExitStack()
         try:
             from PIL import Image
             from PIL.ExifTags import TAGS
@@ -411,8 +441,11 @@ def register_routes():
                 return False
             
             # Open image to determine format
-            img = Image.open(img_path)
+            img = images.enter_context(closing(Image.open(img_path)))
             img_format = img.format or 'JPEG'
+            if img_format in ('JPEG', 'JPG'):
+                # Metadata insertion replaces the file; release the reader first.
+                img.close()
             
             # Handle PNG files using text chunks
             if img_format == 'PNG':
@@ -448,11 +481,11 @@ def register_routes():
                     
                     # Convert palette images to RGB for better compatibility
                     if img.mode == 'P':
-                        img = img.convert('RGBA')
+                        img = images.enter_context(closing(img.convert('RGBA')))
                     elif img.mode not in ('RGB', 'RGBA', 'L', 'LA'):
                         # Convert unsupported modes to RGB
                         if img.mode in ('1', 'I', 'F'):
-                            img = img.convert('RGB')
+                            img = images.enter_context(closing(img.convert('RGB')))
                     
                     # Save with PngInfo (this properly writes text chunks)
                     # Note: We need to preserve other PNG settings like compression
@@ -473,7 +506,7 @@ def register_routes():
                         shutil.move(temp_path, img_path)
                         
                         # Verify the caption was written
-                        verify_img = Image.open(img_path)
+                        verify_img = images.enter_context(closing(Image.open(img_path)))
                         written_caption = verify_img.info.get('Comment', '')
                         written_description = verify_img.info.get('Description', '')
                         has_comment = 'Comment' in verify_img.info
@@ -528,8 +561,7 @@ def register_routes():
                     
                     # Read current EXIF data (or create new if none exists)
                     try:
-                        with open(img_path, 'rb') as f:
-                            exif_dict = piexif.load(f.read())
+                        exif_dict = piexif.load(img_path)
                     except Exception:
                         # No existing EXIF, create new dict
                         exif_dict = {'0th': {}, 'Exif': {}, 'GPS': {}, '1st': {}, 'thumbnail': None}
@@ -603,93 +635,152 @@ def register_routes():
         except Exception as e:
             print(f"[Caption] Error setting caption for {img_path}: {e}")
             return False
+        finally:
+            images.close()
     
     @app.route('/api/image/preview')
     def api_image_preview():
         """Get image as thumbnail preview (current image or specified path)"""
         if slideshow_instance is None:
+            print("[Web] Preview error: Slideshow not initialized")
             return jsonify({'error': 'Slideshow not initialized'}), 503
 
         # Check if a specific path was requested
         requested_path = request.args.get('path')
+        print(f"[Web] Preview requested for: {requested_path if requested_path else 'current image'}")
 
+        # PIL import flag
+        pil_available = False
         try:
             from PIL import Image
             from flask import send_file
             import io
+            pil_available = True
+            print("[Web] PIL is available for thumbnail generation")
+        except ImportError:
+            print("[Web] PIL not available, will serve original image")
+
+        try:
+            # Determine which image path to use
+            img_path = None
+            img_directory = None
+            img_filename = None
 
             if requested_path:
+                print(f"[Web] Handling specific path request: {requested_path}")
                 # Handle specific path request (for uploaded images modal)
                 if requested_path.startswith('uploaded/'):
                     # This is an uploaded image
                     upload_dir = get_upload_directory()
-                    if not upload_dir:
-                        return jsonify({'error': 'Upload directory not configured'}), 500
-
                     filename = os.path.basename(requested_path)  # Security: prevent directory traversal
+                    
+                    if not upload_dir:
+                        # Fallback: try default uploaded subdirectory in images folder
+                        upload_dir = os.path.join(slideshow_instance.folder, 'uploaded')
+                    
                     img_path = os.path.join(upload_dir, filename)
+                    img_directory = upload_dir
+                    img_filename = filename
+                    print(f"[Web] Uploaded image path: {img_path}")
 
                     if not os.path.exists(img_path):
+                        print(f"[Web] Error: Uploaded image not found at {img_path}")
                         return jsonify({'error': 'Image not found'}), 404
 
                     # Verify it's within upload directory
-                    if not os.path.commonpath([upload_dir, os.path.abspath(img_path)]).startswith(upload_dir):
+                    try:
+                        common_path = os.path.commonpath([upload_dir, os.path.abspath(img_path)])
+                        if not common_path.startswith(upload_dir):
+                            print(f"[Web] Error: Path traversal attempt detected")
+                            return jsonify({'error': 'Invalid path'}), 403
+                    except ValueError:
+                        print(f"[Web] Error: Invalid path - no common path")
                         return jsonify({'error': 'Invalid path'}), 403
                 else:
                     # This might be a regular gallery image
                     img_path = os.path.join(slideshow_instance.folder, requested_path)
+                    img_directory = slideshow_instance.folder
+                    img_filename = requested_path
+                    print(f"[Web] Gallery image path: {img_path}")
+                    
                     if not os.path.exists(img_path):
+                        print(f"[Web] Error: Gallery image not found at {img_path}")
                         return jsonify({'error': 'Image not found'}), 404
             else:
                 # Default: current slideshow image
+                print(f"[Web] Current slideshow image: {slideshow_instance.current_img}")
+                
                 if not slideshow_instance.current_img:
+                    print("[Web] Error: No image currently loaded in slideshow")
                     return jsonify({'error': 'No image loaded'}), 404
 
                 img_path = get_image_path()
+                print(f"[Web] Resolved image path: {img_path}")
+                
                 if not img_path:
+                    print("[Web] Error: Could not resolve image path")
                     return jsonify({'error': 'Image file not found'}), 404
-
-            # Create thumbnail (max 200x200 for modal, maintains aspect ratio)
-            img = Image.open(img_path)
-            img.thumbnail((200, 200), Image.Resampling.LANCZOS)
-
-            # Convert to bytes
-            img_bytes = io.BytesIO()
-            img.save(img_bytes, format='JPEG', quality=85)
-            img_bytes.seek(0)
-
-            return send_file(img_bytes, mimetype='image/jpeg')
-
-        except ImportError:
-            # Fallback: serve original image if PIL not available
-            if requested_path:
-                if requested_path.startswith('uploaded/'):
-                    upload_dir = get_upload_directory()
+                
+                if not os.path.exists(img_path):
+                    print(f"[Web] Error: Image file does not exist at {img_path}")
+                    return jsonify({'error': 'Image file not found on disk'}), 404
+                
+                # Determine directory and filename for fallback
+                if slideshow_instance.current_img.startswith("uploaded/"):
+                    upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
                     if upload_dir:
-                        filename = os.path.basename(requested_path)
-                        img_path = os.path.join(upload_dir, filename)
-                        if os.path.exists(img_path):
-                            return send_from_directory(upload_dir, filename)
-
-                # For gallery images, we can't serve without PIL
-                return jsonify({'error': 'PIL required for image processing'}), 500
-            else:
-                # Original fallback logic
-                img_path = get_image_path()
-                if img_path:
-                    if slideshow_instance.current_img.startswith("uploaded/"):
-                        upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
-                        if upload_dir:
-                            upload_dir = os.path.expanduser(upload_dir)
-                            actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
-                            return send_from_directory(upload_dir, actual_path)
+                        upload_dir = os.path.expanduser(upload_dir)
+                        img_directory = upload_dir
                     else:
-                        return send_from_directory(slideshow_instance.folder, slideshow_instance.current_img)
-                return jsonify({'error': 'Image not found'}), 404
+                        img_directory = os.path.join(slideshow_instance.folder, 'uploaded')
+                    img_filename = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
+                else:
+                    img_directory = slideshow_instance.folder
+                    img_filename = slideshow_instance.current_img
+
+            # Verify we have a valid path
+            if not img_path or not os.path.exists(img_path):
+                print(f"[Web] Error: Final validation failed - path does not exist: {img_path}")
+                return jsonify({'error': 'Image file not accessible'}), 404
+
+            print(f"[Web] Serving image from: {img_path}")
+            print(f"[Web] File exists: {os.path.exists(img_path)}, File size: {os.path.getsize(img_path)} bytes")
+
+            # Try to generate thumbnail if PIL is available
+            if pil_available:
+                try:
+                    print("[Web] Attempting to create thumbnail with PIL")
+                    img_bytes = create_image_preview(img_path)
+                    print("[Web] Thumbnail generated successfully, sending response")
+                    try:
+                        # The response owns this buffer and closes it after use.
+                        return send_file(img_bytes, mimetype='image/jpeg')
+                    except Exception:
+                        img_bytes.close()
+                        raise
+                    
+                except Exception as pil_error:
+                    print(f"[Web] PIL error, falling back to original image: {pil_error}")
+                    # Fall through to serve original file
+
+            # Fallback: serve original image
+            print(f"[Web] Serving original image from directory: {img_directory}, filename: {img_filename}")
+            
+            if not img_directory or not img_filename:
+                print("[Web] Error: Cannot serve original - directory or filename not set")
+                return jsonify({'error': 'Cannot determine image location'}), 500
+            
+            if not os.path.exists(os.path.join(img_directory, img_filename)):
+                print(f"[Web] Error: Original image not found at {os.path.join(img_directory, img_filename)}")
+                return jsonify({'error': 'Image file not found'}), 404
+            
+            return send_from_directory(img_directory, img_filename)
 
         except Exception as e:
             print(f"[Web] Error generating preview: {e}")
-            return jsonify({'error': str(e)}), 500
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'Internal server error: {str(e)}'}), 500
     
     @app.route('/api/image/full')
     def api_image_full():
@@ -711,6 +802,10 @@ def register_routes():
                     upload_dir = os.path.expanduser(upload_dir)
                     actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
                     return send_from_directory(upload_dir, actual_path)
+                else:
+                    # Fallback: try default uploaded subdirectory in images folder
+                    actual_path = slideshow_instance.current_img.replace("uploaded/", "", 1).replace("uploaded\\", "", 1)
+                    return send_from_directory(os.path.join(slideshow_instance.folder, 'uploaded'), actual_path)
             else:
                 return send_from_directory(slideshow_instance.folder, slideshow_instance.current_img)
         except Exception as e:
