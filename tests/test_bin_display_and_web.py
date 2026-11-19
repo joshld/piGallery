@@ -63,6 +63,25 @@ def test_overlay_stays_off_until_the_lead_up():
     assert screen.get_at((640, 40))[:3] == (10, 20, 30)
 
 
+def test_overlay_uses_photo_display_correction_and_stays_transparent():
+    pygame.font.init()
+    now = dt.datetime(2026, 11, 19, 18, tzinfo=BRISBANE)
+    view = calendar_view(sample(), now, config(show_days_before=14, show_yellow=False, show_green=False), now)
+    renderer = BinCalendarRenderer()
+    plain = pygame.Surface((1280, 720))
+    plain.fill((10, 20, 30))
+    stretched = pygame.Surface((1280, 720))
+    stretched.fill((10, 20, 30))
+    plain_rects = renderer.draw(plain, view)
+    wide_rects = renderer.draw(stretched, view, 1.2, 1)
+    assert plain_rects and wide_rects
+    assert abs(wide_rects[0].width / plain_rects[0].width - 1.2) < 0.05
+    assert stretched.get_at(wide_rects[0].topleft)[:3] == (10, 20, 30)
+    assert any(stretched.get_at((x, y))[:3] != (10, 20, 30)
+               for x in range(wide_rects[0].left, wide_rects[0].right, 3)
+               for y in range(wide_rects[0].top, wide_rects[0].bottom, 3))
+
+
 def test_missing_dates_draw_nothing():
     pygame.font.init()
     screen = pygame.Surface((800, 480))

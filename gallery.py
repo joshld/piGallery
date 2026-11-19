@@ -795,7 +795,15 @@ class Slideshow:
             return
         revision = calendar.revision
         day = now_brisbane().date()
-        self.bin_renderer.draw(self.screen, calendar.snapshot())
+        try:
+            correction_h = float(self.config.get('display_correction_horizontal', 1.0))
+        except (TypeError, ValueError):
+            correction_h = 1.0
+        try:
+            correction_v = float(self.config.get('display_correction_vertical', 1.0))
+        except (TypeError, ValueError):
+            correction_v = 1.0
+        self.bin_renderer.draw(self.screen, calendar.snapshot(), correction_h, correction_v)
         self._bin_revision = revision
         self._bin_day = day
 

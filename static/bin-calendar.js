@@ -81,7 +81,6 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const [position, chosen] of groups) {
             const group = node('div', undefined, 'bin-group');
             group.dataset.pos = position;
-            group.append(node('div', 'BIN COLLECTION', 'bin-heading'));
             const tiles = node('div', undefined, 'bin-tiles');
             for (const bin of chosen) {
                 const tile = node('div', undefined, 'bin-tile' + (showing[bin.colour] === false ? ' waiting' : ''));
