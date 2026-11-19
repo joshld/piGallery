@@ -471,6 +471,32 @@
         </div>
     </div>
 
+    <section class="bin-calendar-panel" id="bin-calendar-panel" aria-labelledby="bin-calendar-heading">
+        <div class="bin-panel-heading">
+            <div><h2 id="bin-calendar-heading">Bin Calendar</h2><p>Brisbane City Council · Australia/Brisbane</p></div>
+            <div class="bin-actions">
+                <button type="button" id="bin-show-page" class="btn-primary">Show on Pi</button>
+                <button type="button" id="bin-hide-page" class="btn-secondary">Return to photos</button>
+                <button type="button" id="bin-refresh-data" class="btn-secondary">Refresh data</button>
+            </div>
+        </div>
+        <div id="bin-calendar-message" role="status" aria-live="polite"></div>
+        <div id="bin-calendar-summary" class="bin-calendar-summary">Loading bin calendar...</div>
+        <details class="bin-config-details">
+            <summary>Calendar settings and address</summary>
+            <p>Settings are saved on this Pi and applied live. They also survive a service restart. The address is kept out of the public source repository.</p>
+            <form id="bin-calendar-config-form">
+                <div id="bin-calendar-settings"></div>
+                <div class="bin-actions">
+                    <button type="button" id="bin-lookup-address" class="btn-secondary">Look up address</button>
+                    <button type="submit" class="btn-primary">Save calendar settings</button>
+                </div>
+                <div id="bin-address-results" aria-live="polite"></div>
+            </form>
+        </details>
+        <p class="bin-data-note">Council publishes the next date for each bin. Later dates marked “expected” follow the configured regular pattern; new Council dates take priority. Green waste is optional. Reminders use the existing Telegram bot only when explicitly enabled.</p>
+    </section>
+
     <!-- Shutdown Confirmation Modal -->
     <div id="shutdownModal" class="modal">
         <div class="modal-content">
@@ -583,6 +609,7 @@
     </button>
 
     <script src="/static/app.js"></script>
+    <script src="/static/bin-calendar.js"></script>
 </body>
 </html>
 
