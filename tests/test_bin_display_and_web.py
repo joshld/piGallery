@@ -95,7 +95,8 @@ def test_icon_scale_changes_the_drawn_size():
     normal_rects = renderer.draw(normal, normal_view)
     large_rects = renderer.draw(large, large_view)
     assert normal_view['icon_scale'] == 100 and large_view['icon_scale'] == 200
-    assert abs(large_rects[0].width / normal_rects[0].width - 2) < 0.08
+    assert abs(large_rects[0].height / normal_rects[0].height - 2) < 0.08
+    assert large_rects[0].width > normal_rects[0].width * 1.5
 
 
 def test_missing_dates_draw_nothing():

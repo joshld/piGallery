@@ -87,15 +87,19 @@ class BinCalendarRenderer:
         slot = min(int(150 * scale), max(int(36 * scale), base))
         avail = max(80, screen_w - margin * 2)
         floor = max(28, int(36 * scale))
+        # Just enough space for the labels to stay separate. The column used to
+        # be much wider than the icon, which left a large empty gap.
+        gap = max(8, int(round(10 * scale)))
         while count and slot > floor:
-            gap = max(4, int(slot / 8))
             tile_h = int(slot * 1.15)
-            outer_w = slot * count + gap * (count - 1)
+            icon_w = int(tile_h * 0.52 * 0.72)
+            col_w = max(icon_w, int(icon_w * 1.15) + 8)
+            outer_w = col_w * count + gap * (count - 1)
             if outer_w <= avail:
                 return margin, slot, gap, tile_h
             slot -= 4
-        gap = max(4, floor // 8)
-        return margin, floor, gap, int(floor * 1.15)
+        tile_h = int(floor * 1.15)
+        return margin, floor, gap, tile_h
 
     def place(self, screen_w, screen_h, card, position, margin):
         if position == 'center':
@@ -120,20 +124,36 @@ class BinCalendarRenderer:
             card.clamp_ip(screen_rect)
         return card
 
+    def tracked_width(self, text, size):
+        size = max(12, int(size))
+        gap = max(1, size // 9)
+        font = self.font(size, False)
+        return sum(font.size(char)[0] for char in text) + gap * max(0, len(text) - 1)
+
     def group_surface(self, bins, slot, gap, tile_h):
-        width = slot * len(bins) + gap * (len(bins) - 1)
-        surface = pygame.Surface((width, tile_h), pygame.SRCALPHA)
-        for index, item in enumerate(bins):
-            tile = pygame.Rect(index * (slot + gap), 0, slot, tile_h)
-            icon_h = int(tile.height * 0.52)
-            icon_w = int(icon_h * 0.72)
+        icon_h = int(tile_h * 0.52)
+        icon_w = max(16, int(icon_h * 0.72))
+        label_size = max(12, min(16, int(slot * 0.12)))
+        date_size = max(18, min(24, int(slot * 0.18)))
+        columns = []
+        for item in bins:
+            label = item.get('label') or item['colour'].upper()
+            when = str(item.get('when') or '')
+            col_w = max(icon_w, self.tracked_width(label, label_size), self.font(date_size, True).size(when)[0]) + 4
+            columns.append((item, label, when, col_w))
+        width = sum(col_w for _, _, _, col_w in columns) + gap * (len(columns) - 1)
+        surface = pygame.Surface((max(1, width), tile_h), pygame.SRCALPHA)
+        x = 0
+        for item, label, when, col_w in columns:
+            tile = pygame.Rect(x, 0, col_w, tile_h)
             self.icon(surface, (tile.centerx - icon_w // 2, tile.y + tile.height * 0.02, icon_w, icon_h), COLOURS[item['colour']])
-            self.tracked(surface, item.get('label') or item['colour'].upper(),
+            self.tracked(surface, label,
                          (tile.x + 2, tile.y + tile.height * 0.58, tile.width - 4, tile.height * 0.16),
-                         max(12, slot * 0.14), MUTED)
-            self.text(surface, item.get('when') or '',
-                      (tile.x + 2, tile.y + tile.height * 0.74, tile.width - 4, tile.height * 0.22),
-                      max(16, slot * 0.24), INK, True)
+                         label_size, MUTED)
+            self.text(surface, when,
+                      (tile.x, tile.y + tile.height * 0.74, tile.width, tile.height * 0.22),
+                      date_size, INK, True)
+            x += col_w + gap
         return surface
 
     def draw(self, screen, view, correction_h=1.0, correction_v=1.0):
@@ -174,10 +194,9 @@ class BinCalendarRenderer:
         for position in order:
             bins = grouped[position]
             margin, slot, gap, tile_h = self.metrics(logical_w, logical_h, len(bins), view.get('icon_scale', 100))
-            content_w = slot * len(bins) + gap * (len(bins) - 1)
-            outer = pygame.Rect(0, 0, content_w + pad * 2, tile_h + pad * 2)
-            outer = self.place(logical_w, logical_h, outer, position, margin)
             layer = self.group_surface(bins, slot, gap, tile_h)
+            outer = pygame.Rect(0, 0, layer.get_width() + pad * 2, layer.get_height() + pad * 2)
+            outer = self.place(logical_w, logical_h, outer, position, margin)
             content_scaled = (max(1, int(round(layer.get_width() * correction_h))),
                               max(1, int(round(layer.get_height() * correction_v))))
             if content_scaled != layer.get_size():
