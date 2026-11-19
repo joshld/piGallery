@@ -90,15 +90,14 @@ class BinCalendarRenderer:
         # be much wider than the icon, which left a large empty gap.
         gap = max(8, int(round(10 * scale)))
         while count and slot > floor:
-            tile_h = int(slot * 1.15)
-            icon_w = int(tile_h * 0.52 * 0.72)
-            col_w = max(icon_w, int(icon_w * 1.15) + 8)
+            icon_h = int(slot * 0.60)
+            date_size = max(20, int(icon_h * 0.48))
+            col_w = max(int(icon_h * 0.72), int(date_size * 3.4))
             outer_w = col_w * count + gap * (count - 1)
             if outer_w <= avail:
-                return margin, slot, gap, tile_h
+                return margin, slot, gap, icon_h
             slot -= 4
-        tile_h = int(floor * 1.15)
-        return margin, floor, gap, tile_h
+        return margin, floor, gap, int(floor * 0.60)
 
     def place(self, screen_w, screen_h, card, position, margin):
         if position == 'center':
@@ -130,10 +129,18 @@ class BinCalendarRenderer:
         return sum(font.size(char)[0] for char in text) + gap * max(0, len(text) - 1)
 
     def group_surface(self, bins, slot, gap, tile_h):
-        icon_h = int(tile_h * 0.52)
+        icon_h = max(28, int(slot * 0.60))
         icon_w = max(16, int(icon_h * 0.72))
-        label_size = max(12, min(16, int(slot * 0.12)))
-        date_size = max(18, min(24, int(slot * 0.18)))
+        label_size = max(14, int(icon_h * 0.32))
+        date_size = max(20, int(icon_h * 0.48))
+        label_h = self.font(label_size).get_height()
+        date_h = self.font(date_size).get_height()
+        stack_gap = max(1, int(icon_h * 0.04))
+        # The wheel sits near the bottom of the icon box, so the next line
+        # starts just under that instead of in a tall empty band.
+        label_y = int(icon_h * 0.92) + stack_gap
+        date_y = label_y + label_h + stack_gap
+        content_h = date_y + date_h
         columns = []
         for item in bins:
             label = item.get('label') or item['colour'].upper()
@@ -141,17 +148,12 @@ class BinCalendarRenderer:
             col_w = max(icon_w, self.tracked_width(label, label_size), self.font(date_size).size(when)[0]) + 4
             columns.append((item, label, when, col_w))
         width = sum(col_w for _, _, _, col_w in columns) + gap * (len(columns) - 1)
-        surface = pygame.Surface((max(1, width), tile_h), pygame.SRCALPHA)
+        surface = pygame.Surface((max(1, width), content_h), pygame.SRCALPHA)
         x = 0
         for item, label, when, col_w in columns:
-            tile = pygame.Rect(x, 0, col_w, tile_h)
-            self.icon(surface, (tile.centerx - icon_w // 2, tile.y + tile.height * 0.02, icon_w, icon_h), COLOURS[item['colour']])
-            self.tracked(surface, label,
-                         (tile.x + 2, tile.y + tile.height * 0.58, tile.width - 4, tile.height * 0.16),
-                         label_size, MUTED)
-            self.text(surface, when,
-                      (tile.x, tile.y + tile.height * 0.74, tile.width, tile.height * 0.22),
-                      date_size, INK, False)
+            self.icon(surface, (x + (col_w - icon_w) // 2, 0, icon_w, icon_h), COLOURS[item['colour']])
+            self.tracked(surface, label, (x, label_y, col_w, label_h), label_size, MUTED)
+            self.text(surface, when, (x, date_y, col_w, date_h), date_size, INK, False)
             x += col_w + gap
         return surface
 
