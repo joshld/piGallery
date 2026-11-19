@@ -18,6 +18,7 @@ from PIL import Image
 from PIL.ExifTags import TAGS
 from bin_calendar import BinCalendar, BinConfig, now_brisbane
 from bin_display import BinCalendarRenderer
+from image_rotation import get_rotation
 
 try:
     import psutil
@@ -877,6 +878,10 @@ class Slideshow:
 
             try:
                 img = pygame.image.load(img_path)
+                rotation = get_rotation(CONFIG_PATH, self.current_img)
+                if rotation:
+                    # pygame.transform.rotate turns counter-clockwise.
+                    img = pygame.transform.rotate(img, -rotation)
                 # Get display correction factors for displays with hardware stretching
                 # This compensates for displays where resolution doesn't match physical aspect ratio
                 try:

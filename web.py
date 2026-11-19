@@ -235,12 +235,41 @@ def get_image_caption(img_path):
             img.close()
 
 
-def create_image_preview(img_path):
+def rotated_image_response(img_path, rotation):
+    """Return the picture turned for display, without rewriting the file."""
+    from image_rotation import apply_pil
+    payload = io.BytesIO()
+    try:
+        with ExitStack() as images:
+            img = images.enter_context(closing(Image.open(img_path)))
+            turned = apply_pil(img, rotation)
+            if turned is not img:
+                images.enter_context(closing(turned))
+            if (img.format or '').upper() == 'PNG':
+                turned.save(payload, format='PNG')
+                mimetype = 'image/png'
+            else:
+                if turned.mode not in ('RGB', 'L'):
+                    turned = images.enter_context(closing(turned.convert('RGB')))
+                turned.save(payload, format='JPEG', quality=90)
+                mimetype = 'image/jpeg'
+        payload.seek(0)
+        return payload, mimetype
+    except Exception:
+        payload.close()
+        raise
+
+
+def create_image_preview(img_path, rotation=0):
     """Return a JPEG buffer, releasing all decoded images before returning."""
+    from image_rotation import apply_pil
     img_bytes = io.BytesIO()
     try:
         with ExitStack() as images:
             img = images.enter_context(closing(Image.open(img_path)))
+            turned = apply_pil(img, rotation)
+            if turned is not img:
+                img = images.enter_context(closing(turned))
             img.thumbnail((320, 180), Image.Resampling.LANCZOS)
             if img.mode in ('RGBA', 'LA', 'P'):
                 if img.mode == 'P':
@@ -783,7 +812,10 @@ def register_routes():
             if pil_available:
                 try:
                     print("[Web] Attempting to create thumbnail with PIL")
-                    img_bytes = create_image_preview(img_path)
+                    from image_rotation import get_rotation
+                    rotation_key = requested_path or slideshow_instance.current_img
+                    rotation = get_rotation(CONFIG_PATH, rotation_key)
+                    img_bytes = create_image_preview(img_path, rotation) if rotation else create_image_preview(img_path)
                     print("[Web] Thumbnail generated successfully, sending response")
                     try:
                         # The response owns this buffer and closes it after use.
@@ -829,6 +861,11 @@ def register_routes():
             if not img_path:
                 return jsonify({'error': 'Image file not found'}), 404
             
+            from image_rotation import get_rotation
+            rotation = get_rotation(CONFIG_PATH, slideshow_instance.current_img)
+            if rotation:
+                payload, mimetype = rotated_image_response(img_path, rotation)
+                return send_file(payload, mimetype=mimetype)
             if slideshow_instance.current_img.startswith("uploaded/"):
                 upload_dir = slideshow_instance.config.get('upload_directory', '').strip()
                 if upload_dir:
@@ -845,6 +882,24 @@ def register_routes():
             print(f"[Web] Error serving full image: {e}")
             return jsonify({'error': str(e)}), 500
     
+    @app.route('/api/image/rotate', methods=['POST'])
+    def api_rotate_image():
+        """Turn the current image by 90 degrees and remember it for that file."""
+        if slideshow_instance is None:
+            return jsonify({'error': 'Slideshow not initialized'}), 503
+        if not slideshow_instance.current_img:
+            return jsonify({'error': 'No image loaded'}), 404
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({'error': 'Rotation must be clockwise or counter-clockwise'}), 400
+        try:
+            from image_rotation import turn
+            degrees = turn(CONFIG_PATH, slideshow_instance.current_img, data.get('direction'))
+        except ValueError as error:
+            return jsonify({'error': str(error)}), 400
+        slideshow_instance.force_redraw = True
+        return jsonify({'status': 'ok', 'rotation': degrees, 'current_image': slideshow_instance.current_img})
+
     @app.route('/api/image/caption', methods=['GET'])
     def api_get_caption():
         """Get caption from current image metadata"""

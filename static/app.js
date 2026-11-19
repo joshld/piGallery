@@ -543,6 +543,29 @@ async function saveSettingsSticky() {
     }
 }
 
+async function rotateImage(direction) {
+    try {
+        const response = await fetch('/api/image/rotate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ direction: direction })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not rotate the image');
+        const stamp = Date.now();
+        const previewImg = document.getElementById('image-preview');
+        if (previewImg) {
+            previewImg.src = `/api/image/preview?t=${stamp}`;
+            previewImg.style.display = 'block';
+        }
+        const fullImg = document.getElementById('full-image');
+        if (fullImg && fullImg.src) fullImg.src = `/api/image/full?t=${stamp}`;
+        showAlert(direction === 'cw' ? 'Rotated clockwise' : 'Rotated counter-clockwise', 'success');
+    } catch (error) {
+        showAlert('Error: ' + error.message, 'error');
+    }
+}
+
 async function nextImage() {
     try {
         const response = await fetch('/api/next', { method: 'POST' });
