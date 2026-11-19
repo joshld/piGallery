@@ -12,7 +12,8 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    # Keep Python 3.8/3.9 available as ubuntu-latest advances.
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
