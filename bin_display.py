@@ -20,9 +20,8 @@ class BinCalendarRenderer:
         if key not in self.fonts:
             if len(self.fonts) >= 32:
                 self.fonts.clear()
-            font = pygame.font.Font(None, key[0])
-            font.set_bold(bold)
-            self.fonts[key] = font
+            # Same system font as the clock, date and weather overlays.
+            self.fonts[key] = pygame.font.SysFont(None, key[0], bold=bold)
         return self.fonts[key]
 
     def tracked(self, screen, text, rect, size, colour):
@@ -139,7 +138,7 @@ class BinCalendarRenderer:
         for item in bins:
             label = item.get('label') or item['colour'].upper()
             when = str(item.get('when') or '')
-            col_w = max(icon_w, self.tracked_width(label, label_size), self.font(date_size, True).size(when)[0]) + 4
+            col_w = max(icon_w, self.tracked_width(label, label_size), self.font(date_size).size(when)[0]) + 4
             columns.append((item, label, when, col_w))
         width = sum(col_w for _, _, _, col_w in columns) + gap * (len(columns) - 1)
         surface = pygame.Surface((max(1, width), tile_h), pygame.SRCALPHA)
@@ -152,7 +151,7 @@ class BinCalendarRenderer:
                          label_size, MUTED)
             self.text(surface, when,
                       (tile.x, tile.y + tile.height * 0.74, tile.width, tile.height * 0.22),
-                      date_size, INK, True)
+                      date_size, INK, False)
             x += col_w + gap
         return surface
 
