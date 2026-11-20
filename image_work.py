@@ -15,6 +15,13 @@ from image_rotation import apply_pil
 DECODE_LOCK = threading.RLock()
 
 
+def image_to_surface(image):
+    """pygame 2.1.2, which the frame runs, has fromstring and not frombytes."""
+    data = image.tobytes()
+    load = getattr(pygame.image, 'frombytes', None) or pygame.image.fromstring
+    return load(data, image.size, image.mode)
+
+
 def file_key(path):
     stat = os.stat(path)
     return (os.path.abspath(path), stat.st_mtime_ns, stat.st_size, stat.st_ino)
@@ -96,7 +103,7 @@ class DisplayImageCache:
                 with closing(original.convert('RGBA' if 'A' in original.getbands() or 'transparency' in original.info else 'RGB')) as image:
                     turned = apply_pil(image, rotation)
                     try:
-                        surface = pygame.image.frombytes(turned.tobytes(), turned.size, turned.mode)
+                        surface = image_to_surface(turned)
                     finally:
                         if turned is not image:
                             turned.close()

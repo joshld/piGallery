@@ -69,6 +69,18 @@ def test_concurrent_preview_misses_decode_once_and_warm_hits_do_not_wait(tmp_pat
             assert pool.submit(fetch, 1).result(timeout=2) == b'jpeg'
 
 
+def test_display_cache_loads_on_pygame_without_frombytes(tmp_path, monkeypatch):
+    import pygame
+    monkeypatch.delattr(pygame.image, 'frombytes', raising=False)
+    path = tmp_path / 'photo.png'
+    with Image.new('RGB', (30, 20), (1, 2, 3)) as image:
+        image.save(path)
+    cache = DisplayImageCache()
+    scaler = Mock(side_effect=lambda surface, *args: surface)
+    surface = cache.get(path, 0, (30, 20), 1, 1, scaler)
+    assert surface.get_at((0, 0))[:3] == (1, 2, 3)
+
+
 def test_display_cache_keeps_one_reduced_surface_and_invalidates(tmp_path, monkeypatch):
     path = tmp_path / 'photo.png'
     with Image.new('RGBA', (1600, 900), (255, 0, 0, 128)) as image:
